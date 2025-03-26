@@ -34,15 +34,8 @@ make install
 create a `.env` file in your project root with your deepseek api endpoint and any customization:
 
 ```shell
-BASE_URL = "http://localhost:11434"
-API_KEY = "NONE"
-MODEL = "deepseek-r1"
-MAX_TURNS = 10
-WRAPPER_DICT_KEY = "response"
-DEFAULT_MAX_QUEUE_SIZE = 1000
-DEFAULT_MAX_GUARDRAIL_QUEUE_SIZE = 100
-LRU_CACHE_SIZE = 128
-LOG_LEVEL = "DEBUG"  
+BASE_URL = "http://localhost:11434"      
+LOGGING = "DEBUG"     
 ```
 
 <br>
@@ -110,8 +103,17 @@ def main() -> Optional[str]:
 you should get something like this:
 
 ```shell
-✅ Received Model Response...
-✅ RunResult:
+📝 Messages:
+
+  • {'content': 'You are a cool special agent robot', 'role': 'system'}
+  • {'role': 'user', 'content': 'Write a haiku about love in the cypherpunk world.'}
+
+🛠️  Tools:
+
+    []
+
+ 🧠
+🎯 RunResult:
   
   👾 Agent Info:
         Last Agent : Agent Mulder
@@ -127,35 +129,27 @@ you should get something like this:
         Tool Mode  : None
         Response   : None
 
-✅ REASONING:
+  ✨ Final Output:
 
-Okay, so I have to write a Haiku about love in the cyberpunk world.
-Hmm, let me think about how to approach this.
+       🤔 REASONING:
 
-First, what is a Haiku? It's a three-line poem with a 5-7-5 syllable structure.
-The first and third lines are five syllables, and the middle line is seven.
-So I need to make sure each line meets that syllable count.
+Okay, so I have to write a Haiku about love in the cyberpunk world. Hmm, let me think about how to approach this.
 
-Now, the subject is "love" in the cyberpunk setting. Cyberpunk usually involves futuristic cities, neon lights, abandoned places, high-tech but often dystopian environments.
-Love in such a setting could be portrayed through themes like overcominf connections through technology, or ideals versus reality.
+First, what is a Haiku? It's a three-line poem with a 5-7-5 syllable structure. The first and third lines are five syllables, and the middle line is seven. So I need to make sure each line meets that syllable count.
 
-I should think about metaphors or symbols related to love that fit into this genre.
-Maybe something like signals, connection points that bring people together who wouldn't normally interact ike how cyberpunk often features isolated individuals connected by these futuristic means.
+Now, the subject is "love" in the cyberpunk setting. Cyberpunk usually involves futuristic cities, neon lights, abandoned places, high-tech but often dystopian environments. Love in such a setting could be portrayed through themes like overcomingçè·ç¦», connections through technology, or ideals versus reality.
 
-In the first line, I want to set a scene or an emotion that starts with "loving."
-Maybe starting with "Love" and then moving into the environment.
-Something about technology influencing relationships, like holograms or virtual connections.
-So maybe love as something that exists not just in person but also in digital spaces.
+I should think about metaphors or symbols related to love that fit into this genre. Maybe something like signals, connection points that bring people together who wouldn't normally interactâlike how cyberpunk often features isolated individuals connected by these futuristic means.
 
-The second line should be longer with seven syllables.
-Here, I can introduce a setting where this love takes place amidst the cyberpunk elements
-Perhaps mentioning how the environment is both bright and broken, providing contrast between light and darkness, like neon signs against decay or preserved ruins next to glowing tech.
+In the first line, I want to set a scene or an emotion that starts with "loving." Maybe starting with "Love" and then moving into the environment. Something about technology influencing relationships, like holograms or virtual connections. So maybe love as something that exists not just in person but also in digital spaces.
 
-For the third line, focusing on emotions that come from such love perhaps the connection between two people who've been apart for a long time but find each other through this digital lens.
-Maybe something about memories connecting them now with the help of technology.
+The second line should be longerâseven syllables. Here, I can introduce a setting where this love takes place amidst the cyberpunk elements. Perhaps mentioning how the environment is both bright and broken, providing contrast between light and darkness, like neon signs against decay or preserved ruins next to glowing tech.
+
+For the third line, focusing on emotions that come from such loveâperhaps the connection between two people who've been apart for a long time but find each other through this digital lens. Maybe something about memories connecting them now with the help of technology.
 
 
-✅ RESULT:
+       🎯 RESULT:
+
 
 Encrypted hearts pulse,
 Digital whispers unite —

@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
-from ..util._constants import HEADERS, UNSET, IncludeLiteral
+from ..util import _debug
 from ..util._exceptions import UsageError
 from ..util._handoffs import Handoff
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
 from ..util._logger import logger
 from ..util._tool import ComputerTool, FileSearchTool, FunctionTool, Tool, WebSearchTool
 from ..util._types import (
+    NOT_GIVEN,
     AsyncDeepSeek,
     AsyncStream,
     ChatCompletionToolChoiceOptionParam,
@@ -22,11 +23,27 @@ from ..util._types import (
     ResponseOutput,
 )
 from ..util._usage import Usage
+from ..util._version import __version__
 from .interface import Model
 from .settings import ModelSettings
 
 if TYPE_CHECKING:
     from .settings import ModelSettings
+
+
+########################################################
+#               Constants                              #
+########################################################
+
+_USER_AGENT = f"Agents/Python {__version__}"
+_HEADERS = {"User-Agent": _USER_AGENT}
+# API response
+IncludeLiteral = Literal[
+    "file_search_call.results",
+    "message.input_image.image_url",
+    "computer_call_output.output.image_url",
+]
+
 
 ########################################################
 #           Main Class: Responses Model                #
@@ -44,7 +61,7 @@ class ModelResponsesModel(Model):
         self._client = model_client
 
     def _non_null_or_not_given(self, value: Any) -> Any:
-        return value or UNSET
+        return value or NOT_GIVEN
 
     async def get_response(
         self,
@@ -66,10 +83,13 @@ class ModelResponsesModel(Model):
                 stream=False,
             )
 
-            logger.debug(
-                "\n 🧠  LLM resp for responses:\n"
-                f"{json.dumps(list(response.output), indent=2)}\n"
-            )
+            if _debug.DONT_LOG_MODEL_DATA:
+                logger.debug("LLM responded")
+            else:
+                logger.debug(
+                    "\n 🧠  LLM resp for responses:\n"
+                    f"{json.dumps(list(response.output), indent=2)}\n"
+                )
 
             usage = (
                 Usage(
@@ -158,20 +178,23 @@ class ModelResponsesModel(Model):
         list_input = ItemHelpers.input_to_new_input_list(input)
 
         parallel_tool_calls = (
-            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else UNSET
+            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else NOT_GIVEN
         )
 
         tool_choice = Converter.convert_tool_choice(model_settings.tool_choice)
         converted_tools = Converter.convert_tools(tools, handoffs)
         response_format = Converter.get_response_format(output_schema)
 
-        logger.debug(
-            f"Calling LLM {self.model} with input:\n"
-            f"{json.dumps(list_input, indent=2)}\n"
-            f"Tools:\n{json.dumps(converted_tools.tools, indent=2)}\n"
-            f"Stream: {stream}\n"
-            f"Tool choice: {tool_choice}\n"
-            f"Response format: {response_format}\n"
+        if _debug.DONT_LOG_MODEL_DATA:
+            logger.debug("Calling LLM")
+        else:
+            logger.debug(
+                f"Calling LLM {self.model} with input:\n"
+                f"{json.dumps(list_input, indent=2)}\n"
+                f"Tools:\n{json.dumps(converted_tools.tools, indent=2)}\n"
+                f"Stream: {stream}\n"
+                f"Tool choice: {tool_choice}\n"
+                f"Response format: {response_format}\n"
             )
 
         return await self._client.responses.create(
@@ -187,7 +210,7 @@ class ModelResponsesModel(Model):
             tool_choice=tool_choice,
             parallel_tool_calls=parallel_tool_calls,
             stream=stream,
-            extra_headers=HEADERS,
+            extra_headers=_HEADERS,
             text=response_format,
         )
 
@@ -217,7 +240,7 @@ class Converter:
         cls, tool_choice: Literal["auto", "required", "none"] | str | None
     ) -> ChatCompletionToolChoiceOptionParam:
         if tool_choice is None:
-            return UNSET
+            return NOT_GIVEN
         elif tool_choice == "required":
             return "required"
         elif tool_choice == "auto":
@@ -247,7 +270,7 @@ class Converter:
         cls, output_schema: AgentOutputSchema | None
     ) -> ResponseFormat | None:
         if output_schema is None or output_schema.is_plain_text():
-            return UNSET
+            return NOT_GIVEN
         else:
             return {
                 "format": {

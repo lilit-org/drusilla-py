@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import abc
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING
 
 from ..agents.output import AgentOutputSchema
+from ..util._handoffs import Handoff
 from ..util._items import ModelResponse, TResponseInputItem, TResponseStreamEvent
 from ..util._tool import Tool
 from .settings import ModelSettings
@@ -16,14 +18,10 @@ if TYPE_CHECKING:
 #               Main Class for models                  #
 ########################################################
 
-@runtime_checkable
-class Model(Protocol):
-    """Base interface for LLM calls.
+class Model(abc.ABC):
+    """Base interface for LLM calls."""
 
-    This interface defines the contract for model implementations that can generate
-    responses either synchronously or asynchronously via streaming.
-    """
-
+    @abc.abstractmethod
     async def get_response(
         self,
         system_instructions: str | None,
@@ -33,22 +31,23 @@ class Model(Protocol):
         output_schema: AgentOutputSchema | None,
         handoffs: list[Handoff],
     ) -> ModelResponse:
-        """Get a complete model response.
+        """Get model response.
 
         Args:
-            system_instructions: System prompt/instructions for the model. Can be None.
-            input: Either a raw string input or a list of structured input items.
-            model_settings: Configuration parameters for the model including temperature, top_p, etc.
-            tools: List of available tools the model can use for function calling.
-            output_schema: Optional schema defining the expected output format and structure.
-            handoffs: List of available handoffs for model interactions with other agents.
+            system_instructions: System prompt
+            input: Model input items
+            model_settings: Model config
+            tools: Available tools
+            output_schema: Output format
+            handoffs: Available handoffs
 
         Returns:
-            A ModelResponse containing the model's output and usage statistics.
+            Model response
         """
         pass
 
-    async def stream_response(
+    @abc.abstractmethod
+    def stream_response(
         self,
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
@@ -57,19 +56,18 @@ class Model(Protocol):
         output_schema: AgentOutputSchema | None,
         handoffs: list[Handoff],
     ) -> AsyncIterator[TResponseStreamEvent]:
-        """Stream model responses as they are generated.
+        """Stream model response.
 
         Args:
-            system_instructions: System prompt/instructions for the model. Can be None.
-            input: Either a raw string input or a list of structured input items.
-            model_settings: Configuration parameters for the model including temperature, top_p, etc.
-            tools: List of available tools the model can use for function calling.
-            output_schema: Optional schema defining the expected output format and structure.
-            handoffs: List of available handoffs for model interactions with other agents.
+            system_instructions: System prompt
+            input: Model input items
+            model_settings: Model config
+            tools: Available tools
+            output_schema: Output format
+            handoffs: Available handoffs
 
         Returns:
-            An async iterator yielding response events as they are generated. Each event
-            represents a partial response chunk or completion status.
+            Stream of response events
         """
         pass
 
@@ -78,14 +76,17 @@ class Model(Protocol):
 #               Main Class for model providers         #
 ########################################################
 
-@runtime_checkable
-class ModelProvider(Protocol):
-    """Interface for model lookup and instantiation.
+class ModelProvider(abc.ABC):
+    """Interface for model lookup."""
 
-    This interface defines the contract for providers that can create and return
-    Model instances based on a model name or identifier.
-    """
-
+    @abc.abstractmethod
     def get_model(self, model_name: str | None) -> Model:
-        """Get a model instance by name."""
+        """Get model by name.
+
+        Args:
+            model_name: Model identifier
+
+        Returns:
+            Model instance
+        """
         pass

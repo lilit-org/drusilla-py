@@ -7,31 +7,34 @@ from typing import Literal
 #            Data class for settings                   #
 ########################################################
 
-@dataclass(frozen=True)
+@dataclass
 class ModelSettings:
-    """Optional LLM configuration parameters (temperature, top_p, penalties, etc.)."""
+    """Optional LLM configuration parameters (temperature, top_p, penalties, etc.).
+    Check provider API docs for supported parameters."""
 
     temperature: float | None = None
-    top_p: float | None = None
-    frequency_penalty: float | None = None
-    presence_penalty: float | None = None
-    tool_choice: Literal["auto", "required", "none"] | str | None = None
-    parallel_tool_calls: bool | None = False
-    truncation: Literal["auto", "disabled"] | None = None
-    max_tokens: int | None = None
+    """Sampling temperature for model outputs."""
 
-    def __post_init__(self) -> None:
-        """Validate numeric parameters after initialization."""
-        if self.temperature is not None and not 0 <= self.temperature <= 2:
-            raise ValueError("temperature must be between 0 and 2")
-        if self.top_p is not None and not 0 <= self.top_p <= 1:
-            raise ValueError("top_p must be between 0 and 1")
-        if self.frequency_penalty is not None and not -2 <= self.frequency_penalty <= 2:
-            raise ValueError("frequency_penalty must be between -2 and 2")
-        if self.presence_penalty is not None and not -2 <= self.presence_penalty <= 2:
-            raise ValueError("presence_penalty must be between -2 and 2")
-        if self.max_tokens is not None and self.max_tokens < 1:
-            raise ValueError("max_tokens must be positive")
+    top_p: float | None = None
+    """Nucleus sampling parameter."""
+
+    frequency_penalty: float | None = None
+    """Penalty for token frequency."""
+
+    presence_penalty: float | None = None
+    """Penalty for token presence."""
+
+    tool_choice: Literal["auto", "required", "none"] | str | None = None
+    """Tool selection strategy."""
+
+    parallel_tool_calls: bool | None = False
+    """Enable parallel tool execution."""
+
+    truncation: Literal["auto", "disabled"] | None = None
+    """Output truncation strategy."""
+
+    max_tokens: int | None = None
+    """Maximum output token limit."""
 
     def resolve(self, override: ModelSettings | None) -> ModelSettings:
         """Merge override settings with current settings, preferring non-None values from override."""

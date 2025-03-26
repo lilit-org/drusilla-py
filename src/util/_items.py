@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import abc
 import copy
-from dataclasses import dataclass, field
-from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, Union, cast
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, Union
 
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
@@ -37,19 +36,12 @@ TResponseOutputItem = ResponseOutputItem
 TResponseStreamEvent = ResponseStreamEvent
 T = TypeVar("T", bound=Union[TResponseOutputItem, TResponseInputItem])
 
-MESSAGE_TYPE = "message"
-OUTPUT_TEXT_TYPE = "output_text"
-REFUSAL_TYPE = "refusal"
-THINK_START = "<think>"
-THINK_END = "</think>"
-ECHOES_START = "Echoes of encrypted hearts"
-
 
 ########################################################
 #            Data Classes for Outputs                  #
 ########################################################
 
-@dataclass(frozen=True)
+@dataclass
 class RunItemBase(Generic[T], abc.ABC):
     """Base class for agent run items.
 
@@ -59,19 +51,6 @@ class RunItemBase(Generic[T], abc.ABC):
     """
     agent: Agent[Any]
     raw_item: T
-    _cached_input_item: TResponseInputItem | None = field(default=None, init=False)
-
-    @cached_property
-    def input_item(self) -> TResponseInputItem:
-        """Convert and cache item to model input format."""
-        if self._cached_input_item is None:
-            if isinstance(self.raw_item, dict):
-                self._cached_input_item = self.raw_item
-            elif isinstance(self.raw_item, BaseModel):
-                self._cached_input_item = self.raw_item.model_dump(exclude_unset=True)
-            else:
-                self._cached_input_item = self.raw_item
-        return self._cached_input_item
 
     def to_input_item(self) -> TResponseInputItem:
         """Convert item to model input format.
@@ -79,33 +58,28 @@ class RunItemBase(Generic[T], abc.ABC):
         Returns:
             The item converted to input format
         """
-        return self.input_item
+        if isinstance(self.raw_item, dict):
+            return self.raw_item
+        elif isinstance(self.raw_item, BaseModel):
+            return self.raw_item.model_dump(exclude_unset=True)
+        return self.raw_item
 
 
-@dataclass(frozen=True)
+@dataclass
 class MessageOutputItem(RunItemBase[ResponseOutputItem]):
     """LLM message output."""
     raw_item: ResponseOutputItem
     type: Literal["message_output_item"] = "message_output_item"
 
-    @cached_property
-    def text_content(self) -> str:
-        """Cache the text content of the message."""
-        return "".join(
-            item["text"]
-            for item in self.raw_item["content"]
-            if item["type"] == OUTPUT_TEXT_TYPE
-        )
 
-
-@dataclass(frozen=True)
+@dataclass
 class HandoffCallItem(RunItemBase[ResponseFunctionToolCall]):
     """Agent handoff tool call."""
     raw_item: ResponseFunctionToolCall
     type: Literal["handoff_call_item"] = "handoff_call_item"
 
 
-@dataclass(frozen=True)
+@dataclass
 class HandoffOutputItem(RunItemBase[TResponseInputItem]):
     """Agent handoff output."""
     raw_item: TResponseInputItem
@@ -122,14 +96,14 @@ ToolCallItemTypes: TypeAlias = Union[
 ]
 
 
-@dataclass(frozen=True)
+@dataclass
 class ToolCallItem(RunItemBase[ToolCallItemTypes]):
     """Tool call for function or computer action."""
     raw_item: ToolCallItemTypes
     type: Literal["tool_call_item"] = "tool_call_item"
 
 
-@dataclass(frozen=True)
+@dataclass
 class ToolCallOutputItem(RunItemBase[Union[FunctionCallOutput, ComputerCallOutput]]):
     """Tool call execution output."""
     raw_item: FunctionCallOutput | ComputerCallOutput
@@ -137,7 +111,7 @@ class ToolCallOutputItem(RunItemBase[Union[FunctionCallOutput, ComputerCallOutpu
     type: Literal["tool_call_output_item"] = "tool_call_output_item"
 
 
-@dataclass(frozen=True)
+@dataclass
 class ReasoningItem(RunItemBase[ResponseReasoningItem]):
     """LLM reasoning step."""
     raw_item: ResponseReasoningItem
@@ -154,7 +128,7 @@ RunItem: TypeAlias = Union[
 ]
 
 
-@dataclass(frozen=True)
+@dataclass
 class ModelResponse:
     """Model response containing outputs and usage information.
 
@@ -166,21 +140,14 @@ class ModelResponse:
     output: list[TResponseOutputItem]
     usage: Usage
     referenceable_id: str | None
-    _cached_input_items: list[TResponseInputItem] | None = field(default=None, init=False)
-
-    @cached_property
-    def input_items(self) -> list[TResponseInputItem]:
-        """Convert and cache outputs to input format."""
-        if self._cached_input_items is None:
-            self._cached_input_items = [
-                cast(TResponseInputItem, it.model_dump(exclude_unset=True))
-                for it in self.output
-            ]
-        return self._cached_input_items
 
     def to_input_items(self) -> list[TResponseInputItem]:
-        """Convert outputs to input format efficiently."""
-        return self.input_items
+        """Convert outputs to input format.
+
+        Returns:
+            List of items converted to input format
+        """
+        return [it.model_dump(exclude_unset=True) for it in self.output]  # type: ignore
 
 
 ########################################################
@@ -190,76 +157,124 @@ class ModelResponse:
 class ItemHelpers:
     """Helper methods for processing and formatting various item types."""
 
-    SPECIAL_LINES: ClassVar[tuple[str, str]] = (THINK_START, ECHOES_START)
+    @classmethod
+    def extract_last_content(cls, message: TResponseOutputItem) -> str:
+        """Extract the last content from a message.
 
-    @staticmethod
-    def extract_last_content(message: TResponseOutputItem) -> str:
-        """Extract the last content from a message."""
-        if not hasattr(message, "type") or message.type != MESSAGE_TYPE:
+        Args:
+            message: The message to extract content from
+
+        Returns:
+            The last text or refusal content
+
+        Raises:
+            ModelError: If the content type is unexpected
+        """
+        if not hasattr(message, "type") or message.type != "message":
             return ""
 
         last_content = message.content[-1]
-        if last_content.type == OUTPUT_TEXT_TYPE:
+        if last_content.type == "output_text":
             return last_content.text
-        if last_content.type == REFUSAL_TYPE:
+        elif last_content.type == "refusal":
             return last_content.refusal
-        raise ModelError(f"Unexpected content type: {last_content.type}")
+        else:
+            raise ModelError(f"Unexpected content type: {last_content.type}")
 
-    @staticmethod
-    def extract_last_text(message: TResponseOutputItem) -> str | None:
-        """Extract the last text content from a message, ignoring refusals."""
-        if hasattr(message, "type") and message.type == MESSAGE_TYPE:
+    @classmethod
+    def extract_last_text(cls, message: TResponseOutputItem) -> str | None:
+        """Extract the last text content from a message, ignoring refusals.
+
+        Args:
+            message: The message to extract text from
+
+        Returns:
+            The last text content if available, None otherwise
+        """
+        if hasattr(message, "type") and message.type == "message":
             last_content = message.content[-1]
-            if last_content.type == OUTPUT_TEXT_TYPE:
+            if last_content.type == "output_text":
                 return last_content.text
         return None
 
-    @staticmethod
+    @classmethod
     def input_to_new_input_list(
-        input: str | list[TResponseInputItem]
+        cls, input: str | list[TResponseInputItem]
     ) -> list[TResponseInputItem]:
-        """Convert string or input items to input list."""
+        """Convert string or input items to input list.
+
+        Args:
+            input: String or list of input items to convert
+
+        Returns:
+            List of input items
+        """
         if isinstance(input, str):
             return [{"content": input, "role": "user"}]
         return copy.deepcopy(input)
 
-    @staticmethod
-    def text_message_outputs(items: list[RunItem]) -> str:
-        """Concatenate text from all message outputs efficiently."""
+    @classmethod
+    def text_message_outputs(cls, items: list[RunItem]) -> str:
+        """Concatenate text from all message outputs.
+
+        Args:
+            items: List of run items to process
+
+        Returns:
+            Concatenated text from message outputs
+        """
         return "".join(
-            item.text_content if isinstance(item, MessageOutputItem) else ""
+            cls.text_message_output(item)
             for item in items
-        ).strip()
+            if isinstance(item, MessageOutputItem)
+        )
 
-    @staticmethod
-    def text_message_output(message: MessageOutputItem) -> str:
-        """Extract text from a message output efficiently."""
-        text = message.text_content
-        text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
-        return text.strip()
+    @classmethod
+    def text_message_output(cls, message: MessageOutputItem) -> str:
+        """Extract text from a message output.
 
-    @staticmethod
+        Args:
+            message: The message output to extract text from
+
+        Returns:
+            Extracted text content
+        """
+        return "".join(
+            item["text"]
+            for item in message.raw_item["content"]
+            if item["type"] == "output_text"
+        )
+
+    @classmethod
     def tool_call_output_item(
-        tool_call: ResponseFunctionToolCall, output: str
+        cls, tool_call: ResponseFunctionToolCall, output: str
     ) -> FunctionCallOutput:
-        """Create a tool call output from a call and result."""
+        """Create a tool call output from a call and result.
+
+        Args:
+            tool_call: The tool call to create output for
+            output: The output string
+
+        Returns:
+            Function call output dictionary
+        """
         return {
             "call_id": tool_call.call_id,
             "output": output,
             "type": "function_call_output",
         }
 
-    @staticmethod
-    def format_content(content: str) -> str:
-        """Format content with proper indentation and borders efficiently."""
-        if not content:
-            return ""
-        # Remove the pattern anywhere in the content
-        content = content.replace("', 'type': 'output_text', 'annotations': []}", "")
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
-        if not lines:
-            return ""
+    @classmethod
+    def format_content(cls, content: str) -> str:
+        """Format content with proper indentation and borders.
 
+        Args:
+            content: The content string to format
+
+        Returns:
+            Formatted content with proper indentation and borders
+        """
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
         formatted_lines = []
         current_section = []
 
@@ -268,17 +283,21 @@ class ItemHelpers:
                 return []
             width = max(len(l) for l in section)
             border = "+" + "-" * (width + 2) + "+"
-            return [border, *[f"| {l:<{width}} |" for l in section], border]
+            return [
+                border,
+                *[f"| {l:<{width}} |" for l in section],
+                border
+            ]
 
         for line in lines:
-            if line.startswith(ItemHelpers.SPECIAL_LINES):
+            if line.startswith('<think>') or line.startswith('Echoes of encrypted hearts'):
                 if current_section:
                     formatted_lines.extend(format_section(current_section))
                     current_section = []
-                if line.startswith(ECHOES_START):
+                if line.startswith('Echoes of encrypted hearts'):
                     formatted_lines.append('')
                 formatted_lines.append(line)
-            elif line.endswith(THINK_END):
+            elif line.endswith('</think>'):
                 formatted_lines.append(line)
             else:
                 current_section.append(line)

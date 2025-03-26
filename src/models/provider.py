@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import httpx
 
-from src.util._constants import DEFAULT_BASE_URL, DEFAULT_MODEL
 from src.util._env import get_env_var
 
 from ..util._http import DefaultAsyncHttpxClient
@@ -17,8 +16,8 @@ from .responses import ModelResponsesModel
 #               Constants                                #
 ########################################################
 
-MODEL = get_env_var('MODEL', DEFAULT_MODEL)
-BASE_URL = get_env_var('BASE_URL', DEFAULT_BASE_URL)
+MODEL = get_env_var('MODEL', "deepseek-r1")
+BASE_URL = get_env_var('BASE_URL', "http://localhost:11434")
 _http_client: httpx.AsyncClient | None = None
 
 

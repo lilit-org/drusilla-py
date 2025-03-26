@@ -11,12 +11,6 @@ The Agent class allows you to create AI agents with:
 
 Agents can be used standalone or converted into tools for other agents, enabling
 composition of complex AI behaviors from simpler components.
-
-Tool handling behavior:
-- run_llm_again: Run tools, feed results to LLM
-- stop_on_first_tool: Use first tool result
-- tool names: Stop on listed tools
-- function: Custom processing
 """
 
 from __future__ import annotations
@@ -115,7 +109,7 @@ class Agent(Generic[TContext]):
 
     handoff_description: str | None = None
     handoffs: list[Agent[Any] | Handoff[TContext]] = field(default_factory=list)
-    model: str | Model = field(default="")
+    model: str | Model | None = None
     model_settings: ModelSettings = field(default_factory=ModelSettings)
     tools: list[Tool] = field(default_factory=list)
     input_guardrails: list[InputGuardrail[TContext]] = field(default_factory=list)
@@ -126,21 +120,16 @@ class Agent(Generic[TContext]):
         Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
     ) = "run_llm_again"
 
+    """
+    Tool handling:
+    - run_llm_again: Run tools, feed results to LLM
+    - stop_on_first_tool: Use first tool result
+    - tool names: Stop on listed tools
+    - function: Custom processing
+    """
+
     def clone(self, **kwargs: Any) -> Agent[TContext]:
-        """Create a copy of the agent with optional field updates."""
-        defaults = {
-            "handoffs": [],
-            "model": "",
-            "model_settings": ModelSettings(),
-            "tools": [],
-            "input_guardrails": [],
-            "output_guardrails": [],
-            "output_type": None,
-            "hooks": None,
-            "tool_use_behavior": "run_llm_again"
-        }
-        defaults.update(kwargs)
-        return dataclasses.replace(self, **defaults)
+        return dataclasses.replace(self, **kwargs)
 
     def as_tool(
         self,
@@ -148,17 +137,16 @@ class Agent(Generic[TContext]):
         tool_description: str | None,
         custom_output_extractor: Callable[[RunResult], Awaitable[str]] | None = None,
     ) -> Tool:
-        """Converts agent to tool for other agents."""
+        """Converts agent to tool for other agents.
+        Unlike handoffs:
+        - Gets generated input, not history
+        - Called as tool, not conversation"""
         return _create_agent_tool(self, tool_name, tool_description, custom_output_extractor)
 
     async def get_system_prompt(self, run_context: RunContextWrapper[TContext]) -> str | None:
-        """Get the system prompt for the agent."""
-        if self.instructions is None:
-            return None
         if isinstance(self.instructions, str):
             return self.instructions
-        if callable(self.instructions):
+        elif callable(self.instructions):
             if inspect.iscoroutinefunction(self.instructions):
                 return await cast(Awaitable[str], self.instructions(run_context, self))
             return cast(str, self.instructions(run_context, self))
-        raise TypeError(f"Invalid instructions type: {type(self.instructions)}")

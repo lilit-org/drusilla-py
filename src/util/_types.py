@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable
 from dataclasses import dataclass
-from typing import Any, Literal, NotRequired, TypeAlias, TypedDict, Union
+from typing import Any, Literal, TypeAlias, TypedDict, Union
 
 from typing_extensions import TypeVar
 
@@ -17,7 +17,7 @@ MaybeAwaitable = Union[Awaitable[T], T]
 #            Data class for types                      #
 ########################################################
 
-@dataclass(frozen=True)
+@dataclass
 class Usage:
     """Token usage statistics for API calls."""
     requests: int
@@ -25,12 +25,12 @@ class Usage:
     output_tokens: int
     total_tokens: int
 
-@dataclass(frozen=True)
+@dataclass
 class ResponseCompletedEvent:
     """Event indicating completion of a response."""
     response: Response
 
-@dataclass(frozen=True)
+@dataclass
 class ResponseContentPartAddedEvent:
     """Event indicating a new content part has been added to a response."""
     content_index: int
@@ -39,7 +39,7 @@ class ResponseContentPartAddedEvent:
     part: ResponseOutput
     type: Literal["response.content_part.added"] = "response.content_part.added"
 
-@dataclass(frozen=True)
+@dataclass
 class ResponseContentPartDoneEvent:
     """Event indicating a content part has been completed."""
     content_index: int
@@ -48,18 +48,18 @@ class ResponseContentPartDoneEvent:
     part: ResponseOutput
     type: Literal["response.content_part.done"] = "response.content_part.done"
 
-@dataclass(frozen=True)
+@dataclass
 class Response:
     """API response containing outputs and usage stats."""
     id: str
-    output: Sequence[ResponseOutput]
+    output: list[ResponseOutput]
     usage: Usage | None = None
     created_at: float | None = None
     model: str | None = None
     object: str | None = None
     tool_choice: str | None = None
     temperature: float | None = None
-    tools: Sequence[Mapping[str, Any]] | None = None
+    tools: list[Any] | None = None
     parallel_tool_calls: bool | None = None
     top_p: float | None = None
 
@@ -71,31 +71,31 @@ class Response:
 class ComputerAction(TypedDict):
     """Computer interaction actions like clicks, typing, etc."""
     type: Literal["click", "double_click", "drag", "keypress", "move", "screenshot", "scroll", "type", "wait"]
-    x: NotRequired[int]
-    y: NotRequired[int]
-    button: NotRequired[str]
-    keys: NotRequired[Sequence[str]]
-    path: NotRequired[Sequence[Mapping[str, int]]]
-    scroll_x: NotRequired[int]
-    scroll_y: NotRequired[int]
-    text: NotRequired[str]
+    x: int | None
+    y: int | None
+    button: str | None
+    keys: list[str] | None
+    path: list[dict[str, int]] | None
+    scroll_x: int | None
+    scroll_y: int | None
+    text: str | None
 
 
 class ResponseOutput(TypedDict):
     """Output from an API response with optional content and metadata."""
     type: str
-    content: NotRequired[str]
-    name: NotRequired[str]
-    arguments: NotRequired[Mapping[str, Any]]
-    call_id: NotRequired[str]
-    action: NotRequired[ComputerAction]
+    content: str | None
+    name: str | None
+    arguments: dict[str, Any] | None
+    call_id: str | None
+    action: ComputerAction | None
 
 
 class ResponseOutputText(TypedDict):
     """Text content in a response output."""
     type: Literal["output_text"]
     text: str
-    annotations: Sequence[Mapping[str, Any]]
+    annotations: list[Any]
 
 
 class ResponseOutputRefusal(TypedDict):
@@ -116,12 +116,12 @@ class ResponseFunctionToolCall(TypedDict):
 class ResponseStreamEvent(TypedDict):
     """Event in a streaming response."""
     type: str
-    content_index: NotRequired[int]
-    item_id: NotRequired[str]
-    output_index: NotRequired[int]
-    delta: NotRequired[str]
-    part: NotRequired[ResponseOutput]
-    response: NotRequired[Response]
+    content_index: int | None
+    item_id: str | None
+    output_index: int | None
+    delta: str | None
+    part: ResponseOutput | None
+    response: Response | None
 
 
 class ResponseTextDeltaEvent(TypedDict):
@@ -147,12 +147,12 @@ class ComputerCallOutput(TypedDict):
     output: str
 
 
-ResponseOutputItem: TypeAlias = ResponseOutput
-ResponseOutputMessage: TypeAlias = ResponseOutput
-ResponseFileSearchToolCall: TypeAlias = ResponseOutput
-ResponseFunctionWebSearch: TypeAlias = ResponseOutput
-ResponseComputerToolCall: TypeAlias = ResponseOutput
-ResponseReasoningItem: TypeAlias = ResponseOutput
+ResponseOutputItem = ResponseOutput
+ResponseOutputMessage = ResponseOutput
+ResponseFileSearchToolCall = ResponseOutput
+ResponseFunctionWebSearch = ResponseOutput
+ResponseComputerToolCall = ResponseOutput
+ResponseReasoningItem = ResponseOutput
 
 
 ########################################################
@@ -162,12 +162,12 @@ ResponseReasoningItem: TypeAlias = ResponseOutput
 class ResponseInputItemParam(TypedDict):
     """Input item for API requests."""
     type: str
-    content: NotRequired[str]
-    role: NotRequired[Literal["user", "assistant", "system", "developer"]]
-    name: NotRequired[str]
-    arguments: NotRequired[Mapping[str, Any]]
-    call_id: NotRequired[str]
-    action: NotRequired[ComputerAction]
+    content: str | None
+    role: Literal["user", "assistant", "system", "developer"] | None
+    name: str | None
+    arguments: dict[str, Any] | None
+    call_id: str | None
+    action: ComputerAction | None
 
 
 ########################################################
@@ -178,7 +178,7 @@ class ChatCompletionFunctionParam(TypedDict):
     """Parameters for a function call in chat completion."""
     name: str
     description: str
-    parameters: Mapping[str, Any]
+    parameters: dict[str, Any]
 
 class ChatCompletionToolParam(TypedDict):
     """Tool parameters for chat completion."""
@@ -194,24 +194,24 @@ class ChatCompletionMessageToolCallParam(TypedDict):
 class ChatCompletionContentPartParam(TypedDict):
     """Content part parameters for chat completion messages."""
     type: Literal["text", "image_url"]
-    text: NotRequired[str]
-    image_url: NotRequired[Mapping[str, str]]
+    text: str | None
+    image_url: dict[str, str] | None
 
 class ChatCompletionMessage(TypedDict):
     """Message in a chat completion."""
     role: Literal["user", "assistant", "system", "developer", "tool"]
-    content: NotRequired[str]
-    tool_calls: NotRequired[Sequence[ChatCompletionMessageToolCallParam]]
-    refusal: NotRequired[str]
-    audio: NotRequired[Any]
+    content: str | None
+    tool_calls: list[ChatCompletionMessageToolCallParam] | None
+    refusal: str | None
+    audio: Any | None
 
 class ChatCompletionMessageParam(TypedDict):
     """Parameters for a chat completion message."""
     role: Literal["user", "assistant", "system", "developer", "tool"]
-    content: str | Sequence[ChatCompletionContentPartParam]
-    tool_call_id: NotRequired[str]
-    tool_calls: NotRequired[Sequence[ChatCompletionMessageToolCallParam]]
-    refusal: NotRequired[str]
+    content: str | list[ChatCompletionContentPartParam]
+    tool_call_id: str | None
+    tool_calls: list[ChatCompletionMessageToolCallParam] | None
+    refusal: str | None
 
 class ChatCompletionUsage(TypedDict):
     """Token usage statistics for chat completion."""
@@ -221,27 +221,27 @@ class ChatCompletionUsage(TypedDict):
 
 class ChatCompletionDeltaFunction(TypedDict):
     """Delta update for a function call in streaming responses."""
-    name: NotRequired[str]
-    arguments: NotRequired[str]
+    name: str | None
+    arguments: str | None
 
 class ChatCompletionDeltaToolCall(TypedDict):
     """Delta update for a tool call in streaming responses."""
     index: int
-    id: NotRequired[str]
-    type: NotRequired[Literal["function"]]
-    function: NotRequired[ChatCompletionDeltaFunction]
+    id: str | None
+    type: Literal["function"] | None
+    function: ChatCompletionDeltaFunction | None
 
 class ChatCompletionDelta(TypedDict):
     """Delta update in streaming responses."""
-    content: NotRequired[str]
-    tool_calls: NotRequired[Sequence[ChatCompletionDeltaToolCall]]
+    content: str | None
+    tool_calls: list[ChatCompletionDeltaToolCall] | None
 
 class ChatCompletionChoice(TypedDict):
     """Choice in a chat completion response."""
     index: int
     message: ChatCompletionMessage
-    finish_reason: NotRequired[str]
-    delta: NotRequired[ChatCompletionDelta]
+    finish_reason: str | None
+    delta: ChatCompletionDelta | None
 
 class ChatCompletion(TypedDict):
     """Complete chat completion response."""
@@ -249,8 +249,8 @@ class ChatCompletion(TypedDict):
     object: Literal["chat.completion"]
     created: int
     model: str
-    choices: Sequence[ChatCompletionChoice]
-    usage: NotRequired[ChatCompletionUsage]
+    choices: list[ChatCompletionChoice]
+    usage: ChatCompletionUsage | None
 
 class ChatCompletionChunk(TypedDict):
     """Chunk in a streaming chat completion response."""
@@ -258,11 +258,11 @@ class ChatCompletionChunk(TypedDict):
     object: Literal["chat.completion.chunk"]
     created: int
     model: str
-    choices: Sequence[ChatCompletionChoice]
-    usage: NotRequired[ChatCompletionUsage]
+    choices: list[ChatCompletionChoice]
+    usage: ChatCompletionUsage | None
 
 
-ChatCompletionToolChoiceOptionParam: TypeAlias = Union[Literal["auto", "required", "none"], Mapping[str, Any]]
+ChatCompletionToolChoiceOptionParam: TypeAlias = Union[Literal["auto", "required", "none"], dict[str, Any]]
 
 
 ########################################################
@@ -272,7 +272,7 @@ ChatCompletionToolChoiceOptionParam: TypeAlias = Union[Literal["auto", "required
 class ResponseFormat(TypedDict):
     """Format specification for API responses."""
     type: Literal["json_schema"]
-    json_schema: Mapping[str, Any]
+    json_schema: dict[str, Any]
 
 
 ########################################################
@@ -292,8 +292,8 @@ class AsyncDeepSeek:
             async def create(
                 cls,
                 model: str,
-                messages: Sequence[ChatCompletionMessageParam],
-                tools: Sequence[ChatCompletionToolParam] | None = None,
+                messages: list[ChatCompletionMessageParam],
+                tools: list[ChatCompletionToolParam] | None = None,
                 temperature: float | None = None,
                 top_p: float | None = None,
                 frequency_penalty: float | None = None,
@@ -303,8 +303,11 @@ class AsyncDeepSeek:
                 response_format: ResponseFormat | None = None,
                 parallel_tool_calls: bool | None = None,
                 stream: bool = False,
-                stream_options: Mapping[str, bool] | None = None,
-                extra_headers: Mapping[str, str] | None = None,
+                stream_options: dict[str, bool] | None = None,
+                extra_headers: dict[str, str] | None = None,
             ) -> ChatCompletion | AsyncStream:
                 """Create a chat completion with the given parameters."""
                 raise NotImplementedError
+
+ # Sentinel value for optional parameters
+NOT_GIVEN = object()

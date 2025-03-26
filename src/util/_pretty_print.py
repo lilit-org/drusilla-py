@@ -1,6 +1,7 @@
-import re
-from re import Pattern
 from typing import Any, Protocol
+from pydantic import BaseModel
+import re
+
 
 ########################################################
 #               Protocol Class                         #
@@ -18,13 +19,6 @@ class PrettyPrintable(Protocol):
     input_guardrail_results: list
     output_guardrail_results: list
 
-########################################################
-#               Compiled Regex Patterns                #
-########################################################
-
-THINK_PATTERN: Pattern[str] = re.compile(r'<think>(.*?)</think>(.*)', re.DOTALL)
-RESULT_PATTERN: Pattern[str] = re.compile(r"^([^']*?)(?:',\s*'type':.*)?$")
-TEXT_PATTERN: Pattern[str] = re.compile(r"'text':\s*'([^']*)'")
 
 ########################################################
 #               Private Functions                      #
@@ -59,6 +53,42 @@ def _format_stream_info(stream: bool, tool_choice: Any, response_format: Any) ->
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
+def _format_output(output: Any) -> str:
+    """Format different types of output into a string representation."""
+
+    if output is None:
+        return "None"
+    elif output is object():
+        return "Not Set"
+    elif isinstance(output, str):
+        lines = output.splitlines()
+        if len(lines) > 1:
+            width = max(len(line) for line in lines)
+            border = "+" + "-" * (width + 2) + "+"
+            formatted_lines = [border]
+            for line in lines:
+                formatted_lines.append(f"| {line:<{width}} |")
+            formatted_lines.append(border)
+            return "\n".join(formatted_lines)
+        return output
+    elif isinstance(output, BaseModel):
+        json_str = output.model_dump_json(indent=2)
+        return f"📋 Model Output:\n{_indent(json_str, 1)}"
+    elif isinstance(output, (list, tuple)):
+        if not output:
+            return "[]"
+        items = [f"• {item}" for item in output]
+        return "\n" + "\n".join(_indent(item, 1) for item in items)
+    elif isinstance(output, dict):
+        if not output:
+            return "{}"
+        max_key_length = max(len(str(k)) for k in output.keys())
+        items = [f"• {str(k):<{max_key_length}} : {_format_special_object(v)}" for k, v in output.items()]
+        return "\n" + "\n".join(_indent(item, 1) for item in items)
+    else:
+        return _format_special_object(output)
+
+
 def _format_stats(result: PrettyPrintable) -> str:
     """Format the statistics section of the result."""
     stats = [
@@ -88,74 +118,35 @@ def _format_agent_info(result: PrettyPrintable) -> str:
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
-def _decode_unicode_escape(text: str) -> str:
-    """Decode unicode escape sequences in text."""
-    return text.encode().decode('unicode-escape')
-
-
 def _format_final_output(result: PrettyPrintable) -> str:
     """Format the final output section."""
-    try:
+    header = "\n\n  ✨ Final Output:\n"
+    
+    try:    
         output = str(result.raw_responses[0].output[0])
-        match = THINK_PATTERN.search(output)
-
+        think_pattern = r'<think>(.*?)</think>(.*)'
+        match = re.search(think_pattern, output, re.DOTALL)
+        
         if match:
             reasoning = match.group(1).strip()
             final_result = match.group(2).strip()
-            result_match = RESULT_PATTERN.match(final_result)
-
-            if result_match:
-                final_result = result_match.group(1).strip()
-            else:
-                final_result = final_result.strip()
-
-            reasoning = _decode_unicode_escape(reasoning)
-            final_result = _decode_unicode_escape(final_result)
-
-            return f"\n\n✅ REASONING:\n{reasoning}\n\n✅ RESULT:\n{final_result}\n"
-
-        # Handle responses without think tags
-        result_match = RESULT_PATTERN.match(output)
-        if result_match:
-            final_result = result_match.group(1).strip()
-            final_result = _decode_unicode_escape(final_result)
-            return f"\n\n✅ RESULT:\n{final_result}\n"
-
-        # If no pattern matches, try to extract just the text content
-        text_match = TEXT_PATTERN.search(output)
-        if text_match:
-            final_result = text_match.group(1).strip()
-            final_result = _decode_unicode_escape(final_result)
-            return f"\n\n✅ RESULT:\n{final_result}\n"
-
-        return f"\n\n✅ RESULT:\n{output}\n"
-
+            result_pattern = r"^([^']*?)(?:',\s*'type':.*)?$"
+            final_result = re.match(result_pattern, final_result).group(1).strip()
+            reasoning = reasoning.encode().decode('unicode-escape')
+            final_result = final_result.encode().decode('unicode-escape')
+            
+            sections = [
+                header,
+                "       🤔 REASONING:",
+                reasoning,
+                "       🎯 RESULT:",
+                final_result
+            ]
+            return "\n".join(sections) + "\n"
+            
     except Exception as e:
         print(f"Error formatting final output: {e}")
         return ""
-
-
-def _wrap_text(text: str, max_width: int = 78) -> list[str]:
-    """Wrap text to specified width."""
-    words = text.split()
-    lines = []
-    current_line = []
-    current_length = 0
-
-    for word in words:
-        if current_length + len(word) + 1 > max_width:
-            if current_line:
-                lines.append(" ".join(current_line))
-            current_line = [word]
-            current_length = len(word)
-        else:
-            current_line.append(word)
-            current_length += len(word) + 1
-
-    if current_line:
-        lines.append(" ".join(current_line))
-
-    return lines
 
 
 ########################################################
@@ -164,18 +155,16 @@ def _wrap_text(text: str, max_width: int = 78) -> list[str]:
 
 def pretty_print_result(result: PrettyPrintable) -> str:
     """Pretty print a RunResult object."""
-    parts = [
-        f"✅ {result.__class__.__name__}:",
-        _format_agent_info(result),
-        _format_stats(result),
-        _format_stream_info(
-            stream=hasattr(result, 'is_complete'),
-            tool_choice=getattr(result, 'tool_choice', None),
-            response_format=getattr(result, 'response_format', None)
-        ),
-        _format_final_output(result)
-    ]
-    return "".join(parts)
+    output = f"🎯 {result.__class__.__name__}:"
+    output += _format_agent_info(result)
+    output += _format_stats(result)
+    output += _format_stream_info(
+        stream=hasattr(result, 'is_complete'),
+        tool_choice=getattr(result, 'tool_choice', None),
+        response_format=getattr(result, 'response_format', None)
+    )
+    output += _format_final_output(result)
+    return output
 
 
 def pretty_print_run_result_streaming(result: PrettyPrintable) -> str:
@@ -185,25 +174,50 @@ def pretty_print_run_result_streaming(result: PrettyPrintable) -> str:
 
 def format_json_response(response: dict[str, Any]) -> str:
     """Format a JSON response to be more readable."""
+
     role = response.get("role", "")
     content = response.get("content", "")
-    header = f"{role.title()}"
+
+    role_emoji = {
+        "assistant": "🤖",
+        "user": "👤",
+        "system": "⚙️",
+        "function": "🔧"
+    }.get(role, "📝")
+
+    header = f"{role_emoji} {role.title()}"
     header_border = "═" * (len(header) + 4)
     header_text = f"╔{header_border}╗\n║ {header} ║\n╚{header_border}╝"
 
     formatted_lines = []
     sections = content.split("</think>")
-
     if len(sections) > 1:
         thinking = sections[0].replace("<think>", "").strip()
         if thinking:
             formatted_lines.append("💭 Thinking:")
-            formatted_lines.extend(f"  {line.strip()}" for line in thinking.split("\n") if line.strip())
+            for line in thinking.split("\n"):
+                if line.strip():
+                    formatted_lines.append(f"  {line.strip()}")
             formatted_lines.append("")
 
     final_content = sections[-1].strip()
     final_content = final_content.replace("**", "").replace("*", "")
-    formatted_lines.extend(_wrap_text(final_content))
+    words = final_content.split()
+    current_line = []
+    current_length = 0
+
+    for word in words:
+        if current_length + len(word) + 1 > 78:
+            if current_line:
+                formatted_lines.append(" ".join(current_line))
+            current_line = [word]
+            current_length = len(word)
+        else:
+            current_line.append(word)
+            current_length += len(word) + 1
+
+    if current_line:
+        formatted_lines.append(" ".join(current_line))
 
     content_text = "\n".join(formatted_lines)
     bottom_border = "═" * 80

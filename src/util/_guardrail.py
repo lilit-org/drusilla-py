@@ -20,14 +20,14 @@ if TYPE_CHECKING:
 #               Data classes                           #
 ########################################################
 
-@dataclass(frozen=True)
+@dataclass
 class GuardrailFunctionOutput:
     """Output from a guardrail function."""
     tripwire_triggered: bool
     output: Any | None = None
 
 
-@dataclass(frozen=True)
+@dataclass
 class InputGuardrailResult:
     """Result from running an input guardrail."""
     guardrail: InputGuardrail[Any]
@@ -36,7 +36,7 @@ class InputGuardrailResult:
     output: GuardrailFunctionOutput
 
 
-@dataclass(frozen=True)
+@dataclass
 class OutputGuardrailResult:
     """Result from running an output guardrail."""
     guardrail: OutputGuardrail[Any]
@@ -45,7 +45,7 @@ class OutputGuardrailResult:
     output: GuardrailFunctionOutput
 
 
-@dataclass(frozen=True)
+@dataclass
 class InputGuardrail(Generic[TContext]):
     """Guardrail that validates agent input before execution."""
     guardrail_function: Callable[
@@ -83,7 +83,7 @@ class InputGuardrail(Generic[TContext]):
         )
 
 
-@dataclass(frozen=True)
+@dataclass
 class OutputGuardrail(Generic[TContext]):
     """Guardrail that validates agent output after execution."""
 
@@ -123,6 +123,8 @@ class OutputGuardrail(Generic[TContext]):
 
 
 TContext_co = TypeVar("TContext_co", bound=Any, covariant=True)
+
+# Type definitions for input guardrail functions
 _InputGuardrailFuncSync = Callable[
     [RunContextWrapper[TContext_co], "Agent[Any]", Union[str, list[TResponseInputItem]]],
     GuardrailFunctionOutput,
@@ -181,6 +183,7 @@ def input_guardrail(
     return decorator
 
 
+# Type definitions for output guardrail functions
 _OutputGuardrailFuncSync = Callable[
     [RunContextWrapper[TContext_co], "Agent[Any]", Any],
     GuardrailFunctionOutput,
