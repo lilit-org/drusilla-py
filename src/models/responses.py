@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
-from ..util._constants import HEADERS, NOT_GIVEN, IncludeLiteral
+from ..util._constants import HEADERS, UNSET, IncludeLiteral
 from ..util._exceptions import UsageError
 from ..util._handoffs import Handoff
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
@@ -44,7 +44,7 @@ class ModelResponsesModel(Model):
         self._client = model_client
 
     def _non_null_or_not_given(self, value: Any) -> Any:
-        return value or NOT_GIVEN
+        return value or UNSET
 
     async def get_response(
         self,
@@ -158,7 +158,7 @@ class ModelResponsesModel(Model):
         list_input = ItemHelpers.input_to_new_input_list(input)
 
         parallel_tool_calls = (
-            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else NOT_GIVEN
+            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else UNSET
         )
 
         tool_choice = Converter.convert_tool_choice(model_settings.tool_choice)
@@ -217,7 +217,7 @@ class Converter:
         cls, tool_choice: Literal["auto", "required", "none"] | str | None
     ) -> ChatCompletionToolChoiceOptionParam:
         if tool_choice is None:
-            return NOT_GIVEN
+            return UNSET
         elif tool_choice == "required":
             return "required"
         elif tool_choice == "auto":
@@ -247,7 +247,7 @@ class Converter:
         cls, output_schema: AgentOutputSchema | None
     ) -> ResponseFormat | None:
         if output_schema is None or output_schema.is_plain_text():
-            return NOT_GIVEN
+            return UNSET
         else:
             return {
                 "format": {

@@ -15,7 +15,7 @@ __all__ = [
     "Environment",
     "Button",
     "IncludeLiteral",
-    "NOT_GIVEN",
+    "UNSET",
     "DEFAULT_MODEL",
     "DEFAULT_BASE_URL",
     "DEFAULT_WRAPPER_DICT_KEY",
@@ -43,7 +43,7 @@ IncludeLiteral = Literal[
 ]
 
 # System Constants
-NOT_GIVEN = object()
+UNSET = object()
 
 # Default Configuration Values
 DEFAULT_MODEL = "deepseek-r1"

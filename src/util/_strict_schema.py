@@ -5,7 +5,7 @@ from typing import Any, TypeAlias, cast
 
 from typing_extensions import TypeGuard
 
-from ._constants import NOT_GIVEN
+from ._constants import UNSET
 from ._exceptions import UsageError
 
 ########################################################
@@ -97,7 +97,7 @@ def _enforce_strict_schema_rules(
                 ]
 
     # Remove null defaults
-    if schema.get("default", NOT_GIVEN) is None:
+    if schema.get("default", UNSET) is None:
         schema.pop("default")
 
     # Handle schema references

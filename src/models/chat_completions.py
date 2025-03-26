@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
-from ..util._constants import FAKE_RESPONSES_ID, HEADERS, NOT_GIVEN
+from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET
 from ..util._exceptions import AgentError, UsageError
 from ..util._handoffs import Handoff
 from ..util._items import (
@@ -265,7 +265,7 @@ class ModelChatCompletionsModel(Model):
             )
 
         parallel_tool_calls = (
-            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else NOT_GIVEN
+            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else UNSET
         )
         tool_choice = _Converter.convert_tool_choice(model_settings.tool_choice)
         response_format = _Converter.convert_response_format(output_schema)
@@ -288,11 +288,11 @@ class ModelChatCompletionsModel(Model):
 
         if converted_tools:
             request_params["tools"] = converted_tools
-        if tool_choice != NOT_GIVEN:
+        if tool_choice != UNSET:
             request_params["tool_choice"] = tool_choice
-        if response_format != NOT_GIVEN:
+        if response_format != UNSET:
             request_params["response_format"] = response_format
-        if parallel_tool_calls != NOT_GIVEN:
+        if parallel_tool_calls != UNSET:
             request_params["parallel_tool_calls"] = parallel_tool_calls
         if stream:
             request_params["stream_options"] = {"include_usage": True}
@@ -307,7 +307,7 @@ class ModelChatCompletionsModel(Model):
                 object="response",
                 output=[],
                 tool_choice=cast(Literal["auto", "required", "none"], tool_choice)
-                if tool_choice != NOT_GIVEN
+                if tool_choice != UNSET
                 else "auto",
                 top_p=model_settings.top_p,
                 temperature=model_settings.temperature,
@@ -336,7 +336,7 @@ class _Converter:
     ) -> ChatCompletionToolChoiceOptionParam | Any:
         """Converts tool choice settings to API format."""
         if tool_choice is None:
-            return NOT_GIVEN
+            return UNSET
         elif tool_choice == "auto":
             return "auto"
         elif tool_choice == "required":
@@ -357,7 +357,7 @@ class _Converter:
     ) -> ResponseFormat | Any:
         """Converts output schema to API response format."""
         if not final_output_schema or final_output_schema.is_plain_text():
-            return NOT_GIVEN
+            return UNSET
         return {
             "type": "json_schema",
             "json_schema": {
@@ -730,6 +730,6 @@ class ToolConverter:
         }
 
 class NotGivenEncoder(json.JSONEncoder):
-    """JSON encoder that converts NOT_GIVEN values to None."""
+    """JSON encoder that converts UNSET values to None."""
     def default(self, obj):
-        return None if obj is NOT_GIVEN else super().default(obj)
+        return None if obj is UNSET else super().default(obj)
