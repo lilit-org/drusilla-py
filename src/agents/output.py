@@ -5,6 +5,7 @@ from pydantic import BaseModel, TypeAdapter
 from typing_extensions import TypedDict, get_args, get_origin
 
 from ..util import _json
+from ..util._constants import DEFAULT_WRAPPER_DICT_KEY
 from ..util._env import get_env_var
 from ..util._exceptions import ModelError, UsageError
 from ..util._strict_schema import ensure_strict_json_schema
@@ -13,7 +14,7 @@ from ..util._strict_schema import ensure_strict_json_schema
 #             Constants                                #
 ########################################################
 
-WRAPPER_DICT_KEY = get_env_var("WRAPPER_DICT_KEY", "response")
+WRAPPER_DICT_KEY = get_env_var("WRAPPER_DICT_KEY", DEFAULT_WRAPPER_DICT_KEY)
 
 
 ########################################################

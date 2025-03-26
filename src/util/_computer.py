@@ -1,13 +1,7 @@
 import abc
 from typing import Literal
 
-########################################################
-#              Constants
-########################################################
-
-Environment = Literal["mac", "windows", "ubuntu", "browser"]
-Button = Literal["left", "right", "wheel", "back", "forward"]
-
+from ._constants import Button, Environment
 
 ########################################################
 #              Computer Interface
