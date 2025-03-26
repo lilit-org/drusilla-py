@@ -4,7 +4,7 @@ import abc
 import copy
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, Union, cast, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, Union, cast
 
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
@@ -229,12 +229,15 @@ class ItemHelpers:
         return "".join(
             item.text_content if isinstance(item, MessageOutputItem) else ""
             for item in items
-        )
+        ).strip()
 
     @staticmethod
     def text_message_output(message: MessageOutputItem) -> str:
         """Extract text from a message output efficiently."""
-        return message.text_content
+        text = message.text_content
+        if text.endswith("', 'type': 'output_text', 'annotations': []}"):
+            text = text[:-len("', 'type': 'output_text', 'annotations': []}")]
+        return text.strip()
 
     @staticmethod
     def tool_call_output_item(
@@ -252,14 +255,15 @@ class ItemHelpers:
         """Format content with proper indentation and borders efficiently."""
         if not content:
             return ""
-            
+        if content.endswith("', 'type': 'output_text', 'annotations': []}"):
+            content = content[:-len("', 'type': 'output_text', 'annotations': []}")]
         lines = [line.strip() for line in content.split('\n') if line.strip()]
         if not lines:
             return ""
-            
+
         formatted_lines = []
         current_section = []
-        
+
         def format_section(section: list[str]) -> list[str]:
             if not section:
                 return []

@@ -10,7 +10,7 @@ from ._exceptions import ModelError
 ########################################################
 
 T = TypeVar("T")
-
+FUNCTION_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9]")
 
 ########################################################
 #              Validators
@@ -37,4 +37,4 @@ def transform_string_function_style(name: str) -> str:
     Returns:
         Lowercase string with spaces and special chars replaced by underscores
     """
-    return re.sub(r"[^a-zA-Z0-9]", "_", name.replace(" ", "_")).lower()
+    return FUNCTION_NAME_PATTERN.sub("_", name.replace(" ", "_")).lower()
