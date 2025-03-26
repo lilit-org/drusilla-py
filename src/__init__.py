@@ -41,7 +41,6 @@ from .util._items import (
     TResponseInputItem,
 )
 from .util._lifecycle import AgentHooks, RunHooks
-from .util._logger import enable_verbose_stdout_logging
 from .util._result import RunResult, RunResultStreaming
 from .util._run_context import RunContextWrapper, TContext
 from .util._stream_events import (
@@ -136,6 +135,5 @@ __all__ = [
     "set_default_model_key",
     "set_default_model_client",
     "set_default_model_api",
-    "enable_verbose_stdout_logging",
     "default_tool_error_function",
 ]

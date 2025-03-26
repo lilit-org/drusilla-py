@@ -1,7 +1,7 @@
-from typing import Any, Protocol
-from pydantic import BaseModel
 import re
+from typing import Any, Protocol
 
+from pydantic import BaseModel
 
 ########################################################
 #               Protocol Class                         #
@@ -121,12 +121,12 @@ def _format_agent_info(result: PrettyPrintable) -> str:
 def _format_final_output(result: PrettyPrintable) -> str:
     """Format the final output section."""
     header = "\n\n  ✨ Final Output:\n"
-    
-    try:    
+
+    try:
         output = str(result.raw_responses[0].output[0])
         think_pattern = r'<think>(.*?)</think>(.*)'
         match = re.search(think_pattern, output, re.DOTALL)
-        
+
         if match:
             reasoning = match.group(1).strip()
             final_result = match.group(2).strip()
@@ -134,7 +134,7 @@ def _format_final_output(result: PrettyPrintable) -> str:
             final_result = re.match(result_pattern, final_result).group(1).strip()
             reasoning = reasoning.encode().decode('unicode-escape')
             final_result = final_result.encode().decode('unicode-escape')
-            
+
             sections = [
                 header,
                 "       🤔 REASONING:",
@@ -143,7 +143,7 @@ def _format_final_output(result: PrettyPrintable) -> str:
                 final_result
             ]
             return "\n".join(sections) + "\n"
-            
+
     except Exception as e:
         print(f"Error formatting final output: {e}")
         return ""
