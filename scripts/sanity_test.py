@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Sanity test script for the DeepSeek agent framework.
-This script demonstrates basic usage of the DeepSeekClient and Agent classes
-by running a simple task of generating a haiku.
+This script demonstrates basic usage of the DeepSeekClient and Agent classes.
 """
 
 import os
@@ -15,6 +13,7 @@ from src.util._client import DeepSeekClient
 from src.agents.run import Runner
 from src.agents.agent import Agent
 from src import set_default_model_client, set_default_model_api
+from src.util._pretty_print import pretty_print_result
 
 
 def setup_client() -> DeepSeekClient:
@@ -45,7 +44,7 @@ def main() -> Optional[str]:
             agent,
             "Write a haiku about love in the cypherpunk world."
         )
-        return result.final_output
+        return pretty_print_result(result)
     except Exception as e:
         print(f"Error running sanity test: {e}", file=sys.stderr)
 

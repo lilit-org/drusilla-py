@@ -87,7 +87,7 @@ class ModelResponsesModel(Model):
                 logger.debug("LLM responded")
             else:
                 logger.debug(
-                    "LLM resp:\n"
+                    "\n 🧠  LLM resp for responses:\n"
                     f"{json.dumps(list(response.output), indent=2)}\n"
                 )
 

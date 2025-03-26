@@ -1,6 +1,6 @@
 from typing import Any, Protocol
-
 from pydantic import BaseModel
+
 
 ########################################################
 #               Protocol Class                         #
@@ -36,7 +36,7 @@ def _format_special_object(obj: Any) -> str:
     elif obj is object():
         return "Not Set"
     elif isinstance(obj, bool):
-        return "✓ Enabled" if obj else "✗ Disabled"
+        return "✅Enabled" if obj else "❌ Disabled"
     else:
         return str(obj)
 
@@ -44,22 +44,22 @@ def _format_special_object(obj: Any) -> str:
 def _format_stream_info(stream: bool, tool_choice: Any, response_format: Any) -> str:
     """Format stream, tool choice and response format information."""
     info = [
-        "🔧 Configuration:",
-        f"• Streaming  : {_format_special_object(stream)}",
-        f"• Tool Mode  : {_format_special_object(tool_choice)}",
-        f"• Response   : {_format_special_object(response_format)}",
+        "\n🦾 Configuration:",
+        f"      Streaming  : {_format_special_object(stream)}",
+        f"      Tool Mode  : {_format_special_object(tool_choice)}",
+        f"      Response   : {_format_special_object(response_format)}",
     ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
 def _format_output(output: Any) -> str:
     """Format different types of output into a string representation."""
+
     if output is None:
         return "None"
     elif output is object():
         return "Not Set"
     elif isinstance(output, str):
-        # Add borders and padding for text output
         lines = output.splitlines()
         if len(lines) > 1:
             width = max(len(line) for line in lines)
@@ -71,17 +71,14 @@ def _format_output(output: Any) -> str:
             return "\n".join(formatted_lines)
         return output
     elif isinstance(output, BaseModel):
-        # Pretty print Pydantic models with nice formatting
         json_str = output.model_dump_json(indent=2)
         return f"📋 Model Output:\n{_indent(json_str, 1)}"
     elif isinstance(output, (list, tuple)):
-        # Format lists with bullets and indentation
         if not output:
             return "[]"
         items = [f"• {item}" for item in output]
         return "\n" + "\n".join(_indent(item, 1) for item in items)
     elif isinstance(output, dict):
-        # Format dictionaries with key-value alignment
         if not output:
             return "{}"
         max_key_length = max(len(str(k)) for k in output.keys())
@@ -94,55 +91,59 @@ def _format_output(output: Any) -> str:
 def _format_stats(result: PrettyPrintable) -> str:
     """Format the statistics section of the result."""
     stats = [
-        "📊 Statistics:",
-        f"• Items     : {len(result.new_items)}",
-        f"• Responses : {len(result.raw_responses)}",
-        f"• Input GR  : {len(result.input_guardrail_results)}",
-        f"• Output GR : {len(result.output_guardrail_results)}",
+        "\n📊 Statistics:",
+        f"      Items     : {len(result.new_items)}",
+        f"      Responses : {len(result.raw_responses)}",
+        f"      Input GR  : {len(result.input_guardrail_results)}",
+        f"      Output GR : {len(result.output_guardrail_results)}",
     ]
     return "\n" + "\n".join(_indent(stat, 1) for stat in stats)
 
 
 def _format_agent_info(result: PrettyPrintable) -> str:
     """Format the agent information section."""
-    if hasattr(result, 'is_complete'):  # RunResultStreaming
+    if hasattr(result, 'is_complete'):
         info = [
-            "🤖 Agent Info:",
-            f"• Name       : {result.current_agent.name}",
-            f"• Turn       : {result.current_turn}/{result.max_turns}",
-            f"• Status     : {'✅ Complete' if result.is_complete else '🔄 Running'}",
+            "\n👾 Agent Info:",
+            f"      Name       : {result.current_agent.name}",
+            f"      Turn       : {result.current_turn}/{result.max_turns}",
+            f"      Status     : {'✅ Complete' if result.is_complete else '🔄 Running'}",
         ]
-    else:  # RunResult
+    else:
         info = [
-            "🤖 Agent Info:",
-            f"• Last Agent : {result.last_agent.name}",
+            "\n👾 Agent Info:",
+            f"      Last Agent : {result.last_agent.name}",
         ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
 def _format_final_output(result: PrettyPrintable) -> str:
     """Format the final output section."""
-    from ._result import RunResult, RunResultStreaming
 
-    header = "📤 Final Output"
-    if isinstance(result.final_output, (RunResult, RunResultStreaming)):
-        nested_type = type(result.final_output).__name__
-        header = f"{header} (nested {nested_type})"
-        return f"\n{header}:\n{_indent(str(result.final_output), 2)}"
+    header = "\n\n  ✨ Final Output:\n"
+    try:    
+        output = str(result.raw_responses[0].output[0])
 
-    output = _format_output(result.final_output)
-    if "</think>" in output:
-        reasoning, final_result = output.split("</think>")
-        sections = [
-            header,
-            "🤔 Reasoning:",
-            _indent(reasoning, 2),
-            "🎯 Result:",
-            _indent(final_result, 2)
-        ]
-        return "\n" + "\n".join(sections)
-
-    return f"\n{header} ({type(result.final_output).__name__}):\n{_indent(output, 2)}"
+        if "</think>" in output:
+            try:
+                reasoning, final_result = output.split("</think>")
+                reasoning = reasoning.split("<think>")[1].strip("\n")
+                reasoning = reasoning.encode().decode('unicode-escape')
+                result = final_result.split("', 'type':")[0].strip()
+                result = result.encode().decode('unicode-escape')
+                sections = [
+                    header,
+                    "       🤔 REASONING:",
+                    reasoning,
+                    "       🎯 RESULT:",
+                    result
+                ]
+                return "\n".join(sections) + "\n"
+            except ValueError as e:
+                print(e)
+    
+    except Exception as e:
+        print(e)
 
 
 ########################################################
@@ -169,20 +170,11 @@ def pretty_print_run_result_streaming(result: PrettyPrintable) -> str:
 
 
 def format_json_response(response: dict[str, Any]) -> str:
-    """
-    Format a JSON response to be more readable.
+    """Format a JSON response to be more readable."""
 
-    Args:
-        response: The JSON response to format
-
-    Returns:
-        A formatted string representation of the JSON
-    """
-    # Extract role and content
     role = response.get("role", "")
     content = response.get("content", "")
 
-    # Format the role with an emoji
     role_emoji = {
         "assistant": "🤖",
         "user": "👤",
@@ -190,18 +182,12 @@ def format_json_response(response: dict[str, Any]) -> str:
         "function": "🔧"
     }.get(role, "📝")
 
-    # Create the header with a nice border
     header = f"{role_emoji} {role.title()}"
     header_border = "═" * (len(header) + 4)
     header_text = f"╔{header_border}╗\n║ {header} ║\n╚{header_border}╝"
 
-    # Handle content formatting
     formatted_lines = []
-
-    # Split content into sections
     sections = content.split("</think>")
-
-    # Handle thinking process if present
     if len(sections) > 1:
         thinking = sections[0].replace("<think>", "").strip()
         if thinking:
@@ -211,13 +197,8 @@ def format_json_response(response: dict[str, Any]) -> str:
                     formatted_lines.append(f"  {line.strip()}")
             formatted_lines.append("")
 
-    # Handle the actual content
     final_content = sections[-1].strip()
-
-    # Remove any markdown formatting
     final_content = final_content.replace("**", "").replace("*", "")
-
-    # Format the content with proper wrapping
     words = final_content.split()
     current_line = []
     current_length = 0
@@ -235,11 +216,6 @@ def format_json_response(response: dict[str, Any]) -> str:
     if current_line:
         formatted_lines.append(" ".join(current_line))
 
-    # Format the content with proper indentation and borders
     content_text = "\n".join(formatted_lines)
-
-    # Add a bottom border
     bottom_border = "═" * 80
-
-    # Combine everything with proper spacing
     return f"{header_text}\n\n{_indent(content_text, 1)}\n\n╔{bottom_border}╗"
