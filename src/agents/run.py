@@ -62,8 +62,8 @@ class RunConfig:
     model_provider: ModelProvider = field(default_factory=ModelProvider)
     model_settings: ModelSettings | None = None
     handoff_input_filter: HandoffInputFilter | None = None
-    input_guardrails: list[InputGuardrail[Any]] = field(default_factory=list)
-    output_guardrails: list[OutputGuardrail[Any]] = field(default_factory=list)
+    input_guardrails: list[InputGuardrail[TContext]] = field(default_factory=list)
+    output_guardrails: list[OutputGuardrail[TContext]] = field(default_factory=list)
     max_turns: int = MAX_TURNS
 
 
@@ -347,7 +347,7 @@ class Runner:
                 streamed_result.current_turn = current_turn
 
                 if current_turn > max_turns:
-                    cls._handle_max_turns_exceeded(max_turns)
+                    raise MaxTurnsError(f"Max turns ({max_turns}) exceeded")
                     streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
                     break
 
@@ -457,9 +457,18 @@ class Runner:
     ):
         queue = streamed_result._input_guardrail_queue
 
+        # Only deepcopy if we have guardrails to run
+        if not guardrails:
+            return
+
+        # Convert input to list if it's a string
+        input_list = ItemHelpers.input_to_new_input_list(input)
+        # Only deepcopy if we have multiple guardrails that might modify the input
+        input_to_use = deepcopy(input_list) if len(guardrails) > 1 else input_list
+
         guardrail_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_input_guardrail(agent, guardrail, input, context)
+                RunImpl.run_single_input_guardrail(agent, guardrail, input_to_use, context)
             )
             for guardrail in guardrails
         ]

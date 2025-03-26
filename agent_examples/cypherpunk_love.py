@@ -7,6 +7,7 @@ This script demonstrates basic usage of the DeepSeekClient and Agent classes.
 import sys
 import httpx
 from pathlib import Path
+from typing import Optional
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -15,14 +16,28 @@ from src.agents.run import Runner
 from src.agents.agent import Agent
 from src import set_default_model_client, set_default_model_api
 from src.util._pretty_print import pretty_print_result
+from src.util._constants import (
+    HTTP_TIMEOUT_TOTAL,
+    HTTP_TIMEOUT_CONNECT,
+    HTTP_TIMEOUT_READ,
+    HTTP_MAX_KEEPALIVE_CONNECTIONS,
+    HTTP_MAX_CONNECTIONS
+)
 
 
 def setup_client() -> DeepSeekClient:
     """Set up and configure the DeepSeek client with optimal settings."""
     client = DeepSeekClient(
         http_client=httpx.AsyncClient(
-            timeout=httpx.Timeout(120.0, connect=30.0, read=90.0),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+            timeout=httpx.Timeout(
+                HTTP_TIMEOUT_TOTAL,
+                connect=HTTP_TIMEOUT_CONNECT,
+                read=HTTP_TIMEOUT_READ
+            ),
+            limits=httpx.Limits(
+                max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                max_connections=HTTP_MAX_CONNECTIONS
+            )
         )
     )
     set_default_model_client(client)
@@ -48,14 +63,14 @@ def main() -> str | None:
             agent,
             "Write a haiku about love in the cypherpunk world."
         )
-        return pretty_print_result(result)
+        print(pretty_print_result(result))
     except httpx.HTTPError as e:
         print(f"HTTP error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error running sanity test: {e}", file=sys.stderr)
-    return None
+        print(f"Error running poetry generator: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    if output := main():
-        print(output)
+    main()

@@ -23,15 +23,14 @@ __all__ = [
     "MAX_QUEUE_SIZE",
     "MAX_GUARDRAIL_QUEUE_SIZE",
     "CHAT_COMPLETIONS_ENDPOINT",
+    "HTTP_CONFIG",
+    "SUPPORTED_LANGUAGES",
+    "HTTP_TIMEOUT_TOTAL",
+    "HTTP_TIMEOUT_CONNECT",
+    "HTTP_TIMEOUT_READ",
+    "HTTP_MAX_KEEPALIVE_CONNECTIONS",
+    "HTTP_MAX_CONNECTIONS",
 ]
-
-# API Configuration
-FAKE_RESPONSES_ID = "__fake_id__"
-_USER_AGENT = f"Agents/Python {__version__}"
-HEADERS = {"User-Agent": _USER_AGENT}
-
-# API Endpoints
-CHAT_COMPLETIONS_ENDPOINT = "/api/chat"
 
 # Type Definitions
 Environment = Literal["mac", "windows", "ubuntu", "browser"]
@@ -42,33 +41,44 @@ IncludeLiteral = Literal[
     "computer_call_output.output.image_url",
 ]
 
-# System Constants
+# Special Constants
 UNSET = object()
+FAKE_RESPONSES_ID = "__fake_id__"
 
-# Default Configuration Values
+# API Configuration
+_USER_AGENT = f"Agents/Python {__version__}"
+HEADERS = {"User-Agent": _USER_AGENT}
+CHAT_COMPLETIONS_ENDPOINT = "/api/chat"
+
+# Default Settings
 DEFAULT_MODEL = "deepseek-r1:latest"
 DEFAULT_BASE_URL = "http://localhost:11434"
 DEFAULT_WRAPPER_DICT_KEY = "response"
 DEFAULT_MAX_TURNS = 10
+
+# Queue and Cache Limits
 MAX_QUEUE_SIZE = 1000
 MAX_GUARDRAIL_QUEUE_SIZE = 100
 LRU_CACHE_SIZE = 128
 
-# HTTP Client settings
+# HTTP Client Configuration
 HTTP_TIMEOUT_TOTAL = 120.0
 HTTP_TIMEOUT_CONNECT = 30.0
 HTTP_TIMEOUT_READ = 90.0
 HTTP_MAX_KEEPALIVE_CONNECTIONS = 5
 HTTP_MAX_CONNECTIONS = 10
 
-# Supported languages
+# Language Support
 SUPPORTED_LANGUAGES = {
-    "PORTUGUESE": "Portuguese",
-    "SPANISH": "Spanish",
-    "FRENCH": "French",
-    "ITALIAN": "Italian",
-    "JAPANESE": "Japanese",
-    "GERMAN": "German",
-    "CHINESE": "Chinese",
-    "RUSSIAN": "Russian"
-} 
+    "en": "English",
+    "zh": "Chinese",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "ar": "Arabic",
+}

@@ -159,3 +159,23 @@ Encrypted hearts pulse,
 Digital whispers unite —
 Secret love in code.
 ```
+
+<br>
+___
+
+## agent "world traveler"
+
+<br>
+
+run a first example of a simple multi-agent with:
+
+```shell
+make world-traveler
+```
+
+<br>
+
+you can input a sentence in any major language and it will translate for you:
+
+```
+

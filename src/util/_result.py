@@ -144,26 +144,6 @@ class RunResultStreaming(RunResultBase):
             if self._stored_exception:
                 raise self._stored_exception
 
-    def _check_errors(self) -> None:
-        """Optimized error checking that only processes necessary checks."""
-        if self.current_turn > self.max_turns:
-            self._stored_exception = MaxTurnsError(f"Max turns ({self.max_turns}) exceeded")
-            return
-
-        if not self._input_guardrail_queue.empty():
-            try:
-                guardrail_result = self._input_guardrail_queue.get_nowait()
-                if guardrail_result.output.tripwire_triggered:
-                    self._stored_exception = InputGuardrailError(guardrail_result)
-            except asyncio.QueueEmpty:
-                pass
-
-        for task in (self._run_impl_task, self._input_guardrails_task, self._output_guardrails_task):
-            if task and task.done():
-                exc = task.exception()
-                if exc and isinstance(exc, Exception):
-                    self._stored_exception = exc
-
     def _cleanup_tasks(self) -> None:
         """Efficiently cleanup all active tasks."""
         tasks_to_cancel = {
