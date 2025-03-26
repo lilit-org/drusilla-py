@@ -88,6 +88,8 @@ def main() -> str | None:
                 text = ItemHelpers.text_message_output(item)
                 if text:
                     print(f"        📝Translation: {text}")
+        
+        return pretty_print_result(orchestrator_result)
 
     except httpx.HTTPError as e:
         print(f"HTTP error: {e}", file=sys.stderr)

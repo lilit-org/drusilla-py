@@ -7,7 +7,6 @@ This script demonstrates basic usage of the DeepSeekClient and Agent classes.
 import sys
 import httpx
 from pathlib import Path
-from typing import Optional
 
 sys.path.append(str(Path(__file__).parent.parent))
 

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import abc
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, Union, cast
 
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
 
-from ._exceptions import ModelError
 from ._types import (
     ComputerCallOutput,
     FunctionCallOutput,
