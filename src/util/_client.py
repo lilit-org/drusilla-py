@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 
+from ._constants import CHAT_COMPLETIONS_ENDPOINT, DEFAULT_BASE_URL, HEADERS
 from ._types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -14,7 +15,6 @@ from ._types import (
     ChatCompletionToolParam,
     ResponseFormat,
 )
-from ._constants import DEFAULT_BASE_URL, HEADERS, CHAT_COMPLETIONS_ENDPOINT
 
 
 class DeepSeekClient(AsyncDeepSeek):
