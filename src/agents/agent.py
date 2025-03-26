@@ -27,9 +27,9 @@ from ..models.settings import ModelSettings
 from ..util import _json
 from ..util._guardrail import InputGuardrail, OutputGuardrail
 from ..util._handoffs import Handoff
-from ..util._items import ItemHelpers
+from ..util._items import ItemHelpers, RunItem
 from ..util._run_context import RunContextWrapper, TContext
-from ..util._tool import FunctionToolResult, Tool, function_tool
+from ..util._tool import Tool, function_tool, FunctionToolResult
 from ..util._types import MaybeAwaitable
 
 if TYPE_CHECKING:
