@@ -3,15 +3,16 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from ..models.interface import Model
 from ..models.provider import ModelProvider
 from ..models.settings import ModelSettings
-from ..util import _coro
+from ..util._constants import DEFAULT_MAX_TURNS
 from ..util._env import get_env_var
 from ..util._exceptions import (
     AgentError,
+    GenericError,
     InputGuardrailError,
     MaxTurnsError,
     ModelError,
@@ -39,20 +40,21 @@ from .run_impl import (
     QueueCompleteSentinel,
     RunImpl,
     SingleStepResult,
+    noop_coroutine,
 )
 
 ########################################################
 #             Constants                                #
 ########################################################
 
-MAX_TURNS = get_env_var("MAX_TURNS", 10)
+MAX_TURNS = get_env_var("MAX_TURNS", DEFAULT_MAX_TURNS)
 
 
 ########################################################
 #               Data classes                            #
 ########################################################
 
-@dataclass
+@dataclass(frozen=True)
 class RunConfig:
     """Settings for agent run."""
 
@@ -60,13 +62,9 @@ class RunConfig:
     model_provider: ModelProvider = field(default_factory=ModelProvider)
     model_settings: ModelSettings | None = None
     handoff_input_filter: HandoffInputFilter | None = None
-    input_guardrails: list[InputGuardrail[Any]] | None = None
-    output_guardrails: list[OutputGuardrail[Any]] | None = None
+    input_guardrails: list[InputGuardrail[Any]] = field(default_factory=list)
+    output_guardrails: list[OutputGuardrail[Any]] = field(default_factory=list)
     max_turns: int = MAX_TURNS
-
-    def __post_init__(self) -> None:
-        self.input_guardrails = self.input_guardrails or []
-        self.output_guardrails = self.output_guardrails or []
 
 
 ########################################################
@@ -87,7 +85,15 @@ class Runner:
 
         hooks = hooks or RunHooks[Any]()
         run_config = run_config or RunConfig()
-        run_config.max_turns = max_turns
+        run_config = RunConfig(
+            model=run_config.model,
+            model_provider=run_config.model_provider,
+            model_settings=run_config.model_settings,
+            handoff_input_filter=run_config.handoff_input_filter,
+            input_guardrails=run_config.input_guardrails,
+            output_guardrails=run_config.output_guardrails,
+            max_turns=max_turns
+        )
         context_wrapper = RunContextWrapper(context=context)
         output_schema = cls._get_output_schema(starting_agent)
         return hooks, run_config, context_wrapper, input, output_schema
@@ -158,7 +164,7 @@ class Runner:
                 else:
                     raise AgentError(f"Unknown next step type: {type(turn_result.next_step)}")
         except Exception as e:
-            raise e
+            raise GenericError(e)
 
     @classmethod
     def _handle_max_turns_exceeded(cls, max_turns: int) -> None:
@@ -394,7 +400,7 @@ class Runner:
             streamed_result.is_complete = True
         except Exception as e:
             streamed_result.is_complete = True
-            raise e
+            raise GenericError(e)
 
     @classmethod
     def _update_streamed_result(
@@ -485,11 +491,11 @@ class Runner:
 
         if should_run_agent_start_hooks:
             await asyncio.gather(
-                hooks.on_agent_start(context_wrapper, agent),
+                hooks.on_start(context_wrapper, agent),
                 (
                     agent.hooks.on_start(context_wrapper, agent)
                     if agent.hooks
-                    else _coro.noop_coroutine()
+                    else noop_coroutine()
                 ),
             )
 
@@ -566,11 +572,11 @@ class Runner:
 
         if should_run_agent_start_hooks:
             await asyncio.gather(
-                hooks.on_agent_start(context_wrapper, agent),
+                hooks.on_start(context_wrapper, agent),
                 (
                     agent.hooks.on_start(context_wrapper, agent)
                     if agent.hooks
-                    else _coro.noop_coroutine()
+                    else noop_coroutine()
                 ),
             )
 
@@ -685,7 +691,6 @@ class Runner:
         for done in asyncio.as_completed(guardrail_tasks):
             result = await done
             if result.output.tripwire_triggered:
-                # Cancel all guardrail tasks if a tripwire is triggered.
                 for t in guardrail_tasks:
                     t.cancel()
                 raise OutputGuardrailError(result)
@@ -720,26 +725,28 @@ class Runner:
 
     @classmethod
     def _get_output_schema(cls, agent: Agent[Any]) -> AgentOutputSchema | None:
+        """Get output schema for agent if specified."""
         if agent.output_type is None or agent.output_type is str:
             return None
         return AgentOutputSchema(agent.output_type)
 
     @classmethod
     def _get_handoffs(cls, agent: Agent[Any]) -> list[Handoff]:
-        handoffs = []
-        for handoff_item in agent.handoffs:
-            if isinstance(handoff_item, Handoff):
-                handoffs.append(handoff_item)
-            elif isinstance(handoff_item, Agent):
-                handoffs.append(handoff(handoff_item))
-        return handoffs
+        """Get list of handoffs from agent, converting Agent instances to Handoff objects."""
+        return [
+            handoff_item if isinstance(handoff_item, Handoff) else handoff(handoff_item)
+            for handoff_item in agent.handoffs
+        ]
 
     @classmethod
     def _get_model(cls, agent: Agent[Any], run_config: RunConfig) -> Model:
+        """Get the model instance based on configuration and agent settings."""
         if isinstance(run_config.model, Model):
             return run_config.model
-        elif isinstance(run_config.model, str):
+        if isinstance(run_config.model, str):
             return run_config.model_provider.get_model(run_config.model)
-        elif isinstance(agent.model, Model):
+        if isinstance(agent.model, Model):
             return agent.model
         return run_config.model_provider.get_model(agent.model)
+
+TContext = TypeVar("TContext")

@@ -4,10 +4,10 @@ import json
 import time
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
-from ..util import _debug
+from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET
 from ..util._exceptions import AgentError, UsageError
 from ..util._handoffs import Handoff
 from ..util._items import (
@@ -17,10 +17,8 @@ from ..util._items import (
     TResponseStreamEvent,
 )
 from ..util._logger import logger
-from ..util._pretty_print import _format_output
 from ..util._tool import FunctionTool, Tool
 from ..util._types import (
-    NOT_GIVEN,
     AsyncDeepSeek,
     AsyncStream,
     ChatCompletion,
@@ -38,39 +36,26 @@ from ..util._types import (
     ResponseTextDeltaEvent,
 )
 from ..util._usage import Usage
-from ..util._version import __version__
 from .interface import Model
 from .settings import ModelSettings
-
-if TYPE_CHECKING:
-    from .settings import ModelSettings
-
-
-########################################################
-#            Constants                                 #
-########################################################
-
-_USER_AGENT = f"Agents/Python {__version__}"
-FAKE_RESPONSES_ID = "__fake_id__"
-_HEADERS = {"User-Agent": _USER_AGENT}
-
 
 ########################################################
 #           Data Classes                               #
 ########################################################
 
-@dataclass
+@dataclass(frozen=True)
 class _StreamingState:
-    """Tracks streaming state."""
+    """Maintains the current state of streaming responses."""
     text_content_index_and_output: tuple[int, ResponseOutputText] | None = None
     function_calls: dict[int, ResponseFunctionToolCall] = field(default_factory=dict)
+
 
 ########################################################
 #           Main Class: Chat Completions Model         #
 ########################################################
 
 class ModelChatCompletionsModel(Model):
-    """Chat completions API model."""
+    """Handles chat completion requests to the API model."""
 
     def __init__(
         self,
@@ -81,7 +66,7 @@ class ModelChatCompletionsModel(Model):
         self._client = model_client
 
     def _non_null_or_not_given(self, value: Any) -> Any:
-        """Convert falsy values to None, otherwise return the value."""
+        """Converts falsy values to None, preserving non-falsy values."""
         return None if not value else value
 
     async def get_response(
@@ -93,7 +78,7 @@ class ModelChatCompletionsModel(Model):
         output_schema: AgentOutputSchema | None,
         handoffs: list[Handoff],
     ) -> ModelResponse:
-        """Get complete model response."""
+        """Retrieves a complete model response."""
         response = await self._fetch_response(
             system_instructions,
             input,
@@ -104,22 +89,11 @@ class ModelChatCompletionsModel(Model):
             stream=False,
         )
 
-        if _debug.DONT_LOG_MODEL_DATA:
-            logger.debug("Received model response")
+        logger.debug("Successfully received model response")
+        if isinstance(response, tuple):
+            response_obj = response[0]
         else:
-            if isinstance(response, tuple):
-                response_obj = response[0]
-            else:
-                response_obj = response
-
-            try:
-                json_response = json.dumps(response_obj['choices'][0]['message']['content'], indent=2, cls=NotGivenEncoder)
-            except Exception as e:
-                logger.debug(f"Error parsing JSON response: {e}")
-                json_response = response_obj['choices'][0]['message']['content']
-            logger.debug(
-                f" 🧠  LLM resp for chat completions:\n\n{json_response}\n"
-            )
+            response_obj = response
 
         usage = (
             Usage(
@@ -166,7 +140,7 @@ class ModelChatCompletionsModel(Model):
                 delta = chunk["choices"][0]["delta"]
                 if not state.text_content_index_and_output:
                     state.text_content_index_and_output = (0, ResponseOutputText(
-                        text="",
+                        text=delta["content"],
                         type="output_text",
                         annotations=[],
                     ))
@@ -175,20 +149,21 @@ class ModelChatCompletionsModel(Model):
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
                         part=ResponseOutputText(
-                            text="",
+                            text=delta["content"],
                             type="output_text",
                             annotations=[],
                         ),
                         type="response.content_part.added",
                     )
-                yield ResponseTextDeltaEvent(
-                    content_index=state.text_content_index_and_output[0],
-                    delta=delta["content"],
-                    item_id=FAKE_RESPONSES_ID,
-                    output_index=0,
-                    type="response.output_text.delta",
-                )
-                state.text_content_index_and_output[1].text += delta["content"]
+                else:
+                    state.text_content_index_and_output[1].text += delta["content"]
+                    yield ResponseTextDeltaEvent(
+                        content_index=state.text_content_index_and_output[0],
+                        delta=delta["content"],
+                        item_id=FAKE_RESPONSES_ID,
+                        output_index=0,
+                        type="response.output_text.delta",
+                    )
 
             if chunk["choices"][0]["delta"]["tool_calls"]:
                 for tc_delta in chunk["choices"][0]["delta"]["tool_calls"]:
@@ -278,7 +253,7 @@ class ModelChatCompletionsModel(Model):
         handoffs: list[Handoff],
         stream: bool = False,
     ) -> ChatCompletion | tuple[Response, AsyncStream]:
-        """Fetch response from chat completions API."""
+        """Makes a request to the chat completions API and returns the response."""
         converted_messages = _Converter.items_to_messages(input)
 
         if system_instructions:
@@ -291,7 +266,7 @@ class ModelChatCompletionsModel(Model):
             )
 
         parallel_tool_calls = (
-            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else NOT_GIVEN
+            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else UNSET
         )
         tool_choice = _Converter.convert_tool_choice(model_settings.tool_choice)
         response_format = _Converter.convert_response_format(output_schema)
@@ -300,7 +275,6 @@ class ModelChatCompletionsModel(Model):
         for handoff in handoffs:
             converted_tools.append(ToolConverter.convert_handoff_tool(handoff))
 
-        # Prepare request parameters, converting NOT_GIVEN to None
         request_params = {
             "model": self.model,
             "messages": converted_messages,
@@ -310,30 +284,19 @@ class ModelChatCompletionsModel(Model):
             "presence_penalty": self._non_null_or_not_given(model_settings.presence_penalty),
             "max_tokens": self._non_null_or_not_given(model_settings.max_tokens),
             "stream": stream,
-            "extra_headers": _HEADERS,
+            "extra_headers": HEADERS,
         }
 
-        # Only add optional parameters if they're not NOT_GIVEN
         if converted_tools:
             request_params["tools"] = converted_tools
-        if tool_choice != NOT_GIVEN:
+        if tool_choice != UNSET:
             request_params["tool_choice"] = tool_choice
-        if response_format != NOT_GIVEN:
+        if response_format != UNSET:
             request_params["response_format"] = response_format
-        if parallel_tool_calls != NOT_GIVEN:
+        if parallel_tool_calls != UNSET:
             request_params["parallel_tool_calls"] = parallel_tool_calls
         if stream:
             request_params["stream_options"] = {"include_usage": True}
-
-        if _debug.DONT_LOG_MODEL_DATA:
-            logger.debug("Calling LLM")
-        else:
-            logger.debug(
-                f"\n📝 Messages:\n"
-                f"{_format_output(converted_messages)}\n\n"
-                f"🛠️  Tools:\n\n"
-                f"{"    " + _format_output(converted_tools)}\n"
-            )
 
         ret = await self._get_client().chat.completions.create(**request_params)
 
@@ -345,7 +308,7 @@ class ModelChatCompletionsModel(Model):
                 object="response",
                 output=[],
                 tool_choice=cast(Literal["auto", "required", "none"], tool_choice)
-                if tool_choice != NOT_GIVEN
+                if tool_choice != UNSET
                 else "auto",
                 top_p=model_settings.top_p,
                 temperature=model_settings.temperature,
@@ -357,8 +320,8 @@ class ModelChatCompletionsModel(Model):
         return ret
 
     def _get_client(self) -> AsyncDeepSeek:
-        """Get or create the API client."""
-        return self._client or AsyncDeepSeek()
+        """Returns the configured API client instance."""
+        return self._client
 
 
 ########################################################
@@ -366,15 +329,15 @@ class ModelChatCompletionsModel(Model):
 ########################################################
 
 class _Converter:
-    """API and internal format converter."""
+    """Converts between API and internal data formats."""
 
     @classmethod
     def convert_tool_choice(
         cls, tool_choice: Literal["auto", "required", "none"] | str | None
     ) -> ChatCompletionToolChoiceOptionParam | Any:
-
+        """Converts tool choice settings to API format."""
         if tool_choice is None:
-            return NOT_GIVEN
+            return UNSET
         elif tool_choice == "auto":
             return "auto"
         elif tool_choice == "required":
@@ -393,9 +356,9 @@ class _Converter:
     def convert_response_format(
         cls, final_output_schema: AgentOutputSchema | None
     ) -> ResponseFormat | Any:
-
+        """Converts output schema to API response format."""
         if not final_output_schema or final_output_schema.is_plain_text():
-            return NOT_GIVEN
+            return UNSET
         return {
             "type": "json_schema",
             "json_schema": {
@@ -735,11 +698,11 @@ class _Converter:
 ########################################################
 
 class ToolConverter:
-    """Tool format converter."""
+    """Converts tool definitions to API format."""
 
     @classmethod
     def to_api_format(cls, tool: Tool) -> ChatCompletionToolParam:
-
+        """Converts a tool to its API representation."""
         if isinstance(tool, FunctionTool):
             return {
                 "type": "function",
@@ -751,13 +714,13 @@ class ToolConverter:
             }
 
         raise AgentError(
-            f"Hosted tools are not supported with the ChatCompletions API. Got tool type: "
+            f"Chat completions API does not support hosted tools. Received tool type: "
             f"{type(tool)}, tool: {tool}"
         )
 
     @classmethod
     def convert_handoff_tool(cls, handoff: Handoff[Any]) -> ChatCompletionToolParam:
-
+        """Converts a handoff tool to API format."""
         return {
             "type": "function",
             "function": {
@@ -768,8 +731,6 @@ class ToolConverter:
         }
 
 class NotGivenEncoder(json.JSONEncoder):
-    """Custom JSON encoder that handles NOT_GIVEN values."""
+    """JSON encoder that converts UNSET values to None."""
     def default(self, obj):
-        if obj is NOT_GIVEN:
-            return None
-        return super().default(obj)
+        return None if obj is UNSET else super().default(obj)

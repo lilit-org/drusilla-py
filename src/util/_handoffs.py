@@ -62,11 +62,9 @@ class Handoff(Generic[TContext]):
     Can be used to remove older inputs or specific tools.
     Note: In streaming mode, no items are streamed from this function."""
 
-    strict_json_schema: bool = True
-
     def get_transfer_message(self, agent: Agent[Any]) -> str:
-        base = f"{{'assistant': '{agent.name}'}}"
-        return base
+        """Get the transfer message for the handoff."""
+        return f"{{'assistant': '{agent.name}'}}"
 
     @classmethod
     def default_tool_name(cls, agent: Agent[Any]) -> str:
@@ -131,25 +129,26 @@ def handoff(
         input_type: Type for validating handoff input (if on_handoff takes input)
         input_filter: Function to filter inputs passed to next agent
     """
-    assert (on_handoff and input_type) or not (on_handoff and input_type), (
-        "You must provide either both on_input and input_type, or neither"
-    )
-    type_adapter: TypeAdapter[Any] | None
+    if bool(on_handoff) != bool(input_type):
+        raise UsageError("You must provide either both on_input and input_type, or neither")
+
+    type_adapter: TypeAdapter[Any] | None = None
+    input_json_schema: dict[str, Any] = {}
+
     if input_type is not None:
-        assert callable(on_handoff), "on_handoff must be callable"
+        if not callable(on_handoff):
+            raise UsageError("on_handoff must be callable")
+
         sig = inspect.signature(on_handoff)
         if len(sig.parameters) != 2:
             raise UsageError("on_handoff must take two arguments: context and input")
 
         type_adapter = TypeAdapter(input_type)
         input_json_schema = type_adapter.json_schema()
-    else:
-        type_adapter = None
-        input_json_schema = {}
-        if on_handoff is not None:
-            sig = inspect.signature(on_handoff)
-            if len(sig.parameters) != 1:
-                raise UsageError("on_handoff must take one argument: context")
+    elif on_handoff is not None:
+        sig = inspect.signature(on_handoff)
+        if len(sig.parameters) != 1:
+            raise UsageError("on_handoff must take one argument: context")
 
     async def _invoke_handoff(
         ctx: RunContextWrapper[Any], input_json: str | None = None
@@ -179,8 +178,6 @@ def handoff(
 
     tool_name = tool_name_override or Handoff.default_tool_name(agent)
     tool_description = tool_description_override or Handoff.default_tool_description(agent)
-
-    # Ensure input JSON schema is in strict mode
     input_json_schema = ensure_strict_json_schema(input_json_schema)
 
     return Handoff(

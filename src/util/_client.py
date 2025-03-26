@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 
+from ._constants import CHAT_COMPLETIONS_ENDPOINT, DEFAULT_BASE_URL, HEADERS
 from ._types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -29,7 +30,7 @@ class DeepSeekClient(AsyncDeepSeek):
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = api_key
-        self.base_url = (base_url or os.getenv("BASE_URL", "http://localhost:11434")).rstrip("/")
+        self.base_url = (base_url or os.getenv("BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
         self.organization = organization
         self.project = project
         self.http_client = http_client or httpx.AsyncClient()
@@ -64,6 +65,7 @@ class DeepSeekClient(AsyncDeepSeek):
                 """Create a chat completion with the given parameters."""
                 client = self._chat._client
                 headers = {
+                    **HEADERS,
                     "Content-Type": "application/json",
                     **(extra_headers or {}),
                 }
@@ -76,29 +78,23 @@ class DeepSeekClient(AsyncDeepSeek):
                     "stream": stream,
                 }
 
-                if tools is not None:
-                    data["tools"] = tools
-                if temperature is not None:
-                    data["temperature"] = temperature
-                if top_p is not None:
-                    data["top_p"] = top_p
-                if frequency_penalty is not None:
-                    data["frequency_penalty"] = frequency_penalty
-                if presence_penalty is not None:
-                    data["presence_penalty"] = presence_penalty
-                if max_tokens is not None:
-                    data["max_tokens"] = max_tokens
-                if tool_choice is not None:
-                    data["tool_choice"] = tool_choice
-                if response_format is not None:
-                    data["response_format"] = response_format
-                if parallel_tool_calls is not None:
-                    data["parallel_tool_calls"] = parallel_tool_calls
-                if stream_options is not None:
-                    data["stream_options"] = stream_options
+                optional_params = {
+                    "tools": tools,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "frequency_penalty": frequency_penalty,
+                    "presence_penalty": presence_penalty,
+                    "max_tokens": max_tokens,
+                    "tool_choice": tool_choice,
+                    "response_format": response_format,
+                    "parallel_tool_calls": parallel_tool_calls,
+                    "stream_options": stream_options,
+                }
+                data.update({k: v for k, v in optional_params.items() if v is not None})
 
+                endpoint = os.getenv("CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT)
                 response = await client.http_client.post(
-                    f"{client.base_url}/v1/chat/completions",
+                    f"{client.base_url}{endpoint}",
                     headers=headers,
                     json=data,
                 )
@@ -106,5 +102,4 @@ class DeepSeekClient(AsyncDeepSeek):
 
                 if stream:
                     return AsyncStream(response.aiter_lines())
-                else:
-                    return ChatCompletion(**response.json())
+                return ChatCompletion(**response.json())

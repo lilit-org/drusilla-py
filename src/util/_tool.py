@@ -3,10 +3,10 @@ from __future__ import annotations
 import contextlib
 import inspect
 import json
-import logging
 import re
 from collections.abc import Awaitable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Callable, Literal, Union, get_args, get_origin, get_type_hints, overload
 
 from griffe import Docstring, DocstringSectionKind
@@ -14,14 +14,13 @@ from pydantic import BaseModel, Field, ValidationError, create_model
 from typing_extensions import Concatenate, ParamSpec
 
 from ._computer import AsyncComputer, Computer
-from ._debug import DONT_LOG_TOOL_DATA
+from ._constants import LRU_CACHE_SIZE
 from ._exceptions import ModelError, UsageError
 from ._items import RunItem
+from ._logger import logger
 from ._run_context import RunContextWrapper
 from ._strict_schema import ensure_strict_json_schema
 from ._types import MaybeAwaitable
-
-logger = logging.getLogger("deepseek.agents")
 
 ########################################################
 #               Private Types                           #
@@ -37,7 +36,7 @@ ToolFunction = Union[ToolFunctionWithoutContext[ToolParams], ToolFunctionWithCon
 #               Data classes                           #
 ########################################################
 
-@dataclass
+@dataclass(frozen=True)
 class FuncSchema:
     """Schema for Python functions used as LLM tools."""
 
@@ -48,47 +47,76 @@ class FuncSchema:
     signature: inspect.Signature
     takes_context: bool = False
     strict_json_schema: bool = True
+    _positional_params: list[str] = field(init=False)
+    _keyword_params: list[str] = field(init=False)
+    _var_positional: str | None = field(init=False)
+    _var_keyword: str | None = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Pre-compute parameter order and types."""
+        positional_params: list[str] = []
+        keyword_params: list[str] = []
+        var_positional: str | None = None
+        var_keyword: str | None = None
+
+        for name, param in self.signature.parameters.items():
+            if self.takes_context and name == list(self.signature.parameters.keys())[0]:
+                continue
+
+            if param.kind == param.VAR_POSITIONAL:
+                var_positional = name
+            elif param.kind == param.VAR_KEYWORD:
+                var_keyword = name
+            elif param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
+                positional_params.append(name)
+            else:
+                keyword_params.append(name)
+
+        object.__setattr__(self, '_positional_params', positional_params)
+        object.__setattr__(self, '_keyword_params', keyword_params)
+        object.__setattr__(self, '_var_positional', var_positional)
+        object.__setattr__(self, '_var_keyword', var_keyword)
 
     def to_call_args(self, data: BaseModel) -> tuple[list[Any], dict[str, Any]]:
         """Convert Pydantic model to function call arguments."""
         positional_args: list[Any] = []
         keyword_args: dict[str, Any] = {}
-        seen_var_positional = False
 
-        for idx, (name, param) in enumerate(self.signature.parameters.items()):
-            if self.takes_context and idx == 0:
-                continue
-
+        for name in self._positional_params:
             value = getattr(data, name, None)
-            if param.kind == param.VAR_POSITIONAL:
-                positional_args.extend(value or [])
-                seen_var_positional = True
-            elif param.kind == param.VAR_KEYWORD:
-                keyword_args.update(value or {})
-            elif param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
-                if not seen_var_positional:
-                    positional_args.append(value)
-                else:
-                    keyword_args[name] = value
-            else:
-                keyword_args[name] = value
+            positional_args.append(value)
+
+        if self._var_positional:
+            value = getattr(data, self._var_positional, None)
+            if value:
+                positional_args.extend(value)
+
+        for name in self._keyword_params:
+            value = getattr(data, name, None)
+            keyword_args[name] = value
+
+        if self._var_keyword:
+            value = getattr(data, self._var_keyword, None)
+            if value:
+                keyword_args.update(value)
+
         return positional_args, keyword_args
 
-@dataclass
+@dataclass(frozen=True)
 class FuncDocumentation:
     """Function metadata from docstring."""
     name: str
     description: str | None
     param_descriptions: dict[str, str] | None
 
-@dataclass
+@dataclass(frozen=True)
 class FunctionToolResult:
     """Result of running a function tool."""
     tool: FunctionTool
     output: Any
     run_item: RunItem
 
-@dataclass
+@dataclass(frozen=True)
 class FunctionTool:
     """Tool that wraps a Python function."""
     name: str
@@ -97,7 +125,7 @@ class FunctionTool:
     on_invoke_tool: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
     strict_json_schema: bool = True
 
-@dataclass
+@dataclass(frozen=True)
 class FileSearchTool:
     """Tool for searching vector stores."""
     vector_store_ids: list[str]
@@ -110,7 +138,7 @@ class FileSearchTool:
     def name(self):
         return "file_search"
 
-@dataclass
+@dataclass(frozen=True)
 class WebSearchTool:
     """Tool for web searching."""
     user_location: Any | None = None
@@ -120,7 +148,7 @@ class WebSearchTool:
     def name(self):
         return "web_search_preview"
 
-@dataclass
+@dataclass(frozen=True)
 class ComputerTool:
     """Tool for computer control."""
     computer: Computer | AsyncComputer
@@ -135,6 +163,7 @@ class ComputerTool:
 ########################################################
 
 DocstringStyle = Literal["google", "numpy", "sphinx"]
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _detect_docstring_style(doc: str) -> DocstringStyle:
     """Detect docstring style using pattern matching."""
     scores: dict[DocstringStyle, int] = {"sphinx": 0, "numpy": 0, "google": 0}
@@ -178,6 +207,7 @@ def _suppress_griffe_logging():
     finally:
         logger.setLevel(previous_level)
 
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _process_var_positional(param: inspect.Parameter, ann: Any, field_description: str | None) -> tuple[Any, Field]:
     """Process *args parameters."""
     if get_origin(ann) is tuple:
@@ -191,6 +221,7 @@ def _process_var_positional(param: inspect.Parameter, ann: Any, field_descriptio
 
     return ann, Field(default_factory=list, description=field_description)  # type: ignore
 
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _process_var_keyword(param: inspect.Parameter, ann: Any, field_description: str | None) -> tuple[Any, Field]:
     """Process **kwargs parameters."""
     if get_origin(ann) is dict:
@@ -383,18 +414,12 @@ def function_tool(
             try:
                 json_data: dict[str, Any] = json.loads(input) if input else {}
             except Exception as e:
-                if DONT_LOG_TOOL_DATA:
-                    logger.debug(f"Invalid JSON input for tool {schema.name}")
-                else:
-                    logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
+                logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
                 raise ModelError(
                     f"Invalid JSON input for tool {schema.name}: {input}"
                 ) from e
 
-            if DONT_LOG_TOOL_DATA:
-                logger.debug(f"Invoking tool {schema.name}")
-            else:
-                logger.debug(f"Invoking tool {schema.name} with input {input}")
+            logger.debug(f"Invoking tool {schema.name} with input {input}")
 
             try:
                 parsed = (
@@ -407,8 +432,7 @@ def function_tool(
 
             args, kwargs_dict = schema.to_call_args(parsed)
 
-            if not DONT_LOG_TOOL_DATA:
-                logger.debug(f"Tool call args: {args}, kwargs: {kwargs_dict}")
+            logger.debug(f"Tool call args: {args}, kwargs: {kwargs_dict}")
 
             try:
                 result = the_func(ctx, *args, **kwargs_dict)
@@ -427,10 +451,7 @@ def function_tool(
             try:
                 return await _on_invoke_tool_impl(ctx, input)
             except Exception as e:
-                if DONT_LOG_TOOL_DATA:
-                    logger.debug(f"Tool {schema.name} failed")
-                else:
-                    logger.debug(f"Tool {schema.name} failed with error: {e}")
+                logger.debug(f"Tool {schema.name} failed with error: {e}")
                 raise
 
         return FunctionTool(
