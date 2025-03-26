@@ -23,8 +23,9 @@ class PrettyPrintable(Protocol):
 ########################################################
 
 THINK_PATTERN: Pattern[str] = re.compile(r'<think>(.*?)</think>(.*)', re.DOTALL)
-RESULT_PATTERN: Pattern[str] = re.compile(r"^([^']*?)(?:',\s*'type':.*)?$")
+RESULT_PATTERN: Pattern[str] = re.compile(r"^([^']*?)(?:',\s*'type':\s*'output_text',\s*'annotations':\s*\[\])?$")
 TEXT_PATTERN: Pattern[str] = re.compile(r"'text':\s*'([^']*)'")
+METADATA_PATTERN: Pattern[str] = re.compile(r"',\s*'type':\s*'output_text',\s*'annotations':\s*\[\]$")
 
 ########################################################
 #               Private Functions                      #
@@ -114,21 +115,37 @@ def _format_final_output(result: PrettyPrintable) -> str:
 
             return f"\n\n✅ REASONING:\n{reasoning}\n\n✅ RESULT:\n{final_result}\n"
 
-        # Handle responses without think tags
         result_match = RESULT_PATTERN.match(output)
         if result_match:
             final_result = result_match.group(1).strip()
             final_result = _decode_unicode_escape(final_result)
             return f"\n\n✅ RESULT:\n{final_result}\n"
 
-        # If no pattern matches, try to extract just the text content
         text_match = TEXT_PATTERN.search(output)
         if text_match:
             final_result = text_match.group(1).strip()
             final_result = _decode_unicode_escape(final_result)
             return f"\n\n✅ RESULT:\n{final_result}\n"
 
-        return f"\n\n✅ RESULT:\n{output}\n"
+        try:
+            text_parts = re.findall(r"'text':\s*'([^']*)'", output)
+            if text_parts:
+                final_result = text_parts[0]
+                final_result = _decode_unicode_escape(final_result)
+                return f"\n\n✅ RESULT:\n{final_result}\n"
+        except:
+            pass
+
+        if "', 'type': 'output_text', 'annotations': []" in output:
+            parts = output.split("', 'type': 'output_text', 'annotations': []")
+            if parts:
+                output = parts[0]
+
+        output = re.sub(r"',\s*'type':\s*'output_text',\s*'annotations':\s*\[\]", "", output)
+        output = output.strip("'").strip()
+
+        final_result = _decode_unicode_escape(output)
+        return f"\n\n✅ RESULT:\n{final_result}\n"
 
     except Exception as e:
         print(f"Error formatting final output: {e}")

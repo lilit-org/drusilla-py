@@ -11,7 +11,7 @@ from typing_extensions import TypeVar
 from ..agents.agent import Agent
 from ..agents.output import AgentOutputSchema
 from ..agents.run_impl import QueueCompleteSentinel
-from ._constants import DEFAULT_MAX_GUARDRAIL_QUEUE_SIZE, DEFAULT_MAX_QUEUE_SIZE
+from ._constants import MAX_GUARDRAIL_QUEUE_SIZE, MAX_QUEUE_SIZE
 from ._env import get_env_var
 from ._exceptions import InputGuardrailError, MaxTurnsError
 from ._guardrail import InputGuardrailResult, OutputGuardrailResult
@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 #               Constants                               #
 ########################################################
 
-MAX_QUEUE_SIZE = get_env_var("MAX_QUEUE_SIZE", DEFAULT_MAX_QUEUE_SIZE)
-MAX_GUARDRAIL_QUEUE_SIZE = get_env_var("MAX_GUARDRAIL_QUEUE_SIZE", DEFAULT_MAX_GUARDRAIL_QUEUE_SIZE)
+MAX_QUEUE_SIZE = get_env_var("MAX_QUEUE_SIZE", MAX_QUEUE_SIZE)
+MAX_GUARDRAIL_QUEUE_SIZE = get_env_var("MAX_GUARDRAIL_QUEUE_SIZE", MAX_GUARDRAIL_QUEUE_SIZE)
 
 ########################################################
 #               Public Types                           #

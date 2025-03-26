@@ -35,12 +35,11 @@ create a `.env` file in your project root with your deepseek api endpoint and an
 
 ```shell
 BASE_URL = "http://localhost:11434"
-API_KEY = "NONE"
 MODEL = "deepseek-r1"
 MAX_TURNS = 10
 WRAPPER_DICT_KEY = "response"
-DEFAULT_MAX_QUEUE_SIZE = 1000
-DEFAULT_MAX_GUARDRAIL_QUEUE_SIZE = 100
+MAX_QUEUE_SIZE = 1000
+MAX_GUARDRAIL_QUEUE_SIZE = 100
 LRU_CACHE_SIZE = 128
 LOG_LEVEL = "DEBUG"  
 ```
@@ -109,7 +108,7 @@ def main() -> Optional[str]:
 
 you should get something like this:
 
-```shell
+```
 ✅ Received Model Response...
 ✅ RunResult:
   
