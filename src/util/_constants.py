@@ -11,7 +11,7 @@ from ._version import __version__
 # API and Response Constants
 FAKE_RESPONSES_ID = "__fake_id__"
 _USER_AGENT = f"Agents/Python {__version__}"
-_HEADERS = {"User-Agent": _USER_AGENT}
+HEADERS = {"User-Agent": _USER_AGENT}
 
 # Environment Constants
 Environment = Literal["mac", "windows", "ubuntu", "browser"]
@@ -31,4 +31,4 @@ NOT_GIVEN = object()
 DEFAULT_MODEL = "deepseek-r1"
 DEFAULT_BASE_URL = "http://localhost:11434"
 DEFAULT_WRAPPER_DICT_KEY = "response"
-DEFAULT_MAX_TURNS = 10 
+DEFAULT_MAX_TURNS = 10

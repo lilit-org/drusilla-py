@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import httpx
 
-from src.util._env import get_env_var
 from src.util._constants import DEFAULT_BASE_URL, DEFAULT_MODEL
+from src.util._env import get_env_var
 
 from ..util._http import DefaultAsyncHttpxClient
 from ..util._types import AsyncDeepSeek

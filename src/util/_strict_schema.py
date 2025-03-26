@@ -4,8 +4,8 @@ from typing import Any
 
 from typing_extensions import TypeGuard
 
+from ._constants import NOT_GIVEN
 from ._exceptions import UsageError
-from ._types import NOT_GIVEN
 
 ########################################################
 #               Private Constants                      #

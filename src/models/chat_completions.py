@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
-from ..util._constants import FAKE_RESPONSES_ID, NOT_GIVEN, _HEADERS, _USER_AGENT
+from ..util._constants import FAKE_RESPONSES_ID, HEADERS, NOT_GIVEN
 from ..util._exceptions import AgentError, UsageError
 from ..util._handoffs import Handoff
 from ..util._items import (
@@ -287,7 +287,7 @@ class ModelChatCompletionsModel(Model):
             "presence_penalty": self._non_null_or_not_given(model_settings.presence_penalty),
             "max_tokens": self._non_null_or_not_given(model_settings.max_tokens),
             "stream": stream,
-            "extra_headers": _HEADERS,
+            "extra_headers": HEADERS,
         }
 
         # Only add optional parameters if they're not NOT_GIVEN

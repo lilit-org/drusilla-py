@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
-from ..util._constants import NOT_GIVEN, _HEADERS, _USER_AGENT, IncludeLiteral
+from ..util._constants import _USER_AGENT, HEADERS, NOT_GIVEN, IncludeLiteral
 from ..util._exceptions import UsageError
 from ..util._handoffs import Handoff
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
@@ -35,8 +35,6 @@ if TYPE_CHECKING:
 ########################################################
 
 _USER_AGENT = f"Agents/Python {__version__}"
-_HEADERS = {"User-Agent": _USER_AGENT}
-# API response
 IncludeLiteral = Literal[
     "file_search_call.results",
     "message.input_image.image_url",
@@ -203,7 +201,7 @@ class ModelResponsesModel(Model):
             tool_choice=tool_choice,
             parallel_tool_calls=parallel_tool_calls,
             stream=stream,
-            extra_headers=_HEADERS,
+            extra_headers=HEADERS,
             text=response_format,
         )
 

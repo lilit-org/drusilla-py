@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable
 from dataclasses import dataclass
-from typing import Any, Literal, TypeAlias, TypedDict, Union, cast
+from typing import Any, Literal, TypeAlias, TypedDict, Union
 
 from typing_extensions import TypeVar
-
-from ._constants import NOT_GIVEN
 
 ########################################################
 #              Type Variables                         #

@@ -1,7 +1,7 @@
 import abc
-from typing import Literal
 
 from ._constants import Button, Environment
+
 
 ########################################################
 #              Computer Interface
