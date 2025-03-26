@@ -4,7 +4,6 @@ from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..agents.output import AgentOutputSchema
-from ..util._handoffs import Handoff
 from ..util._items import ModelResponse, TResponseInputItem, TResponseStreamEvent
 from ..util._tool import Tool
 from .settings import ModelSettings
@@ -37,19 +36,19 @@ class Model(Protocol):
         """Get a complete model response.
 
         Args:
-            system_instructions: System prompt/instructions for the model
-            input: Model input items or raw string input
-            model_settings: Configuration parameters for the model
-            tools: List of available tools the model can use
-            output_schema: Optional schema defining the expected output format
-            handoffs: List of available handoffs for model interactions
+            system_instructions: System prompt/instructions for the model. Can be None.
+            input: Either a raw string input or a list of structured input items.
+            model_settings: Configuration parameters for the model including temperature, top_p, etc.
+            tools: List of available tools the model can use for function calling.
+            output_schema: Optional schema defining the expected output format and structure.
+            handoffs: List of available handoffs for model interactions with other agents.
 
         Returns:
-            A ModelResponse containing the model's output and usage statistics
+            A ModelResponse containing the model's output and usage statistics.
         """
         pass
 
-    def stream_response(
+    async def stream_response(
         self,
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
@@ -61,15 +60,16 @@ class Model(Protocol):
         """Stream model responses as they are generated.
 
         Args:
-            system_instructions: System prompt/instructions for the model
-            input: Model input items or raw string input
-            model_settings: Configuration parameters for the model
-            tools: List of available tools the model can use
-            output_schema: Optional schema defining the expected output format
-            handoffs: List of available handoffs for model interactions
+            system_instructions: System prompt/instructions for the model. Can be None.
+            input: Either a raw string input or a list of structured input items.
+            model_settings: Configuration parameters for the model including temperature, top_p, etc.
+            tools: List of available tools the model can use for function calling.
+            output_schema: Optional schema defining the expected output format and structure.
+            handoffs: List of available handoffs for model interactions with other agents.
 
         Returns:
-            An async iterator yielding response events as they are generated
+            An async iterator yielding response events as they are generated. Each event
+            represents a partial response chunk or completion status.
         """
         pass
 
@@ -87,12 +87,5 @@ class ModelProvider(Protocol):
     """
 
     def get_model(self, model_name: str | None) -> Model:
-        """Get a model instance by name.
-
-        Args:
-            model_name: Optional model identifier. If None, a default model may be used.
-
-        Returns:
-            A configured Model instance ready for use
-        """
+        """Get a model instance by name."""
         pass

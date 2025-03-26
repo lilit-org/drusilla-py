@@ -34,8 +34,15 @@ make install
 create a `.env` file in your project root with your deepseek api endpoint and any customization:
 
 ```shell
-BASE_URL = "http://localhost:11434"      
-LOGGING = "DEBUG"     
+BASE_URL = "http://localhost:11434"
+API_KEY = "NONE"
+MODEL = "deepseek-r1"
+MAX_TURNS = 10
+WRAPPER_DICT_KEY = "response"
+DEFAULT_MAX_QUEUE_SIZE = 1000
+DEFAULT_MAX_GUARDRAIL_QUEUE_SIZE = 100
+LRU_CACHE_SIZE = 128
+LOG_LEVEL = "DEBUG"  
 ```
 
 <br>
