@@ -235,8 +235,7 @@ class ItemHelpers:
     def text_message_output(message: MessageOutputItem) -> str:
         """Extract text from a message output efficiently."""
         text = message.text_content
-        if text.endswith("', 'type': 'output_text', 'annotations': []}"):
-            text = text[:-len("', 'type': 'output_text', 'annotations': []}")]
+        text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
         return text.strip()
 
     @staticmethod
@@ -255,8 +254,8 @@ class ItemHelpers:
         """Format content with proper indentation and borders efficiently."""
         if not content:
             return ""
-        if content.endswith("', 'type': 'output_text', 'annotations': []}"):
-            content = content[:-len("', 'type': 'output_text', 'annotations': []}")]
+        # Remove the pattern anywhere in the content
+        content = content.replace("', 'type': 'output_text', 'annotations': []}", "")
         lines = [line.strip() for line in content.split('\n') if line.strip()]
         if not lines:
             return ""
