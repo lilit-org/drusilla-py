@@ -122,6 +122,15 @@ class SingleStepResult:
 ########################################################
 
 class RunImpl:
+    EVENT_MAP = {
+        MessageOutputItem: "message_output_created",
+        HandoffCallItem: "handoff_requested",
+        HandoffOutputItem: "handoff_occured",
+        ToolCallItem: "tool_called",
+        ToolCallOutputItem: "tool_output",
+        ReasoningItem: "reasoning_item_created",
+    }
+
     @classmethod
     async def execute_tools_and_side_effects(
         cls,
@@ -136,8 +145,7 @@ class RunImpl:
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> SingleStepResult:
-        pre_step_items = list(pre_step_items)
-        new_step_items = list(processed_response.new_items)
+        new_step_items = processed_response.new_items
 
         function_results, computer_results = await asyncio.gather(
             cls.execute_function_tool_calls(
@@ -151,7 +159,6 @@ class RunImpl:
                 actions=processed_response.computer_actions,
                 hooks=hooks,
                 context_wrapper=context_wrapper,
-                config=run_config,
             ),
         )
         new_step_items.extend([result.run_item for result in function_results])
@@ -167,7 +174,6 @@ class RunImpl:
                 run_handoffs=run_handoffs,
                 hooks=hooks,
                 context_wrapper=context_wrapper,
-                run_config=run_config,
             )
 
         check_tool_use = await cls._check_for_final_output_from_tools(
@@ -243,13 +249,18 @@ class RunImpl:
         handoffs: list[Handoff],
     ) -> ProcessedResponse:
         items: list[RunItem] = []
-        run_handoffs = []
-        functions = []
-        computer_actions = []
-
+        run_handoffs: list[ToolRunHandoff] = []
+        functions: list[ToolRunFunction] = []
+        computer_actions: list[ToolRunComputerAction] = []
         handoff_map = {handoff.tool_name: handoff for handoff in handoffs}
-        function_map = {tool.name: tool for tool in agent.tools if isinstance(tool, FunctionTool)}
-        computer_tool = next((tool for tool in agent.tools if isinstance(tool, ComputerTool)), None)
+        function_map = {}
+        computer_tool = None
+        
+        for tool in agent.tools:
+            if isinstance(tool, FunctionTool):
+                function_map[tool.name] = tool
+            elif isinstance(tool, ComputerTool):
+                computer_tool = tool
 
         for output in response.output:
             output_type = output["type"]
@@ -264,9 +275,9 @@ class RunImpl:
                 items.append(MessageOutputItem(raw_item=message_output, agent=agent))
             elif output_type in ("file_search", "web_search", "computer"):
                 items.append(ToolCallItem(raw_item=output, agent=agent))
-                if output_type == "computer" and not computer_tool:
-                    raise ModelError("Model produced computer action without a computer tool.")
                 if output_type == "computer":
+                    if not computer_tool:
+                        raise ModelError("Model produced computer action without a computer tool.")
                     computer_actions.append(
                         ToolRunComputerAction(tool_call=output, computer_tool=computer_tool)
                     )
@@ -360,19 +371,16 @@ class RunImpl:
         actions: list[ToolRunComputerAction],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
-        config: RunConfig,
     ) -> list[RunItem]:
-        results: list[RunItem] = []
-        for action in actions:
-            results.append(
-                await ComputerAction.execute(
-                    agent=agent,
-                    action=action,
-                    hooks=hooks,
-                    context_wrapper=context_wrapper,
-                )
+        return await asyncio.gather(*[
+            ComputerAction.execute(
+                agent=agent,
+                action=action,
+                hooks=hooks,
+                context_wrapper=context_wrapper,
             )
-        return results
+            for action in actions
+        ])
 
     @classmethod
     async def execute_handoffs(
@@ -386,21 +394,18 @@ class RunImpl:
         run_handoffs: list[ToolRunHandoff],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
-        run_config: RunConfig,
     ) -> SingleStepResult:
         if len(run_handoffs) > 1:
-            output_message = "Multiple handoffs detected, ignoring this one."
-            new_step_items.extend(
-                [
-                    ToolCallOutputItem(
-                        output=output_message,
-                        raw_item=ItemHelpers.tool_call_output_item(
-                            handoff.tool_call, output_message
-                        ),
-                        agent=agent,
-                    )
-                    for handoff in run_handoffs[1:]
-                ]
+            ignored_handoffs = run_handoffs[1:]
+            output_message = f"Multiple handoffs detected, ignoring {len(ignored_handoffs)} handoffs."
+            new_step_items.append(
+                ToolCallOutputItem(
+                    output=output_message,
+                    raw_item=ItemHelpers.tool_call_output_item(
+                        ignored_handoffs[0].tool_call, output_message
+                    ),
+                    agent=agent,
+                )
             )
 
         actual_handoff = run_handoffs[0]
@@ -503,12 +508,13 @@ class RunImpl:
         context_wrapper: RunContextWrapper[TContext],
         final_output: Any,
     ):
-        await asyncio.gather(
-            hooks.on_end(context_wrapper, agent, final_output),
-            agent.hooks.on_end(context_wrapper, agent, final_output)
-            if agent.hooks
-            else noop(),
-        )
+        if agent.hooks:
+            await asyncio.gather(
+                hooks.on_end(context_wrapper, agent, final_output),
+                agent.hooks.on_end(context_wrapper, agent, final_output)
+            )
+        else:
+            await hooks.on_end(context_wrapper, agent, final_output)
 
     @classmethod
     async def run_single_input_guardrail(
@@ -537,24 +543,11 @@ class RunImpl:
         queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel],
     ):
         for item in step_result.new_step_items:
-            if isinstance(item, MessageOutputItem):
-                event = RunItemStreamEvent(item=item, name="message_output_created")
-            elif isinstance(item, HandoffCallItem):
-                event = RunItemStreamEvent(item=item, name="handoff_requested")
-            elif isinstance(item, HandoffOutputItem):
-                event = RunItemStreamEvent(item=item, name="handoff_occured")
-            elif isinstance(item, ToolCallItem):
-                event = RunItemStreamEvent(item=item, name="tool_called")
-            elif isinstance(item, ToolCallOutputItem):
-                event = RunItemStreamEvent(item=item, name="tool_output")
-            elif isinstance(item, ReasoningItem):
-                event = RunItemStreamEvent(item=item, name="reasoning_item_created")
+            event_name = cls.EVENT_MAP.get(type(item))
+            if event_name:
+                queue.put_nowait(RunItemStreamEvent(item=item, name=event_name))
             else:
                 logger.warning(f"Unexpected item type: {type(item)}")
-                event = None
-
-            if event:
-                queue.put_nowait(event)
 
     @classmethod
     async def _check_for_final_output_from_tools(
@@ -602,6 +595,54 @@ class RunImpl:
 
 class ComputerAction:
     @classmethod
+    async def _execute_computer_action(
+        cls,
+        computer: Computer | AsyncComputer,
+        action: dict[str, Any],
+    ) -> str:
+        action_type = action["type"]
+        if isinstance(computer, AsyncComputer):
+            if action_type == "click":
+                await computer.click(action["x"], action["y"], action["button"])
+            elif action_type == "double_click":
+                await computer.double_click(action["x"], action["y"])
+            elif action_type == "drag":
+                await computer.drag([(p["x"], p["y"]) for p in action["path"]])
+            elif action_type == "keypress":
+                await computer.keypress(action["keys"])
+            elif action_type == "move":
+                await computer.move(action["x"], action["y"])
+            elif action_type == "screenshot":
+                await computer.screenshot()
+            elif action_type == "scroll":
+                await computer.scroll(action["x"], action["y"], action["scroll_x"], action["scroll_y"])
+            elif action_type == "type":
+                await computer.type(action["text"])
+            elif action_type == "wait":
+                await computer.wait()
+            return await computer.screenshot()
+        else:
+            if action_type == "click":
+                computer.click(action["x"], action["y"], action["button"])
+            elif action_type == "double_click":
+                computer.double_click(action["x"], action["y"])
+            elif action_type == "drag":
+                computer.drag([(p["x"], p["y"]) for p in action["path"]])
+            elif action_type == "keypress":
+                computer.keypress(action["keys"])
+            elif action_type == "move":
+                computer.move(action["x"], action["y"])
+            elif action_type == "screenshot":
+                computer.screenshot()
+            elif action_type == "scroll":
+                computer.scroll(action["x"], action["y"], action["scroll_x"], action["scroll_y"])
+            elif action_type == "type":
+                computer.type(action["text"])
+            elif action_type == "wait":
+                computer.wait()
+            return computer.screenshot()
+
+    @classmethod
     async def execute(
         cls,
         *,
@@ -610,20 +651,16 @@ class ComputerAction:
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
     ) -> RunItem:
-        output_func = (
-            cls._get_screenshot_async(action.computer_tool.computer, action.tool_call)
-            if isinstance(action.computer_tool.computer, AsyncComputer)
-            else cls._get_screenshot_sync(action.computer_tool.computer, action.tool_call)
-        )
+        output = await cls._execute_computer_action(action.computer_tool.computer, action.tool_call["action"])
 
-        _, _, output = await asyncio.gather(
+        _, _, _ = await asyncio.gather(
             hooks.on_tool_start(context_wrapper, agent, action.computer_tool),
             (
                 agent.hooks.on_tool_start(context_wrapper, agent, action.computer_tool)
                 if agent.hooks
                 else noop()
             ),
-            output_func,
+            asyncio.sleep(0),
         )
 
         await asyncio.gather(
@@ -648,59 +685,3 @@ class ComputerAction:
                 "type": "computer_call_output",
             },
         )
-
-    @classmethod
-    async def _get_screenshot_sync(
-        cls,
-        computer: Computer,
-        tool_call: ResponseComputerToolCall,
-    ) -> str:
-        action = tool_call["action"]
-        if action["type"] == "click":
-            computer.click(action["x"], action["y"], action["button"])
-        elif action["type"] == "double_click":
-            computer.double_click(action["x"], action["y"])
-        elif action["type"] == "drag":
-            computer.drag([(p["x"], p["y"]) for p in action["path"]])
-        elif action["type"] == "keypress":
-            computer.keypress(action["keys"])
-        elif action["type"] == "move":
-            computer.move(action["x"], action["y"])
-        elif action["type"] == "screenshot":
-            computer.screenshot()
-        elif action["type"] == "scroll":
-            computer.scroll(action["x"], action["y"], action["scroll_x"], action["scroll_y"])
-        elif action["type"] == "type":
-            computer.type(action["text"])
-        elif action["type"] == "wait":
-            computer.wait()
-
-        return computer.screenshot()
-
-    @classmethod
-    async def _get_screenshot_async(
-        cls,
-        computer: AsyncComputer,
-        tool_call: ResponseComputerToolCall,
-    ) -> str:
-        action = tool_call["action"]
-        if action["type"] == "click":
-            await computer.click(action["x"], action["y"], action["button"])
-        elif action["type"] == "double_click":
-            await computer.double_click(action["x"], action["y"])
-        elif action["type"] == "drag":
-            await computer.drag([(p["x"], p["y"]) for p in action["path"]])
-        elif action["type"] == "keypress":
-            await computer.keypress(action["keys"])
-        elif action["type"] == "move":
-            await computer.move(action["x"], action["y"])
-        elif action["type"] == "screenshot":
-            await computer.screenshot()
-        elif action["type"] == "scroll":
-            await computer.scroll(action["x"], action["y"], action["scroll_x"], action["scroll_y"])
-        elif action["type"] == "type":
-            await computer.type(action["text"])
-        elif action["type"] == "wait":
-            await computer.wait()
-
-        return await computer.screenshot()
