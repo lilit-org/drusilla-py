@@ -4,7 +4,7 @@ import json
 import time
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
 from ..util._constants import FAKE_RESPONSES_ID, HEADERS, NOT_GIVEN
@@ -39,26 +39,23 @@ from ..util._usage import Usage
 from .interface import Model
 from .settings import ModelSettings
 
-if TYPE_CHECKING:
-    from .settings import ModelSettings
-
-
 ########################################################
 #           Data Classes                               #
 ########################################################
 
-@dataclass
+@dataclass(frozen=True)
 class _StreamingState:
-    """Tracks streaming state."""
+    """Maintains the current state of streaming responses."""
     text_content_index_and_output: tuple[int, ResponseOutputText] | None = None
     function_calls: dict[int, ResponseFunctionToolCall] = field(default_factory=dict)
+
 
 ########################################################
 #           Main Class: Chat Completions Model         #
 ########################################################
 
 class ModelChatCompletionsModel(Model):
-    """Chat completions API model."""
+    """Handles chat completion requests to the API model."""
 
     def __init__(
         self,
@@ -69,7 +66,7 @@ class ModelChatCompletionsModel(Model):
         self._client = model_client
 
     def _non_null_or_not_given(self, value: Any) -> Any:
-        """Convert falsy values to None, otherwise return the value."""
+        """Converts falsy values to None, preserving non-falsy values."""
         return None if not value else value
 
     async def get_response(
@@ -81,7 +78,7 @@ class ModelChatCompletionsModel(Model):
         output_schema: AgentOutputSchema | None,
         handoffs: list[Handoff],
     ) -> ModelResponse:
-        """Get complete model response."""
+        """Retrieves a complete model response."""
         response = await self._fetch_response(
             system_instructions,
             input,
@@ -92,7 +89,7 @@ class ModelChatCompletionsModel(Model):
             stream=False,
         )
 
-        logger.debug("✅ Received Model Response...")
+        logger.debug("Successfully received model response")
         if isinstance(response, tuple):
             response_obj = response[0]
         else:
@@ -255,7 +252,7 @@ class ModelChatCompletionsModel(Model):
         handoffs: list[Handoff],
         stream: bool = False,
     ) -> ChatCompletion | tuple[Response, AsyncStream]:
-        """Fetch response from chat completions API."""
+        """Makes a request to the chat completions API and returns the response."""
         converted_messages = _Converter.items_to_messages(input)
 
         if system_instructions:
@@ -277,7 +274,6 @@ class ModelChatCompletionsModel(Model):
         for handoff in handoffs:
             converted_tools.append(ToolConverter.convert_handoff_tool(handoff))
 
-        # Prepare request parameters, converting NOT_GIVEN to None
         request_params = {
             "model": self.model,
             "messages": converted_messages,
@@ -290,7 +286,6 @@ class ModelChatCompletionsModel(Model):
             "extra_headers": HEADERS,
         }
 
-        # Only add optional parameters if they're not NOT_GIVEN
         if converted_tools:
             request_params["tools"] = converted_tools
         if tool_choice != NOT_GIVEN:
@@ -324,8 +319,8 @@ class ModelChatCompletionsModel(Model):
         return ret
 
     def _get_client(self) -> AsyncDeepSeek:
-        """Get or create the API client."""
-        return self._client or AsyncDeepSeek()
+        """Returns the configured API client instance."""
+        return self._client
 
 
 ########################################################
@@ -333,13 +328,13 @@ class ModelChatCompletionsModel(Model):
 ########################################################
 
 class _Converter:
-    """API and internal format converter."""
+    """Converts between API and internal data formats."""
 
     @classmethod
     def convert_tool_choice(
         cls, tool_choice: Literal["auto", "required", "none"] | str | None
     ) -> ChatCompletionToolChoiceOptionParam | Any:
-
+        """Converts tool choice settings to API format."""
         if tool_choice is None:
             return NOT_GIVEN
         elif tool_choice == "auto":
@@ -360,7 +355,7 @@ class _Converter:
     def convert_response_format(
         cls, final_output_schema: AgentOutputSchema | None
     ) -> ResponseFormat | Any:
-
+        """Converts output schema to API response format."""
         if not final_output_schema or final_output_schema.is_plain_text():
             return NOT_GIVEN
         return {
@@ -702,11 +697,11 @@ class _Converter:
 ########################################################
 
 class ToolConverter:
-    """Tool format converter."""
+    """Converts tool definitions to API format."""
 
     @classmethod
     def to_api_format(cls, tool: Tool) -> ChatCompletionToolParam:
-
+        """Converts a tool to its API representation."""
         if isinstance(tool, FunctionTool):
             return {
                 "type": "function",
@@ -718,13 +713,13 @@ class ToolConverter:
             }
 
         raise AgentError(
-            f"Hosted tools are not supported with the ChatCompletions API. Got tool type: "
+            f"Chat completions API does not support hosted tools. Received tool type: "
             f"{type(tool)}, tool: {tool}"
         )
 
     @classmethod
     def convert_handoff_tool(cls, handoff: Handoff[Any]) -> ChatCompletionToolParam:
-
+        """Converts a handoff tool to API format."""
         return {
             "type": "function",
             "function": {
@@ -735,8 +730,6 @@ class ToolConverter:
         }
 
 class NotGivenEncoder(json.JSONEncoder):
-    """Custom JSON encoder that handles NOT_GIVEN values."""
+    """JSON encoder that converts NOT_GIVEN values to None."""
     def default(self, obj):
-        if obj is NOT_GIVEN:
-            return None
-        return super().default(obj)
+        return None if obj is NOT_GIVEN else super().default(obj)
