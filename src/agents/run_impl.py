@@ -504,7 +504,7 @@ class RunImpl:
         final_output: Any,
     ):
         await asyncio.gather(
-            hooks.on_agent_end(context_wrapper, agent, final_output),
+            hooks.on_end(context_wrapper, agent, final_output),
             agent.hooks.on_end(context_wrapper, agent, final_output)
             if agent.hooks
             else noop(),

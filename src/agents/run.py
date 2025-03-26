@@ -12,11 +12,11 @@ from ..util import _coro
 from ..util._env import get_env_var
 from ..util._exceptions import (
     AgentError,
+    GenericError,
     InputGuardrailError,
     MaxTurnsError,
     ModelError,
     OutputGuardrailError,
-    GenericError,
 )
 from ..util._guardrail import (
     InputGuardrail,
@@ -486,7 +486,7 @@ class Runner:
 
         if should_run_agent_start_hooks:
             await asyncio.gather(
-                hooks.on_agent_start(context_wrapper, agent),
+                hooks.on_start(context_wrapper, agent),
                 (
                     agent.hooks.on_start(context_wrapper, agent)
                     if agent.hooks
@@ -567,7 +567,7 @@ class Runner:
 
         if should_run_agent_start_hooks:
             await asyncio.gather(
-                hooks.on_agent_start(context_wrapper, agent),
+                hooks.on_start(context_wrapper, agent),
                 (
                     agent.hooks.on_start(context_wrapper, agent)
                     if agent.hooks
