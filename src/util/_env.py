@@ -1,13 +1,13 @@
 import os
-from typing import TypeVar, Dict, Any
 from functools import lru_cache
+from typing import Any, TypeVar
 
 ########################################################
 #              Constants
 ########################################################
 
 T = TypeVar("T")
-_env_cache: Dict[str, Any] = {}
+_env_cache: dict[str, Any] = {}
 TRUE_VALUES = {"true", "1", "yes"}
 
 ########################################################
