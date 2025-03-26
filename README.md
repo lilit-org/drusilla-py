@@ -113,17 +113,17 @@ you should get something like this:
 ✅ RunResult:
   
   👾 Agent Info:
-        Last Agent : Agent Mulder
+        Last Agent → Agent Mulder
   
   📊 Statistics:
-        Items     : 1
-        Responses : 1
-        Input GR  : 0
-        Output GR : 0
+        Items     → 1
+        Responses → 1
+        Input GR  → 0
+        Output GR → 0
   
   🦾 Configuration:
-        Streaming  : ❌ Disabled
-        Tool Mode  : None
+        Streaming → ❌ Disabled
+        Tool Mode → None
 
 ✅ REASONING:
 

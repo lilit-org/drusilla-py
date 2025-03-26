@@ -53,3 +53,22 @@ DEFAULT_MAX_TURNS = 10
 MAX_QUEUE_SIZE = 1000
 MAX_GUARDRAIL_QUEUE_SIZE = 100
 LRU_CACHE_SIZE = 128
+
+# HTTP Client settings
+HTTP_TIMEOUT_TOTAL = 120.0
+HTTP_TIMEOUT_CONNECT = 30.0
+HTTP_TIMEOUT_READ = 90.0
+HTTP_MAX_KEEPALIVE_CONNECTIONS = 5
+HTTP_MAX_CONNECTIONS = 10
+
+# Supported languages
+SUPPORTED_LANGUAGES = {
+    "PORTUGUESE": "Portuguese",
+    "SPANISH": "Spanish",
+    "FRENCH": "French",
+    "ITALIAN": "Italian",
+    "JAPANESE": "Japanese",
+    "GERMAN": "German",
+    "CHINESE": "Chinese",
+    "RUSSIAN": "Russian"
+} 

@@ -53,8 +53,8 @@ def _format_stream_info(stream: bool, tool_choice: Any, response_format: Any) ->
     """Format stream, tool choice and response format information."""
     info = [
         "\n🦾 Configuration:",
-        f"      Streaming  : {_format_special_object(stream)}",
-        f"      Tool Mode  : {_format_special_object(tool_choice)}",
+        f"      Streaming → {_format_special_object(stream)}",
+        f"      Tool Mode → {_format_special_object(tool_choice)}",
     ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
@@ -63,10 +63,10 @@ def _format_stats(result: PrettyPrintable) -> str:
     """Format the statistics section of the result."""
     stats = [
         "\n📊 Statistics:",
-        f"      Items     : {len(result.new_items)}",
-        f"      Responses : {len(result.raw_responses)}",
-        f"      Input GR  : {len(result.input_guardrail_results)}",
-        f"      Output GR : {len(result.output_guardrail_results)}",
+        f"      Items     → {len(result.new_items)}",
+        f"      Responses → {len(result.raw_responses)}",
+        f"      Input GR  → {len(result.input_guardrail_results)}",
+        f"      Output GR → {len(result.output_guardrail_results)}",
     ]
     return "\n" + "\n".join(_indent(stat, 1) for stat in stats)
 
@@ -76,14 +76,14 @@ def _format_agent_info(result: PrettyPrintable) -> str:
     if hasattr(result, 'is_complete'):
         info = [
             "\n👾 Agent Info:",
-            f"      Name       : {result.current_agent.name}",
-            f"      Turn       : {result.current_turn}/{result.max_turns}",
-            f"      Status     : {'✅ Complete' if result.is_complete else '🔄 Running'}",
+            f"      Name   → {result.current_agent.name}",
+            f"      Turn   → {result.current_turn}/{result.max_turns}",
+            f"      Status → {'✅ Complete' if result.is_complete else '🔄 Running'}",
         ]
     else:
         info = [
             "\n👾 Agent Info:",
-            f"      Last Agent : {result.last_agent.name}",
+            f"      Last Agent → {result.last_agent.name}",
         ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 

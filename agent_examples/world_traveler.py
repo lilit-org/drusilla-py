@@ -6,10 +6,18 @@ translation agents to handle user messages.
 """
 
 import sys
-import httpx
 from pathlib import Path
-
 sys.path.append(str(Path(__file__).parent.parent))
+
+import httpx
+from src.util._constants import (
+    HTTP_TIMEOUT_TOTAL,
+    HTTP_TIMEOUT_CONNECT,
+    HTTP_TIMEOUT_READ,
+    HTTP_MAX_KEEPALIVE_CONNECTIONS,
+    HTTP_MAX_CONNECTIONS,
+    SUPPORTED_LANGUAGES
+)
 
 from src.util._client import DeepSeekClient
 from src.agents import Agent, ItemHelpers, MessageOutputItem, Runner
@@ -21,8 +29,15 @@ def setup_client() -> DeepSeekClient:
     """Set up and configure the DeepSeek client with optimal settings."""
     client = DeepSeekClient(
         http_client=httpx.AsyncClient(
-            timeout=httpx.Timeout(120.0, connect=30.0, read=90.0),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+            timeout=httpx.Timeout(
+                HTTP_TIMEOUT_TOTAL,
+                connect=HTTP_TIMEOUT_CONNECT,
+                read=HTTP_TIMEOUT_READ
+            ),
+            limits=httpx.Limits(
+                max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                max_connections=HTTP_MAX_CONNECTIONS
+            )
         )
     )
     set_default_model_client(client)
@@ -32,35 +47,14 @@ def setup_client() -> DeepSeekClient:
 
 def create_agents() -> tuple[Agent, Agent]:
     """Create translation agents and orchestrator."""
-    spanish_agent = Agent(
-        name="Spanish Translator",
-        instructions="Translate English text to Spanish",
-        handoff_description="English to Spanish translator",
-    )
-
-    portuguese_agent = Agent(
-        name="Portuguese Translator",
-        instructions="Translate English text to Portuguese",
-        handoff_description="English to Portuguese translator",
-    )
-
-    french_agent = Agent(
-        name="French Translator",
-        instructions="Translate English text to French",
-        handoff_description="English to French translator",
-    )
-
-    italian_agent = Agent(
-        name="Italian Translator",
-        instructions="Translate English text to Italian",
-        handoff_description="English to Italian translator",
-    )
-
-    japanese_agent = Agent(
-        name="Japanese Translator",
-        instructions="Translate English text to Japanese",
-        handoff_description="English to Japanese translator",
-    )
+    translation_agents = {
+        lang_key.lower(): Agent(
+            name=f"{lang_name} Translator",
+            instructions=f"Translate English text to {lang_name}",
+            handoff_description=f"English to {lang_name} translator",
+        )
+        for lang_key, lang_name in SUPPORTED_LANGUAGES.items()
+    }
 
     orchestrator_agent = Agent(
         name="Translation Orchestrator",
@@ -69,63 +63,36 @@ def create_agents() -> tuple[Agent, Agent]:
             "Use appropriate translation tools based on requested languages."
         ),
         tools=[
-            portuguese_agent.as_tool(
-                tool_name="translate_to_portuguese",
-                tool_description="Translate text to Portuguese",
-            ),
-            spanish_agent.as_tool(
-                tool_name="translate_to_spanish",
-                tool_description="Translate text to Spanish",
-            ),
-            french_agent.as_tool(
-                tool_name="translate_to_french",
-                tool_description="Translate text to French",
-            ),
-            italian_agent.as_tool(
-                tool_name="translate_to_italian",
-                tool_description="Translate text to Italian",
-            ),
-            japanese_agent.as_tool(
-                tool_name="translate_to_japanese",
-                tool_description="Translate text to Japanese",
-            ),
+            translation_agents[lang_key.lower()].as_tool(
+                tool_name=f"translate_to_{lang_key.lower()}",
+                tool_description=f"Translate text to {lang_name}",
+            )
+            for lang_key, lang_name in SUPPORTED_LANGUAGES.items()
         ],
     )
 
-    synthesizer_agent = Agent(
-        name="World Traveler",
-        instructions="Review and combine translations into final response.",
-    )
-
-    return orchestrator_agent, synthesizer_agent
+    return orchestrator_agent
 
 
 def main() -> str | None:
     """Run the translation service and return the result."""
     try:
         setup_client()
-        orchestrator_agent, synthesizer_agent = create_agents()
-        
-        msg = input("\n👾 Enter text to translate and target languages: ")
-        
+        orchestrator_agent = create_agents()
+
+        msg = input("\n✅ Enter text to translate and target languages: ")
         orchestrator_result = Runner.run_sync(orchestrator_agent, msg)
         
         for item in orchestrator_result.new_items:
             if isinstance(item, MessageOutputItem):
                 text = ItemHelpers.text_message_output(item)
                 if text:
-                    print(f"  - Translation: {text}")
-        
-        synthesizer_result = Runner.run_sync(
-            synthesizer_agent, orchestrator_result.to_input_list()
-        )
-        
-        return pretty_print_result(synthesizer_result)
+                    print(f"        📝Translation: {text}")
+
     except httpx.HTTPError as e:
         print(f"HTTP error: {e}", file=sys.stderr)
     except Exception as e:
         print(f"Translation service error: {e}", file=sys.stderr)
-    return None
 
 
 if __name__ == "__main__":

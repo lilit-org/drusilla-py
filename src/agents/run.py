@@ -555,8 +555,6 @@ class Runner:
 
         if not final_response:
             raise ModelError("Model did not produce a final response!")
-
-        # This should never be reached since we return after processing the first response
         raise ModelError("No response was processed!")
 
     @classmethod
