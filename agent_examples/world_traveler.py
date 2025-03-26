@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 """
-Example of agents-as-tools pattern where a frontline agent selects translation agents
-to handle user messages.
+This script demonstrates the agents-as-tools pattern where a frontline agent selects
+translation agents to handle user messages.
 """
 
 import sys
@@ -18,7 +18,7 @@ from src.util._pretty_print import pretty_print_result
 
 
 def setup_client() -> DeepSeekClient:
-    """Configure DeepSeek client with optimal timeout and connection settings."""
+    """Set up and configure the DeepSeek client with optimal settings."""
     client = DeepSeekClient(
         http_client=httpx.AsyncClient(
             timeout=httpx.Timeout(120.0, connect=30.0, read=90.0),
@@ -56,6 +56,12 @@ def create_agents() -> tuple[Agent, Agent]:
         handoff_description="English to Italian translator",
     )
 
+    japanese_agent = Agent(
+        name="Japanese Translator",
+        instructions="Translate English text to Japanese",
+        handoff_description="English to Japanese translator",
+    )
+
     orchestrator_agent = Agent(
         name="Translation Orchestrator",
         instructions=(
@@ -79,26 +85,30 @@ def create_agents() -> tuple[Agent, Agent]:
                 tool_name="translate_to_italian",
                 tool_description="Translate text to Italian",
             ),
+            japanese_agent.as_tool(
+                tool_name="translate_to_japanese",
+                tool_description="Translate text to Japanese",
+            ),
         ],
     )
 
     synthesizer_agent = Agent(
-        name="Translation Synthesizer",
+        name="World Traveler",
         instructions="Review and combine translations into final response.",
     )
 
     return orchestrator_agent, synthesizer_agent
 
 
-async def main() -> str | None:
-    """Run translation service and return results."""
+def main() -> str | None:
+    """Run the translation service and return the result."""
     try:
         setup_client()
         orchestrator_agent, synthesizer_agent = create_agents()
         
-        msg = input("Enter text to translate and target languages: ")
+        msg = input("\n👾 Enter text to translate and target languages: ")
         
-        orchestrator_result = await Runner.run(orchestrator_agent, msg)
+        orchestrator_result = Runner.run_sync(orchestrator_agent, msg)
         
         for item in orchestrator_result.new_items:
             if isinstance(item, MessageOutputItem):
@@ -106,7 +116,7 @@ async def main() -> str | None:
                 if text:
                     print(f"  - Translation: {text}")
         
-        synthesizer_result = await Runner.run(
+        synthesizer_result = Runner.run_sync(
             synthesizer_agent, orchestrator_result.to_input_list()
         )
         
@@ -119,6 +129,5 @@ async def main() -> str | None:
 
 
 if __name__ == "__main__":
-    import asyncio
-    if output := asyncio.run(main()):
+    if output := main():
         print(output)

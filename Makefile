@@ -26,7 +26,7 @@ format:
 
 .PHONY: cypherpunk-love
 cypherpunk-love:
-	python agent_examples/cypherpunk_love.py
+	poetry run python agent_examples/cypherpunk_love.py
 
 .PHONY: world-traveler
 world-traveler:

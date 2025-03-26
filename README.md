@@ -124,7 +124,6 @@ you should get something like this:
   🦾 Configuration:
         Streaming  : ❌ Disabled
         Tool Mode  : None
-        Response   : None
 
 ✅ REASONING:
 

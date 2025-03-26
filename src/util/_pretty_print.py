@@ -55,7 +55,6 @@ def _format_stream_info(stream: bool, tool_choice: Any, response_format: Any) ->
         "\n🦾 Configuration:",
         f"      Streaming  : {_format_special_object(stream)}",
         f"      Tool Mode  : {_format_special_object(tool_choice)}",
-        f"      Response   : {_format_special_object(response_format)}",
     ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 

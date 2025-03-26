@@ -72,7 +72,6 @@ class DeepSeekClient(AsyncDeepSeek):
                 if client.api_key:
                     headers["Authorization"] = f"Bearer {client.api_key}"
 
-                # Convert messages to Ollama format
                 ollama_messages = []
                 for msg in messages:
                     if msg["role"] == "system":
