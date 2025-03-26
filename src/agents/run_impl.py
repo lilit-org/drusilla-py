@@ -550,7 +550,7 @@ class RunImpl:
                 events.append(RunItemStreamEvent(item=item, name=event_name))
             else:
                 logger.warning(f"Unexpected item type: {type(item)}")
-        
+
         # Batch put all events at once
         for event in events:
             queue.put_nowait(event)

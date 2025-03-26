@@ -544,7 +544,7 @@ class Runner:
                     output_schema=output_schema,
                     handoffs=handoffs,
                 )
-                
+
                 single_step_result = await RunImpl.execute_tools_and_side_effects(
                     agent=agent,
                     original_input=streamed_result.input,
@@ -556,7 +556,7 @@ class Runner:
                     context_wrapper=context_wrapper,
                     run_config=run_config,
                 )
-                
+
                 RunImpl.stream_step_result_to_queue(single_step_result, streamed_result._event_queue)
                 return single_step_result
 

@@ -1,3 +1,0 @@
-poetry run python agent_examples/world_traveler.py
-
-✅ Enter text to translate and target languages: 

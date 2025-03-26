@@ -90,11 +90,11 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
         try:
             if not isinstance(self.raw_item, dict):
                 return ""
-                
+
             content = self.raw_item.get("content", [])
             if not content:
                 return ""
-                
+
             # Handle both list of dicts and list of objects
             texts = []
             for item in content:
@@ -107,9 +107,9 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
                     text = getattr(item, "text", "")
                     if text:
                         texts.append(text)
-                        
+
             return " ".join(texts).strip()
-            
+
         except (AttributeError, KeyError, TypeError, IndexError):
             return ""
 
@@ -257,21 +257,21 @@ class ItemHelpers:
             text = message.text_content
             if not text:
                 return ""
-            
+
             # Clean up the text by removing any JSON-like artifacts
             text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
             text = text.replace("'text': '", "")
             text = text.replace("'", "")
-            
+
             # Clean up any remaining whitespace and format
             text = text.strip()
             if not text:
                 return ""
-                
+
             # Format the text with proper spacing
             lines = [line.strip() for line in text.split('\n') if line.strip()]
             return '\n'.join(lines)
-            
+
         except (IndexError, KeyError, AttributeError):
             return ""
 

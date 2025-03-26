@@ -104,7 +104,7 @@ class DeepSeekClient(AsyncDeepSeek):
 
                 if stream:
                     return AsyncStream(response.aiter_lines())
-                
+
                 # Convert Ollama response to ChatCompletion format
                 ollama_response = response.json()
                 return ChatCompletion(
