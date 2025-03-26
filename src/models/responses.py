@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
-from ..util._constants import _USER_AGENT, HEADERS, NOT_GIVEN, IncludeLiteral
+from ..util._constants import HEADERS, NOT_GIVEN, IncludeLiteral
 from ..util._exceptions import UsageError
 from ..util._handoffs import Handoff
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
@@ -22,25 +22,11 @@ from ..util._types import (
     ResponseOutput,
 )
 from ..util._usage import Usage
-from ..util._version import __version__
 from .interface import Model
 from .settings import ModelSettings
 
 if TYPE_CHECKING:
     from .settings import ModelSettings
-
-
-########################################################
-#               Constants                              #
-########################################################
-
-_USER_AGENT = f"Agents/Python {__version__}"
-IncludeLiteral = Literal[
-    "file_search_call.results",
-    "message.input_image.image_url",
-    "computer_call_output.output.image_url",
-]
-
 
 ########################################################
 #           Main Class: Responses Model                #

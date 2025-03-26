@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import abc
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..agents.output import AgentOutputSchema
 from ..util._handoffs import Handoff
@@ -18,10 +17,14 @@ if TYPE_CHECKING:
 #               Main Class for models                  #
 ########################################################
 
-class Model(abc.ABC):
-    """Base interface for LLM calls."""
+@runtime_checkable
+class Model(Protocol):
+    """Base interface for LLM calls.
 
-    @abc.abstractmethod
+    This interface defines the contract for model implementations that can generate
+    responses either synchronously or asynchronously via streaming.
+    """
+
     async def get_response(
         self,
         system_instructions: str | None,
@@ -31,22 +34,21 @@ class Model(abc.ABC):
         output_schema: AgentOutputSchema | None,
         handoffs: list[Handoff],
     ) -> ModelResponse:
-        """Get model response.
+        """Get a complete model response.
 
         Args:
-            system_instructions: System prompt
-            input: Model input items
-            model_settings: Model config
-            tools: Available tools
-            output_schema: Output format
-            handoffs: Available handoffs
+            system_instructions: System prompt/instructions for the model
+            input: Model input items or raw string input
+            model_settings: Configuration parameters for the model
+            tools: List of available tools the model can use
+            output_schema: Optional schema defining the expected output format
+            handoffs: List of available handoffs for model interactions
 
         Returns:
-            Model response
+            A ModelResponse containing the model's output and usage statistics
         """
         pass
 
-    @abc.abstractmethod
     def stream_response(
         self,
         system_instructions: str | None,
@@ -56,18 +58,18 @@ class Model(abc.ABC):
         output_schema: AgentOutputSchema | None,
         handoffs: list[Handoff],
     ) -> AsyncIterator[TResponseStreamEvent]:
-        """Stream model response.
+        """Stream model responses as they are generated.
 
         Args:
-            system_instructions: System prompt
-            input: Model input items
-            model_settings: Model config
-            tools: Available tools
-            output_schema: Output format
-            handoffs: Available handoffs
+            system_instructions: System prompt/instructions for the model
+            input: Model input items or raw string input
+            model_settings: Configuration parameters for the model
+            tools: List of available tools the model can use
+            output_schema: Optional schema defining the expected output format
+            handoffs: List of available handoffs for model interactions
 
         Returns:
-            Stream of response events
+            An async iterator yielding response events as they are generated
         """
         pass
 
@@ -76,17 +78,21 @@ class Model(abc.ABC):
 #               Main Class for model providers         #
 ########################################################
 
-class ModelProvider(abc.ABC):
-    """Interface for model lookup."""
+@runtime_checkable
+class ModelProvider(Protocol):
+    """Interface for model lookup and instantiation.
 
-    @abc.abstractmethod
+    This interface defines the contract for providers that can create and return
+    Model instances based on a model name or identifier.
+    """
+
     def get_model(self, model_name: str | None) -> Model:
-        """Get model by name.
+        """Get a model instance by name.
 
         Args:
-            model_name: Model identifier
+            model_name: Optional model identifier. If None, a default model may be used.
 
         Returns:
-            Model instance
+            A configured Model instance ready for use
         """
         pass

@@ -1,5 +1,6 @@
 import re
-from typing import Any, Protocol, Pattern
+from re import Pattern
+from typing import Any, Protocol
 
 ########################################################
 #               Protocol Class                         #
@@ -112,21 +113,21 @@ def _format_final_output(result: PrettyPrintable) -> str:
             final_result = _decode_unicode_escape(final_result)
 
             return f"\n\n✅ REASONING:\n{reasoning}\n\n✅ RESULT:\n{final_result}\n"
-        
+
         # Handle responses without think tags
         result_match = RESULT_PATTERN.match(output)
         if result_match:
             final_result = result_match.group(1).strip()
             final_result = _decode_unicode_escape(final_result)
             return f"\n\n✅ RESULT:\n{final_result}\n"
-        
+
         # If no pattern matches, try to extract just the text content
         text_match = TEXT_PATTERN.search(output)
         if text_match:
             final_result = text_match.group(1).strip()
             final_result = _decode_unicode_escape(final_result)
             return f"\n\n✅ RESULT:\n{final_result}\n"
-        
+
         return f"\n\n✅ RESULT:\n{output}\n"
 
     except Exception as e:
@@ -192,7 +193,7 @@ def format_json_response(response: dict[str, Any]) -> str:
 
     formatted_lines = []
     sections = content.split("</think>")
-    
+
     if len(sections) > 1:
         thinking = sections[0].replace("<think>", "").strip()
         if thinking:
