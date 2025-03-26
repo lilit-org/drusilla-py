@@ -103,15 +103,7 @@ def main() -> Optional[str]:
 you should get something like this:
 
 ```shell
-📝 Messages:
-
-  • {'content': 'You are a cool special agent robot', 'role': 'system'}
-  • {'role': 'user', 'content': 'Write a haiku about love in the cypherpunk world.'}
-
-🛠️  Tools:
-
-    []
-
+✅ Received Model Response...
 ✅ RunResult:
   
   👾 Agent Info:
@@ -128,9 +120,7 @@ you should get something like this:
         Tool Mode  : None
         Response   : None
 
-  ✨ Final Output:
-
-       🤔 REASONING:
+✅ REASONING:
 
 Okay, so I have to write a Haiku about love in the cyberpunk world.
 Hmm, let me think about how to approach this.
@@ -158,7 +148,7 @@ For the third line, focusing on emotions that come from such love perhaps the co
 Maybe something about memories connecting them now with the help of technology.
 
 
-       🎯 RESULT:
+✅ RESULT:
 
 Encrypted hearts pulse,
 Digital whispers unite —
