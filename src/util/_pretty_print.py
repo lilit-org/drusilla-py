@@ -25,7 +25,6 @@ class PrettyPrintable(Protocol):
 THINK_PATTERN: Pattern[str] = re.compile(r'<think>(.*?)</think>(.*)', re.DOTALL)
 RESULT_PATTERN: Pattern[str] = re.compile(r"^([^']*?)(?:',\s*'type':\s*'output_text',\s*'annotations':\s*\[\])?$")
 TEXT_PATTERN: Pattern[str] = re.compile(r"'text':\s*'([^']*)'")
-METADATA_PATTERN: Pattern[str] = re.compile(r"',\s*'type':\s*'output_text',\s*'annotations':\s*\[\]$")
 
 ########################################################
 #               Private Functions                      #
@@ -49,13 +48,12 @@ def _format_special_object(obj: Any) -> str:
         return str(obj)
 
 
-def _format_stream_info(stream: bool, tool_choice: Any, response_format: Any) -> str:
-    """Format stream, tool choice and response format information."""
+def _format_stream_info(stream: bool, tool_choice: Any) -> str:
+    """Format stream and tool choice information."""
     info = [
         "\n🦾 Configuration:",
-        f"      Streaming  : {_format_special_object(stream)}",
-        f"      Tool Mode  : {_format_special_object(tool_choice)}",
-        f"      Response   : {_format_special_object(response_format)}",
+        f"      Streaming → {_format_special_object(stream)}",
+        f"      Tool Mode → {_format_special_object(tool_choice)}",
     ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
@@ -64,10 +62,10 @@ def _format_stats(result: PrettyPrintable) -> str:
     """Format the statistics section of the result."""
     stats = [
         "\n📊 Statistics:",
-        f"      Items     : {len(result.new_items)}",
-        f"      Responses : {len(result.raw_responses)}",
-        f"      Input GR  : {len(result.input_guardrail_results)}",
-        f"      Output GR : {len(result.output_guardrail_results)}",
+        f"      Items     → {len(result.new_items)}",
+        f"      Responses → {len(result.raw_responses)}",
+        f"      Input GR  → {len(result.input_guardrail_results)}",
+        f"      Output GR → {len(result.output_guardrail_results)}",
     ]
     return "\n" + "\n".join(_indent(stat, 1) for stat in stats)
 
@@ -77,14 +75,14 @@ def _format_agent_info(result: PrettyPrintable) -> str:
     if hasattr(result, 'is_complete'):
         info = [
             "\n👾 Agent Info:",
-            f"      Name       : {result.current_agent.name}",
-            f"      Turn       : {result.current_turn}/{result.max_turns}",
-            f"      Status     : {'✅ Complete' if result.is_complete else '🔄 Running'}",
+            f"      Name   → {result.current_agent.name}",
+            f"      Turn   → {result.current_turn}/{result.max_turns}",
+            f"      Status → {'✅ Complete' if result.is_complete else '🔄 Running'}",
         ]
     else:
         info = [
             "\n👾 Agent Info:",
-            f"      Last Agent : {result.last_agent.name}",
+            f"      Last Agent → {result.last_agent.name}",
         ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
@@ -101,78 +99,29 @@ def _format_final_output(result: PrettyPrintable) -> str:
         match = THINK_PATTERN.search(output)
 
         if match:
-            reasoning = match.group(1).strip()
+            reasoning = _decode_unicode_escape(match.group(1).strip())
             final_result = match.group(2).strip()
             result_match = RESULT_PATTERN.match(final_result)
-
-            if result_match:
-                final_result = result_match.group(1).strip()
-            else:
-                final_result = final_result.strip()
-
-            reasoning = _decode_unicode_escape(reasoning)
-            final_result = _decode_unicode_escape(final_result)
-
+            final_result = _decode_unicode_escape(result_match.group(1).strip() if result_match else final_result.strip())
             return f"\n\n✅ REASONING:\n{reasoning}\n\n✅ RESULT:\n{final_result}\n"
 
         result_match = RESULT_PATTERN.match(output)
         if result_match:
-            final_result = result_match.group(1).strip()
-            final_result = _decode_unicode_escape(final_result)
+            final_result = _decode_unicode_escape(result_match.group(1).strip())
             return f"\n\n✅ RESULT:\n{final_result}\n"
 
         text_match = TEXT_PATTERN.search(output)
         if text_match:
-            final_result = text_match.group(1).strip()
-            final_result = _decode_unicode_escape(final_result)
+            final_result = _decode_unicode_escape(text_match.group(1).strip())
             return f"\n\n✅ RESULT:\n{final_result}\n"
 
-        try:
-            text_parts = re.findall(r"'text':\s*'([^']*)'", output)
-            if text_parts:
-                final_result = text_parts[0]
-                final_result = _decode_unicode_escape(final_result)
-                return f"\n\n✅ RESULT:\n{final_result}\n"
-        except:
-            pass
-
-        if "', 'type': 'output_text', 'annotations': []" in output:
-            parts = output.split("', 'type': 'output_text', 'annotations': []")
-            if parts:
-                output = parts[0]
-
         output = re.sub(r"',\s*'type':\s*'output_text',\s*'annotations':\s*\[\]", "", output)
-        output = output.strip("'").strip()
-
-        final_result = _decode_unicode_escape(output)
+        final_result = _decode_unicode_escape(output.strip("'").strip())
         return f"\n\n✅ RESULT:\n{final_result}\n"
 
     except Exception as e:
         print(f"Error formatting final output: {e}")
         return ""
-
-
-def _wrap_text(text: str, max_width: int = 78) -> list[str]:
-    """Wrap text to specified width."""
-    words = text.split()
-    lines = []
-    current_line = []
-    current_length = 0
-
-    for word in words:
-        if current_length + len(word) + 1 > max_width:
-            if current_line:
-                lines.append(" ".join(current_line))
-            current_line = [word]
-            current_length = len(word)
-        else:
-            current_line.append(word)
-            current_length += len(word) + 1
-
-    if current_line:
-        lines.append(" ".join(current_line))
-
-    return lines
 
 
 ########################################################
@@ -187,8 +136,7 @@ def pretty_print_result(result: PrettyPrintable) -> str:
         _format_stats(result),
         _format_stream_info(
             stream=hasattr(result, 'is_complete'),
-            tool_choice=getattr(result, 'tool_choice', None),
-            response_format=getattr(result, 'response_format', None)
+            tool_choice=getattr(result, 'tool_choice', None)
         ),
         _format_final_output(result)
     ]

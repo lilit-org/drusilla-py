@@ -72,23 +72,25 @@ class DeepSeekClient(AsyncDeepSeek):
                 if client.api_key:
                     headers["Authorization"] = f"Bearer {client.api_key}"
 
+                ollama_messages = []
+                for msg in messages:
+                    if msg["role"] == "system":
+                        ollama_messages.append({"role": "system", "content": msg["content"]})
+                    elif msg["role"] == "user":
+                        ollama_messages.append({"role": "user", "content": msg["content"]})
+                    elif msg["role"] == "assistant":
+                        ollama_messages.append({"role": "assistant", "content": msg["content"]})
+
                 data: dict[str, Any] = {
                     "model": model,
-                    "messages": messages,
+                    "messages": ollama_messages,
                     "stream": stream,
                 }
 
                 optional_params = {
-                    "tools": tools,
                     "temperature": temperature,
                     "top_p": top_p,
-                    "frequency_penalty": frequency_penalty,
-                    "presence_penalty": presence_penalty,
                     "max_tokens": max_tokens,
-                    "tool_choice": tool_choice,
-                    "response_format": response_format,
-                    "parallel_tool_calls": parallel_tool_calls,
-                    "stream_options": stream_options,
                 }
                 data.update({k: v for k, v in optional_params.items() if v is not None})
 
@@ -102,4 +104,25 @@ class DeepSeekClient(AsyncDeepSeek):
 
                 if stream:
                     return AsyncStream(response.aiter_lines())
-                return ChatCompletion(**response.json())
+
+                # Convert Ollama response to ChatCompletion format
+                ollama_response = response.json()
+                return ChatCompletion(
+                    id="ollama-" + str(hash(str(ollama_response))),
+                    object="chat.completion",
+                    created=int(ollama_response.get("created", 0)),
+                    model=model,
+                    choices=[{
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": ollama_response.get("message", {}).get("content", ""),
+                        },
+                        "finish_reason": "stop",
+                    }],
+                    usage={
+                        "prompt_tokens": 0,  # Ollama doesn't provide token counts
+                        "completion_tokens": 0,
+                        "total_tokens": 0,
+                    },
+                )

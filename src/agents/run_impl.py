@@ -543,12 +543,17 @@ class RunImpl:
         step_result: SingleStepResult,
         queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel],
     ):
+        events = []
         for item in step_result.new_step_items:
             event_name = cls.EVENT_MAP.get(type(item))
             if event_name:
-                queue.put_nowait(RunItemStreamEvent(item=item, name=event_name))
+                events.append(RunItemStreamEvent(item=item, name=event_name))
             else:
                 logger.warning(f"Unexpected item type: {type(item)}")
+
+        # Batch put all events at once
+        for event in events:
+            queue.put_nowait(event)
 
     @classmethod
     async def _check_for_final_output_from_tools(

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import abc
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, Union, cast
 
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
 
-from ._exceptions import ModelError
 from ._types import (
     ComputerCallOutput,
     FunctionCallOutput,
@@ -59,19 +58,16 @@ class RunItemBase(Generic[T], abc.ABC):
     """
     agent: Agent[Any]
     raw_item: T
-    _cached_input_item: TResponseInputItem | None = field(default=None, init=False)
 
     @cached_property
     def input_item(self) -> TResponseInputItem:
         """Convert and cache item to model input format."""
-        if self._cached_input_item is None:
-            if isinstance(self.raw_item, dict):
-                self._cached_input_item = self.raw_item
-            elif isinstance(self.raw_item, BaseModel):
-                self._cached_input_item = self.raw_item.model_dump(exclude_unset=True)
-            else:
-                self._cached_input_item = self.raw_item
-        return self._cached_input_item
+        if isinstance(self.raw_item, dict):
+            return self.raw_item
+        elif isinstance(self.raw_item, BaseModel):
+            return self.raw_item.model_dump(exclude_unset=True)
+        else:
+            return self.raw_item
 
     def to_input_item(self) -> TResponseInputItem:
         """Convert item to model input format.
@@ -91,11 +87,31 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
     @cached_property
     def text_content(self) -> str:
         """Cache the text content of the message."""
-        return "".join(
-            item["text"]
-            for item in self.raw_item["content"]
-            if item["type"] == OUTPUT_TEXT_TYPE
-        )
+        try:
+            if not isinstance(self.raw_item, dict):
+                return ""
+
+            content = self.raw_item.get("content", [])
+            if not content:
+                return ""
+
+            # Handle both list of dicts and list of objects
+            texts = []
+            for item in content:
+                if isinstance(item, dict):
+                    if item.get("type") == OUTPUT_TEXT_TYPE:
+                        text = item.get("text", "")
+                        if text:
+                            texts.append(text)
+                elif hasattr(item, "type") and item.type == OUTPUT_TEXT_TYPE:
+                    text = getattr(item, "text", "")
+                    if text:
+                        texts.append(text)
+
+            return " ".join(texts).strip()
+
+        except (AttributeError, KeyError, TypeError, IndexError):
+            return ""
 
 
 @dataclass(frozen=True)
@@ -166,17 +182,14 @@ class ModelResponse:
     output: list[TResponseOutputItem]
     usage: Usage
     referenceable_id: str | None
-    _cached_input_items: list[TResponseInputItem] | None = field(default=None, init=False)
 
     @cached_property
     def input_items(self) -> list[TResponseInputItem]:
         """Convert and cache outputs to input format."""
-        if self._cached_input_items is None:
-            self._cached_input_items = [
-                cast(TResponseInputItem, it.model_dump(exclude_unset=True))
-                for it in self.output
-            ]
-        return self._cached_input_items
+        return [
+            cast(TResponseInputItem, it.model_dump(exclude_unset=True))
+            for it in self.output
+        ]
 
     def to_input_items(self) -> list[TResponseInputItem]:
         """Convert outputs to input format efficiently."""
@@ -195,15 +208,21 @@ class ItemHelpers:
     @staticmethod
     def extract_last_content(message: TResponseOutputItem) -> str:
         """Extract the last content from a message."""
-        if not hasattr(message, "type") or message.type != MESSAGE_TYPE:
-            return ""
+        try:
+            if not hasattr(message, "type") or message.type != MESSAGE_TYPE:
+                return ""
 
-        last_content = message.content[-1]
-        if last_content.type == OUTPUT_TEXT_TYPE:
-            return last_content.text
-        if last_content.type == REFUSAL_TYPE:
-            return last_content.refusal
-        raise ModelError(f"Unexpected content type: {last_content.type}")
+            if not hasattr(message, "content") or not message.content:
+                return ""
+
+            last_content = message.content[-1]
+            if last_content.type == OUTPUT_TEXT_TYPE:
+                return last_content.text
+            if last_content.type == REFUSAL_TYPE:
+                return last_content.refusal
+            return ""
+        except (AttributeError, IndexError, KeyError):
+            return ""
 
     @staticmethod
     def extract_last_text(message: TResponseOutputItem) -> str | None:
@@ -233,10 +252,28 @@ class ItemHelpers:
 
     @staticmethod
     def text_message_output(message: MessageOutputItem) -> str:
-        """Extract text from a message output efficiently."""
-        text = message.text_content
-        text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
-        return text.strip()
+        """Extract and format text from a message output efficiently."""
+        try:
+            text = message.text_content
+            if not text:
+                return ""
+
+            # Clean up the text by removing any JSON-like artifacts
+            text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
+            text = text.replace("'text': '", "")
+            text = text.replace("'", "")
+
+            # Clean up any remaining whitespace and format
+            text = text.strip()
+            if not text:
+                return ""
+
+            # Format the text with proper spacing
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+            return '\n'.join(lines)
+
+        except (IndexError, KeyError, AttributeError):
+            return ""
 
     @staticmethod
     def tool_call_output_item(

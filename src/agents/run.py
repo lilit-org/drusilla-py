@@ -62,8 +62,8 @@ class RunConfig:
     model_provider: ModelProvider = field(default_factory=ModelProvider)
     model_settings: ModelSettings | None = None
     handoff_input_filter: HandoffInputFilter | None = None
-    input_guardrails: list[InputGuardrail[Any]] = field(default_factory=list)
-    output_guardrails: list[OutputGuardrail[Any]] = field(default_factory=list)
+    input_guardrails: list[InputGuardrail[TContext]] = field(default_factory=list)
+    output_guardrails: list[OutputGuardrail[TContext]] = field(default_factory=list)
     max_turns: int = MAX_TURNS
 
 
@@ -347,7 +347,7 @@ class Runner:
                 streamed_result.current_turn = current_turn
 
                 if current_turn > max_turns:
-                    cls._handle_max_turns_exceeded(max_turns)
+                    raise MaxTurnsError(f"Max turns ({max_turns}) exceeded")
                     streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
                     break
 
@@ -457,9 +457,18 @@ class Runner:
     ):
         queue = streamed_result._input_guardrail_queue
 
+        # Only deepcopy if we have guardrails to run
+        if not guardrails:
+            return
+
+        # Convert input to list if it's a string
+        input_list = ItemHelpers.input_to_new_input_list(input)
+        # Only deepcopy if we have multiple guardrails that might modify the input
+        input_to_use = deepcopy(input_list) if len(guardrails) > 1 else input_list
+
         guardrail_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_input_guardrail(agent, guardrail, input, context)
+                RunImpl.run_single_input_guardrail(agent, guardrail, input_to_use, context)
             )
             for guardrail in guardrails
         ]
@@ -488,29 +497,22 @@ class Runner:
         run_config: RunConfig,
         should_run_agent_start_hooks: bool,
     ) -> SingleStepResult:
-
         if should_run_agent_start_hooks:
-            await asyncio.gather(
-                hooks.on_start(context_wrapper, agent),
-                (
-                    agent.hooks.on_start(context_wrapper, agent)
-                    if agent.hooks
-                    else noop_coroutine()
-                ),
+            await cls._run_agent_start_hooks(
+                agent,
+                hooks,
+                context_wrapper,
             )
 
+        system_prompt = agent.system_prompt
+        input = streamed_result.input
         output_schema = cls._get_output_schema(agent)
-        streamed_result.current_agent = agent
-        streamed_result._current_agent_output_schema = output_schema
-        system_prompt = await agent.get_system_prompt(context_wrapper)
         handoffs = cls._get_handoffs(agent)
         model = cls._get_model(agent, run_config)
         model_settings = agent.model_settings.resolve(run_config.model_settings)
-        final_response: ModelResponse | None = None
-        input = ItemHelpers.input_to_new_input_list(streamed_result.input)
-        input.extend([item.to_input_item() for item in streamed_result.new_items])
 
-        # 1. Stream the output events
+        # Stream the output events and collect the final response
+        final_response = None
         async for event in model.stream_response(
             system_prompt,
             input,
@@ -535,27 +537,34 @@ class Runner:
                     usage=usage,
                     referenceable_id=event.response.id,
                 )
+                # Process the response immediately when we get it
+                processed_response = RunImpl.process_model_response(
+                    agent=agent,
+                    response=final_response,
+                    output_schema=output_schema,
+                    handoffs=handoffs,
+                )
+
+                single_step_result = await RunImpl.execute_tools_and_side_effects(
+                    agent=agent,
+                    original_input=streamed_result.input,
+                    pre_step_items=streamed_result.new_items,
+                    new_response=final_response,
+                    processed_response=processed_response,
+                    output_schema=output_schema,
+                    hooks=hooks,
+                    context_wrapper=context_wrapper,
+                    run_config=run_config,
+                )
+
+                RunImpl.stream_step_result_to_queue(single_step_result, streamed_result._event_queue)
+                return single_step_result
 
             streamed_result._event_queue.put_nowait(RawResponsesStreamEvent(data=event))
 
-        # 2. At this point, the streaming is complete for this turn of the agent loop.
         if not final_response:
             raise ModelError("Model did not produce a final response!")
-
-        # 3. Now, we can process the turn as we do in the non-streaming case
-        single_step_result = await cls._get_single_step_result_from_response(
-            agent=agent,
-            original_input=streamed_result.input,
-            pre_step_items=streamed_result.new_items,
-            new_response=final_response,
-            output_schema=output_schema,
-            handoffs=handoffs,
-            hooks=hooks,
-            context_wrapper=context_wrapper,
-            run_config=run_config,
-        )
-        RunImpl.stream_step_result_to_queue(single_step_result, streamed_result._event_queue)
-        return single_step_result
+        raise ModelError("No response was processed!")
 
     @classmethod
     async def _run_single_turn(
