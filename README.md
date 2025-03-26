@@ -3,8 +3,9 @@
 <br>
 
 <p align="center">
-<img src="https://github.com/user-attachments/assets/464a55d2-3a44-4b48-bd4a-6ec4fd5660bb" width="70%" align="center" style="padding:1px;border:1px solid black;"/>
+<img src="https://github.com/user-attachments/assets/f473ad0c-82e7-40b7-9aea-e4de45c8d360" width="70%" align="center" style="padding:1px;border:1px solid black;"/>
 </p>
+
 
 <br>
 
