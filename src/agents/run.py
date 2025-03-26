@@ -16,6 +16,7 @@ from ..util._exceptions import (
     MaxTurnsError,
     ModelError,
     OutputGuardrailError,
+    GenericError,
 )
 from ..util._guardrail import (
     InputGuardrail,
@@ -158,7 +159,7 @@ class Runner:
                 else:
                     raise AgentError(f"Unknown next step type: {type(turn_result.next_step)}")
         except Exception as e:
-            raise e
+            raise GenericError(e)
 
     @classmethod
     def _handle_max_turns_exceeded(cls, max_turns: int) -> None:
@@ -394,7 +395,7 @@ class Runner:
             streamed_result.is_complete = True
         except Exception as e:
             streamed_result.is_complete = True
-            raise e
+            raise GenericError(e)
 
     @classmethod
     def _update_streamed_result(

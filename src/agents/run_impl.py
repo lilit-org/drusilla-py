@@ -333,9 +333,7 @@ class RunImpl:
                     ),
                 )
             except Exception as e:
-                if isinstance(e, AgentError):
-                    raise e
-                raise UsageError(f"Error running tool {func_tool.name}: {e}") from e
+                raise AgentError(e)
 
             return result
 

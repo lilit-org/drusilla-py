@@ -1,11 +1,19 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..agents._guardrail import InputGuardrailResult, OutputGuardrailResult
+    from ._guardrail import InputGuardrailResult, OutputGuardrailResult
 
 
 class AgentError(Exception):
     """Base exception for Agents SDK."""
+
+
+class GenericError(AgentError):
+    """Raised when an unexpected error occurs during agent execution."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error: Exception = error
+        super().__init__(str(error))
 
 
 class MessageError(AgentError):
