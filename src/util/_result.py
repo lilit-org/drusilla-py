@@ -11,7 +11,7 @@ from typing_extensions import TypeVar
 from ..agents.agent import Agent
 from ..agents.output import AgentOutputSchema
 from ..agents.run_impl import QueueCompleteSentinel
-from ._constants import MAX_GUARDRAIL_QUEUE_SIZE, MAX_GUARDRAIL_QUEUE_SIZE, MAX_QUEUE_SIZE
+from ._constants import MAX_GUARDRAIL_QUEUE_SIZE, MAX_QUEUE_SIZE
 from ._env import get_env_var
 from ._exceptions import InputGuardrailError, MaxTurnsError
 from ._guardrail import InputGuardrailResult, OutputGuardrailResult
