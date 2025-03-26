@@ -22,12 +22,16 @@ __all__ = [
     "DEFAULT_MAX_TURNS",
     "DEFAULT_MAX_QUEUE_SIZE",
     "DEFAULT_MAX_GUARDRAIL_QUEUE_SIZE",
+    "CHAT_COMPLETIONS_ENDPOINT",
 ]
 
 # API Configuration
 FAKE_RESPONSES_ID = "__fake_id__"
 _USER_AGENT = f"Agents/Python {__version__}"
 HEADERS = {"User-Agent": _USER_AGENT}
+
+# API Endpoints
+CHAT_COMPLETIONS_ENDPOINT = "/v1/chat/completions"
 
 # Type Definitions
 Environment = Literal["mac", "windows", "ubuntu", "browser"]

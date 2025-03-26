@@ -9,6 +9,7 @@ from ..models.interface import Model
 from ..models.provider import ModelProvider
 from ..models.settings import ModelSettings
 from ..util import _coro
+from ..util._constants import DEFAULT_MAX_TURNS
 from ..util._env import get_env_var
 from ..util._exceptions import (
     AgentError,
@@ -31,7 +32,6 @@ from ..util._result import RunResult, RunResultStreaming
 from ..util._run_context import RunContextWrapper, TContext
 from ..util._stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
 from ..util._types import ResponseCompletedEvent, Usage
-from ..util._constants import DEFAULT_MAX_TURNS
 from .agent import Agent
 from .output import AgentOutputSchema
 from .run_impl import (

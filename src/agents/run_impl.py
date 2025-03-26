@@ -256,7 +256,7 @@ class RunImpl:
         handoff_map = {handoff.tool_name: handoff for handoff in handoffs}
         function_map = {}
         computer_tool = None
-        
+
         for tool in agent.tools:
             if isinstance(tool, FunctionTool):
                 function_map[tool.name] = tool
