@@ -56,14 +56,14 @@ ollama serve
 
 ___
 
-## example
+## agent "cypherpunk love"
 
 <br>
 
 test your configuration by running:
 
 ```shell
-make sanity-test
+make cypherpunk-love
 ```
 
 <br>
@@ -85,8 +85,8 @@ def setup_client() -> DeepSeekClient:
 
 def create_agent() -> Agent:
     return Agent(
-        name="Agent Mulder",
-        instructions="You are a cool special agent robot"
+        name="Agent Dr. Love",
+        instructions="You are a cool special robot who loves"
     )
 
 

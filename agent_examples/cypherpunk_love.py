@@ -33,8 +33,8 @@ def setup_client() -> DeepSeekClient:
 def create_agent() -> Agent:
     """Create a configured agent instance."""
     return Agent(
-        name="Agent Mulder",
-        instructions="You are a cool special agent robot"
+        name="Agent Dr. Love",
+        instructions="You are a cool special robot who loves"
     )
 
 

@@ -31,7 +31,7 @@ _USER_AGENT = f"Agents/Python {__version__}"
 HEADERS = {"User-Agent": _USER_AGENT}
 
 # API Endpoints
-CHAT_COMPLETIONS_ENDPOINT = "/v1/chat/completions"
+CHAT_COMPLETIONS_ENDPOINT = "/api/chat"
 
 # Type Definitions
 Environment = Literal["mac", "windows", "ubuntu", "browser"]
@@ -46,7 +46,7 @@ IncludeLiteral = Literal[
 UNSET = object()
 
 # Default Configuration Values
-DEFAULT_MODEL = "deepseek-r1"
+DEFAULT_MODEL = "deepseek-r1:latest"
 DEFAULT_BASE_URL = "http://localhost:11434"
 DEFAULT_WRAPPER_DICT_KEY = "response"
 DEFAULT_MAX_TURNS = 10

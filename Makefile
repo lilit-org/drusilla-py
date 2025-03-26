@@ -14,10 +14,6 @@ clean:
 install:
 	poetry install --no-root
 
-.PHONY: sanity-test
-sanity-test:
-	python scripts/sanity_test.py
-
 .PHONY: test
 test:
 	poetry run pytest
@@ -27,3 +23,11 @@ format:
 	poetry run ruff check src --fix --unsafe-fixes
 	autoflake -r --in-place --remove-unused-variables src/
 	black src/
+
+.PHONY: cypherpunk-love
+cypherpunk-love:
+	python agent_examples/cypherpunk_love.py
+
+.PHONY: world-traveler
+world-traveler:
+	poetry run python agent_examples/world_traveler.py
