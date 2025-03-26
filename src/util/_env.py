@@ -2,6 +2,8 @@ import os
 from functools import lru_cache
 from typing import Any, TypeVar
 
+from ._constants import LRU_CACHE_SIZE
+
 ########################################################
 #              Constants
 ########################################################
@@ -14,7 +16,7 @@ TRUE_VALUES = {"true", "1", "yes"}
 #              Getters
 ########################################################
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def get_env_var(key: str, default: T) -> T:
     """Retrieves and converts an environment variable to the specified type.
 

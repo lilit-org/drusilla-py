@@ -5,7 +5,7 @@ from typing import Any, TypeAlias, cast
 
 from typing_extensions import TypeGuard
 
-from ._constants import UNSET
+from ._constants import LRU_CACHE_SIZE, UNSET
 from ._exceptions import UsageError
 
 ########################################################
@@ -26,7 +26,7 @@ SchemaPath: TypeAlias = tuple[str, ...]
 #               Private Functions                      #
 ########################################################
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
     """Cached version of schema reference resolution."""
     if not ref.startswith("#/"):

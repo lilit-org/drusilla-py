@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, ValidationError, create_model
 from typing_extensions import Concatenate, ParamSpec
 
 from ._computer import AsyncComputer, Computer
+from ._constants import LRU_CACHE_SIZE
 from ._exceptions import ModelError, UsageError
 from ._items import RunItem
 from ._logger import logger
@@ -162,7 +163,7 @@ class ComputerTool:
 ########################################################
 
 DocstringStyle = Literal["google", "numpy", "sphinx"]
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _detect_docstring_style(doc: str) -> DocstringStyle:
     """Detect docstring style using pattern matching."""
     scores: dict[DocstringStyle, int] = {"sphinx": 0, "numpy": 0, "google": 0}
@@ -206,7 +207,7 @@ def _suppress_griffe_logging():
     finally:
         logger.setLevel(previous_level)
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _process_var_positional(param: inspect.Parameter, ann: Any, field_description: str | None) -> tuple[Any, Field]:
     """Process *args parameters."""
     if get_origin(ann) is tuple:
@@ -220,7 +221,7 @@ def _process_var_positional(param: inspect.Parameter, ann: Any, field_descriptio
 
     return ann, Field(default_factory=list, description=field_description)  # type: ignore
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _process_var_keyword(param: inspect.Parameter, ann: Any, field_description: str | None) -> tuple[Any, Field]:
     """Process **kwargs parameters."""
     if get_origin(ann) is dict:
