@@ -140,7 +140,7 @@ class ModelChatCompletionsModel(Model):
                 delta = chunk["choices"][0]["delta"]
                 if not state.text_content_index_and_output:
                     state.text_content_index_and_output = (0, ResponseOutputText(
-                        text="",
+                        text=delta["content"],
                         type="output_text",
                         annotations=[],
                     ))
@@ -149,20 +149,21 @@ class ModelChatCompletionsModel(Model):
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
                         part=ResponseOutputText(
-                            text="",
+                            text=delta["content"],
                             type="output_text",
                             annotations=[],
                         ),
                         type="response.content_part.added",
                     )
-                yield ResponseTextDeltaEvent(
-                    content_index=state.text_content_index_and_output[0],
-                    delta=delta["content"],
-                    item_id=FAKE_RESPONSES_ID,
-                    output_index=0,
-                    type="response.output_text.delta",
-                )
-                state.text_content_index_and_output[1].text += delta["content"]
+                else:
+                    state.text_content_index_and_output[1].text += delta["content"]
+                    yield ResponseTextDeltaEvent(
+                        content_index=state.text_content_index_and_output[0],
+                        delta=delta["content"],
+                        item_id=FAKE_RESPONSES_ID,
+                        output_index=0,
+                        type="response.output_text.delta",
+                    )
 
             if chunk["choices"][0]["delta"]["tool_calls"]:
                 for tc_delta in chunk["choices"][0]["delta"]["tool_calls"]:
