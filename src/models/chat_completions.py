@@ -111,8 +111,14 @@ class ModelChatCompletionsModel(Model):
                 response_obj = response[0]
             else:
                 response_obj = response
+
+            try:
+                json_response = json.dumps(response_obj['choices'][0]['message']['content'], indent=2, cls=NotGivenEncoder)
+            except Exception as e:
+                logger.debug(f"Error parsing JSON response: {e}")
+                json_response = response_obj['choices'][0]['message']['content']
             logger.debug(
-                f"LLM resp:\n{json.dumps(response_obj['choices'][0]['message'], indent=2, cls=NotGivenEncoder)}\n"
+                f" 🧠  LLM resp for chat completions:\n\n{json_response}\n"
             )
 
         usage = (
@@ -325,13 +331,12 @@ class ModelChatCompletionsModel(Model):
             logger.debug(
                 f"\n📝 Messages:\n"
                 f"{_format_output(converted_messages)}\n\n"
-                f"🛠️  Tools:\n"
-                f"{_format_output(converted_tools)}\n"
+                f"🛠️  Tools:\n\n"
+                f"{"    " + _format_output(converted_tools)}\n"
             )
 
         ret = await self._get_client().chat.completions.create(**request_params)
 
-        # If streaming, return a tuple of (Response, AsyncStream)
         if stream:
             response = Response(
                 id=FAKE_RESPONSES_ID,
@@ -349,7 +354,6 @@ class ModelChatCompletionsModel(Model):
             )
             return response, ret
 
-        # For non-streaming responses, return the ChatCompletion directly
         return ret
 
     def _get_client(self) -> AsyncDeepSeek:
