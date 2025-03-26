@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
-from ..util import _debug
 from ..util._exceptions import AgentError, UsageError
 from ..util._handoffs import Handoff
 from ..util._items import (
@@ -17,7 +16,6 @@ from ..util._items import (
     TResponseStreamEvent,
 )
 from ..util._logger import logger
-from ..util._pretty_print import _format_output
 from ..util._tool import FunctionTool, Tool
 from ..util._types import (
     NOT_GIVEN,
@@ -104,22 +102,11 @@ class ModelChatCompletionsModel(Model):
             stream=False,
         )
 
-        if _debug.DONT_LOG_MODEL_DATA:
-            logger.debug("Received model response")
+        logger.debug("Received model response")
+        if isinstance(response, tuple):
+            response_obj = response[0]
         else:
-            if isinstance(response, tuple):
-                response_obj = response[0]
-            else:
-                response_obj = response
-
-            try:
-                json_response = json.dumps(response_obj['choices'][0]['message']['content'], indent=2, cls=NotGivenEncoder)
-            except Exception as e:
-                logger.debug(f"Error parsing JSON response: {e}")
-                json_response = response_obj['choices'][0]['message']['content']
-            logger.debug(
-                f" 🧠  LLM resp for chat completions:\n\n{json_response}\n"
-            )
+            response_obj = response
 
         usage = (
             Usage(
@@ -324,16 +311,6 @@ class ModelChatCompletionsModel(Model):
             request_params["parallel_tool_calls"] = parallel_tool_calls
         if stream:
             request_params["stream_options"] = {"include_usage": True}
-
-        if _debug.DONT_LOG_MODEL_DATA:
-            logger.debug("Calling LLM")
-        else:
-            logger.debug(
-                f"\n📝 Messages:\n"
-                f"{_format_output(converted_messages)}\n\n"
-                f"🛠️  Tools:\n\n"
-                f"{"    " + _format_output(converted_tools)}\n"
-            )
 
         ret = await self._get_client().chat.completions.create(**request_params)
 

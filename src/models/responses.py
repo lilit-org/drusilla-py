@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
-from ..util import _debug
 from ..util._exceptions import UsageError
 from ..util._handoffs import Handoff
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
@@ -83,13 +82,10 @@ class ModelResponsesModel(Model):
                 stream=False,
             )
 
-            if _debug.DONT_LOG_MODEL_DATA:
-                logger.debug("LLM responded")
-            else:
-                logger.debug(
-                    "\n 🧠  LLM resp for responses:\n"
-                    f"{json.dumps(list(response.output), indent=2)}\n"
-                )
+            logger.debug(
+                "\n 🧠  LLM resp for responses:\n"
+                f"{json.dumps(list(response.output), indent=2)}\n"
+            )
 
             usage = (
                 Usage(
@@ -185,16 +181,13 @@ class ModelResponsesModel(Model):
         converted_tools = Converter.convert_tools(tools, handoffs)
         response_format = Converter.get_response_format(output_schema)
 
-        if _debug.DONT_LOG_MODEL_DATA:
-            logger.debug("Calling LLM")
-        else:
-            logger.debug(
-                f"Calling LLM {self.model} with input:\n"
-                f"{json.dumps(list_input, indent=2)}\n"
-                f"Tools:\n{json.dumps(converted_tools.tools, indent=2)}\n"
-                f"Stream: {stream}\n"
-                f"Tool choice: {tool_choice}\n"
-                f"Response format: {response_format}\n"
+        logger.debug(
+            f"Calling LLM {self.model} with input:\n"
+            f"{json.dumps(list_input, indent=2)}\n"
+            f"Tools:\n{json.dumps(converted_tools.tools, indent=2)}\n"
+            f"Stream: {stream}\n"
+            f"Tool choice: {tool_choice}\n"
+            f"Response format: {response_format}\n"
             )
 
         return await self._client.responses.create(

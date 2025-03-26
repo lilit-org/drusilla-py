@@ -1,7 +1,5 @@
-from typing import Any, Protocol
-from pydantic import BaseModel
 import re
-
+from typing import Any, Protocol
 
 ########################################################
 #               Protocol Class                         #
@@ -53,42 +51,6 @@ def _format_stream_info(stream: bool, tool_choice: Any, response_format: Any) ->
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
-def _format_output(output: Any) -> str:
-    """Format different types of output into a string representation."""
-
-    if output is None:
-        return "None"
-    elif output is object():
-        return "Not Set"
-    elif isinstance(output, str):
-        lines = output.splitlines()
-        if len(lines) > 1:
-            width = max(len(line) for line in lines)
-            border = "+" + "-" * (width + 2) + "+"
-            formatted_lines = [border]
-            for line in lines:
-                formatted_lines.append(f"| {line:<{width}} |")
-            formatted_lines.append(border)
-            return "\n".join(formatted_lines)
-        return output
-    elif isinstance(output, BaseModel):
-        json_str = output.model_dump_json(indent=2)
-        return f"📋 Model Output:\n{_indent(json_str, 1)}"
-    elif isinstance(output, (list, tuple)):
-        if not output:
-            return "[]"
-        items = [f"• {item}" for item in output]
-        return "\n" + "\n".join(_indent(item, 1) for item in items)
-    elif isinstance(output, dict):
-        if not output:
-            return "{}"
-        max_key_length = max(len(str(k)) for k in output.keys())
-        items = [f"• {str(k):<{max_key_length}} : {_format_special_object(v)}" for k, v in output.items()]
-        return "\n" + "\n".join(_indent(item, 1) for item in items)
-    else:
-        return _format_special_object(output)
-
-
 def _format_stats(result: PrettyPrintable) -> str:
     """Format the statistics section of the result."""
     stats = [
@@ -121,20 +83,27 @@ def _format_agent_info(result: PrettyPrintable) -> str:
 def _format_final_output(result: PrettyPrintable) -> str:
     """Format the final output section."""
     header = "\n\n  ✨ Final Output:\n"
-    
-    try:    
+
+    try:
         output = str(result.raw_responses[0].output[0])
         think_pattern = r'<think>(.*?)</think>(.*)'
         match = re.search(think_pattern, output, re.DOTALL)
-        
+
         if match:
             reasoning = match.group(1).strip()
             final_result = match.group(2).strip()
             result_pattern = r"^([^']*?)(?:',\s*'type':.*)?$"
-            final_result = re.match(result_pattern, final_result).group(1).strip()
+            result_match = re.match(result_pattern, final_result)
+            
+            if result_match:
+                final_result = result_match.group(1).strip()
+            else:
+                # If the pattern doesn't match, use the entire final_result
+                final_result = final_result.strip()
+                
             reasoning = reasoning.encode().decode('unicode-escape')
             final_result = final_result.encode().decode('unicode-escape')
-            
+
             sections = [
                 header,
                 "       🤔 REASONING:",
@@ -143,7 +112,10 @@ def _format_final_output(result: PrettyPrintable) -> str:
                 final_result
             ]
             return "\n".join(sections) + "\n"
-            
+        else:
+            # If no think pattern is found, just return the output as is
+            return f"{header}{output}\n"
+
     except Exception as e:
         print(f"Error formatting final output: {e}")
         return ""
@@ -177,15 +149,7 @@ def format_json_response(response: dict[str, Any]) -> str:
 
     role = response.get("role", "")
     content = response.get("content", "")
-
-    role_emoji = {
-        "assistant": "🤖",
-        "user": "👤",
-        "system": "⚙️",
-        "function": "🔧"
-    }.get(role, "📝")
-
-    header = f"{role_emoji} {role.title()}"
+    header = f"{role.title()}"
     header_border = "═" * (len(header) + 4)
     header_text = f"╔{header_border}╗\n║ {header} ║\n╚{header_border}╝"
 

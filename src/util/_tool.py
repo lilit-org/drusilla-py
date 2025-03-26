@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field, ValidationError, create_model
 from typing_extensions import Concatenate, ParamSpec
 
 from ._computer import AsyncComputer, Computer
-from ._debug import DONT_LOG_TOOL_DATA
 from ._exceptions import ModelError, UsageError
 from ._items import RunItem
 from ._run_context import RunContextWrapper
@@ -383,18 +382,12 @@ def function_tool(
             try:
                 json_data: dict[str, Any] = json.loads(input) if input else {}
             except Exception as e:
-                if DONT_LOG_TOOL_DATA:
-                    logger.debug(f"Invalid JSON input for tool {schema.name}")
-                else:
-                    logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
+                logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
                 raise ModelError(
                     f"Invalid JSON input for tool {schema.name}: {input}"
                 ) from e
 
-            if DONT_LOG_TOOL_DATA:
-                logger.debug(f"Invoking tool {schema.name}")
-            else:
-                logger.debug(f"Invoking tool {schema.name} with input {input}")
+            logger.debug(f"Invoking tool {schema.name} with input {input}")
 
             try:
                 parsed = (
@@ -407,8 +400,7 @@ def function_tool(
 
             args, kwargs_dict = schema.to_call_args(parsed)
 
-            if not DONT_LOG_TOOL_DATA:
-                logger.debug(f"Tool call args: {args}, kwargs: {kwargs_dict}")
+            logger.debug(f"Tool call args: {args}, kwargs: {kwargs_dict}")
 
             try:
                 result = the_func(ctx, *args, **kwargs_dict)
@@ -427,10 +419,7 @@ def function_tool(
             try:
                 return await _on_invoke_tool_impl(ctx, input)
             except Exception as e:
-                if DONT_LOG_TOOL_DATA:
-                    logger.debug(f"Tool {schema.name} failed")
-                else:
-                    logger.debug(f"Tool {schema.name} failed with error: {e}")
+                logger.debug(f"Tool {schema.name} failed with error: {e}")
                 raise
 
         return FunctionTool(
