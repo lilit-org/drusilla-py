@@ -60,19 +60,19 @@ _NOT_FINAL_OUTPUT = ToolsToFinalOutputResult(is_final_output=False, final_output
 #               Data Classes                            #
 ########################################################
 
-@dataclass
+@dataclass(frozen=True)
 class ToolRunHandoff:
     handoff: Handoff
     tool_call: ResponseFunctionToolCall
 
 
-@dataclass
+@dataclass(frozen=True)
 class ToolRunFunction:
     tool_call: ResponseFunctionToolCall
     function_tool: FunctionTool
 
 
-@dataclass
+@dataclass(frozen=True)
 class ToolRunComputerAction:
     tool_call: ResponseComputerToolCall
     computer_tool: ComputerTool
@@ -89,17 +89,17 @@ class ProcessedResponse:
         return bool(self.handoffs or self.functions or self.computer_actions)
 
 
-@dataclass
+@dataclass(frozen=True)
 class NextStepHandoff:
     new_agent: Agent[Any]
 
 
-@dataclass
+@dataclass(frozen=True)
 class NextStepFinalOutput:
     output: Any
 
 
-@dataclass
+@dataclass(frozen=True)
 class NextStepRunAgain:
     pass
 
@@ -174,6 +174,7 @@ class RunImpl:
                 run_handoffs=run_handoffs,
                 hooks=hooks,
                 context_wrapper=context_wrapper,
+                run_config=run_config,
             )
 
         check_tool_use = await cls._check_for_final_output_from_tools(
@@ -394,6 +395,7 @@ class RunImpl:
         run_handoffs: list[ToolRunHandoff],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
+        run_config: RunConfig | None,
     ) -> SingleStepResult:
         if len(run_handoffs) > 1:
             ignored_handoffs = run_handoffs[1:]
