@@ -178,4 +178,9 @@ make world-traveler
 you can input a sentence in any major language and it will translate for you:
 
 ```
+✅ Enter text to translate and target languages: eu te amo
 
+✅ Successfully received model response...
+
+Alright, the user sent "eu te amo," which is a Portuguese expression meaning "I love you." They probably want this translated into English or another language.
+```

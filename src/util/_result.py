@@ -4,20 +4,16 @@ import abc
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, ClassVar, TypeVar, cast
-
-from typing_extensions import TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from ..agents.agent import Agent
-from ..agents.output import AgentOutputSchema
 from ..agents.run_impl import QueueCompleteSentinel
 from ._constants import MAX_GUARDRAIL_QUEUE_SIZE, MAX_QUEUE_SIZE
 from ._env import get_env_var
-from ._exceptions import InputGuardrailError, MaxTurnsError
 from ._guardrail import InputGuardrailResult, OutputGuardrailResult
 from ._items import ItemHelpers, ModelResponse, RunItem, TResponseInputItem
 from ._logger import logger
-from ._pretty_print import pretty_print_result, pretty_print_run_result_streaming
+from ._pretty_print import pretty_print_result
 from ._stream_events import StreamEvent
 
 if TYPE_CHECKING:
@@ -63,14 +59,11 @@ class RunResultBase(abc.ABC):
 
     def to_input_list(self) -> list[TResponseInputItem]:
         """Create new input list by merging original input with new items."""
-        original_items: list[TResponseInputItem] = ItemHelpers.input_to_new_input_list(self.input)
-        new_items = [item.to_input_item() for item in self.new_items]
+        return ItemHelpers.input_to_new_input_list(self.input) + [item.to_input_item() for item in self.new_items]
 
-        return original_items + new_items
-
-    def pretty_print(self) -> str:
+    def __str__(self) -> str:
         """Return pretty-printed string representation."""
-        return str(self)
+        return pretty_print_result(self)
 
 
 @dataclass(frozen=True)
@@ -82,9 +75,6 @@ class RunResult(RunResultBase):
         """Last agent that was run."""
         return self._last_agent
 
-    def __str__(self) -> str:
-        return pretty_print_result(self)
-
 
 @dataclass(frozen=True)
 class RunResultStreaming(RunResultBase):
@@ -94,7 +84,6 @@ class RunResultStreaming(RunResultBase):
     current_turn: int
     max_turns: int
     final_output: Any
-    _current_agent_output_schema: AgentOutputSchema | None = field(repr=False)
     is_complete: bool = False
 
     # Optimized queue initialization with max sizes
@@ -112,7 +101,6 @@ class RunResultStreaming(RunResultBase):
     _input_guardrails_task: asyncio.Task[list[InputGuardrailResult]] | None = field(default=None, repr=False)
     _output_guardrails_task: asyncio.Task[list[OutputGuardrailResult]] | None = field(default=None, repr=False)
     _stored_exception: Exception | None = field(default=None, repr=False)
-    _active_tasks: ClassVar[set[asyncio.Task[Any]]] = set()
 
     @property
     def last_agent(self) -> Agent[Any]:
@@ -146,14 +134,9 @@ class RunResultStreaming(RunResultBase):
 
     def _cleanup_tasks(self) -> None:
         """Efficiently cleanup all active tasks."""
-        tasks_to_cancel = {
-            task for task in (self._run_impl_task, self._input_guardrails_task, self._output_guardrails_task)
-            if task and not task.done()
-        }
-
-        for task in tasks_to_cancel:
-            task.cancel()
-            self._active_tasks.discard(task)
+        for task in (self._run_impl_task, self._input_guardrails_task, self._output_guardrails_task):
+            if task and not task.done():
+                task.cancel()
 
     def __str__(self) -> str:
-        return pretty_print_run_result_streaming(self)
+        return pretty_print_result(self)
