@@ -131,18 +131,20 @@ def _format_final_output(result: PrettyPrintable) -> str:
             reasoning = match.group(1).strip()
             final_result = match.group(2).strip()
             result_pattern = r"^([^']*?)(?:',\s*'type':.*)?$"
-            final_result = re.match(result_pattern, final_result).group(1).strip()
-            reasoning = reasoning.encode().decode('unicode-escape')
-            final_result = final_result.encode().decode('unicode-escape')
+            final_result = re.match(result_pattern, final_result)
+            if final_result:
+                final_result = final_result.group(1).strip()
+                reasoning = reasoning.encode().decode('unicode-escape')
+                final_result = final_result.encode().decode('unicode-escape')
 
-            sections = [
-                header,
-                "       🤔 REASONING:",
-                reasoning,
-                "       🎯 RESULT:",
-                final_result
-            ]
-            return "\n".join(sections) + "\n"
+                sections = [
+                    header,
+                    "       🤔 REASONING:",
+                    reasoning,
+                    "       🎯 RESULT:",
+                    final_result
+                ]
+                return "\n".join(sections) + "\n"
 
     except Exception as e:
         print(f"Error formatting final output: {e}")
