@@ -112,7 +112,7 @@ you should get something like this:
 
     []
 
-🎯 RunResult:
+✅ RunResult:
   
   👾 Agent Info:
         Last Agent : Agent Mulder

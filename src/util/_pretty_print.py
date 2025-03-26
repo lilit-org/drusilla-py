@@ -1,6 +1,7 @@
 import re
 from typing import Any, Protocol
 
+
 ########################################################
 #               Protocol Class                         #
 ########################################################
@@ -82,7 +83,6 @@ def _format_agent_info(result: PrettyPrintable) -> str:
 
 def _format_final_output(result: PrettyPrintable) -> str:
     """Format the final output section."""
-    header = "\n\n  ✨ Final Output:\n"
 
     try:
         output = str(result.raw_responses[0].output[0])
@@ -98,23 +98,20 @@ def _format_final_output(result: PrettyPrintable) -> str:
             if result_match:
                 final_result = result_match.group(1).strip()
             else:
-                # If the pattern doesn't match, use the entire final_result
                 final_result = final_result.strip()
                 
             reasoning = reasoning.encode().decode('unicode-escape')
             final_result = final_result.encode().decode('unicode-escape')
 
             sections = [
-                header,
-                "       🤔 REASONING:",
+                "\n\n✅ REASONING:\n",
                 reasoning,
-                "       🎯 RESULT:",
+                "\n\n✅ RESULT:",
                 final_result
             ]
-            return "\n".join(sections) + "\n"
+            return "".join(sections) + "\n"
         else:
-            # If no think pattern is found, just return the output as is
-            return f"{header}{output}\n"
+            return f"{output}\n"
 
     except Exception as e:
         print(f"Error formatting final output: {e}")
@@ -127,7 +124,7 @@ def _format_final_output(result: PrettyPrintable) -> str:
 
 def pretty_print_result(result: PrettyPrintable) -> str:
     """Pretty print a RunResult object."""
-    output = f"🎯 {result.__class__.__name__}:"
+    output = f"✅ {result.__class__.__name__}:"
     output += _format_agent_info(result)
     output += _format_stats(result)
     output += _format_stream_info(

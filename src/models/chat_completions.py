@@ -102,7 +102,7 @@ class ModelChatCompletionsModel(Model):
             stream=False,
         )
 
-        logger.debug("Received model response")
+        logger.debug("✅ Received Model Response...")
         if isinstance(response, tuple):
             response_obj = response[0]
         else:
