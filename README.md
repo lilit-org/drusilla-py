@@ -31,10 +31,11 @@ make install
 
 <br>
 
-create a `.env` file in your project root with your deepseek api endpoint:
+create a `.env` file in your project root with your deepseek api endpoint and any customization:
 
 ```shell
-BASE_URL = "http://localhost:11434"           
+BASE_URL = "http://localhost:11434"      
+LOGGING = "DEBUG"     
 ```
 
 <br>
