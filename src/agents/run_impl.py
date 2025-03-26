@@ -4,7 +4,7 @@ import asyncio
 import inspect
 from collections.abc import Awaitable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast, TypeVar
+from typing import TYPE_CHECKING, Any, cast
 
 from ..util._computer import AsyncComputer, Computer
 from ..util._exceptions import AgentError, ModelError, UsageError

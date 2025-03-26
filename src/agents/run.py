@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, cast, TypeVar
+from typing import Any, TypeVar, cast
 
 from ..models.interface import Model
 from ..models.provider import ModelProvider
