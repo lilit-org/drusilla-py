@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any, Generic, Protocol
 
 from ..agents.agent import Agent
@@ -13,19 +13,19 @@ from ._tool import Tool
 
 class HookProtocol(Protocol[TContext]):
     """Protocol defining the interface for lifecycle hooks."""
-    
+
     async def on_start(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext]
     ) -> None: ...
-    
+
     async def on_end(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], output: Any
     ) -> None: ...
-    
+
     async def on_tool_start(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], tool: Tool
     ) -> None: ...
-    
+
     async def on_tool_end(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], tool: Tool, result: str
     ) -> None: ...
