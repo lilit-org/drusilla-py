@@ -4,10 +4,9 @@ import asyncio
 import inspect
 from collections.abc import Awaitable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, TypeVar
 
 from ..util._computer import AsyncComputer, Computer
-from ..util._coro import noop_coroutine as noop
 from ..util._exceptions import AgentError, ModelError, UsageError
 from ..util._guardrail import (
     InputGuardrail,
@@ -331,7 +330,7 @@ class RunImpl:
                     (
                         agent.hooks.on_tool_start(context_wrapper, agent, func_tool)
                         if agent.hooks
-                        else noop()
+                        else noop_coroutine()
                     ),
                     func_tool.on_invoke_tool(context_wrapper, tool_call.arguments),
                 )
@@ -341,7 +340,7 @@ class RunImpl:
                     (
                         agent.hooks.on_tool_end(context_wrapper, agent, func_tool, result)
                         if agent.hooks
-                        else noop()
+                        else noop_coroutine()
                     ),
                 )
             except Exception as e:
@@ -441,7 +440,7 @@ class RunImpl:
                     source=agent,
                 )
                 if agent.hooks
-                else noop()
+                else noop_coroutine()
             ),
         )
 
@@ -660,7 +659,7 @@ class ComputerAction:
             (
                 agent.hooks.on_tool_start(context_wrapper, agent, action.computer_tool)
                 if agent.hooks
-                else noop()
+                else noop_coroutine()
             ),
             asyncio.sleep(0),
         )
@@ -670,7 +669,7 @@ class ComputerAction:
             (
                 agent.hooks.on_tool_end(context_wrapper, agent, action.computer_tool, output)
                 if agent.hooks
-                else noop()
+                else noop_coroutine()
             ),
         )
 
@@ -687,3 +686,7 @@ class ComputerAction:
                 "type": "computer_call_output",
             },
         )
+
+async def noop_coroutine() -> None:
+    """A coroutine that does nothing. Used as a fallback when no hooks are defined."""
+    pass

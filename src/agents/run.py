@@ -3,12 +3,11 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any, cast, TypeVar
 
 from ..models.interface import Model
 from ..models.provider import ModelProvider
 from ..models.settings import ModelSettings
-from ..util import _coro
 from ..util._constants import DEFAULT_MAX_TURNS
 from ..util._env import get_env_var
 from ..util._exceptions import (
@@ -41,6 +40,7 @@ from .run_impl import (
     QueueCompleteSentinel,
     RunImpl,
     SingleStepResult,
+    noop_coroutine,
 )
 
 ########################################################
@@ -495,7 +495,7 @@ class Runner:
                 (
                     agent.hooks.on_start(context_wrapper, agent)
                     if agent.hooks
-                    else _coro.noop_coroutine()
+                    else noop_coroutine()
                 ),
             )
 
@@ -576,7 +576,7 @@ class Runner:
                 (
                     agent.hooks.on_start(context_wrapper, agent)
                     if agent.hooks
-                    else _coro.noop_coroutine()
+                    else noop_coroutine()
                 ),
             )
 
@@ -748,3 +748,5 @@ class Runner:
         if isinstance(agent.model, Model):
             return agent.model
         return run_config.model_provider.get_model(agent.model)
+
+TContext = TypeVar("TContext")
