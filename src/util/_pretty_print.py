@@ -1,6 +1,7 @@
 import re
 from re import Pattern
 from typing import Any
+
 from ._exceptions import GenericError
 from ._items import ModelResponse
 from ._result import RunResult
@@ -20,19 +21,18 @@ def _decode_unicode_escape(text: str) -> str:
 
 
 def _format_final_output(raw_response: ModelResponse) -> str:
-
     try:
         output = raw_response.output[0]['text']
         match = THINK_PATTERN.search(output)
-        
+
         if match:
             reasoning = _decode_unicode_escape(match.group(1).strip())
             final_result = _decode_unicode_escape(match.group(2).strip())
         else:
             reasoning = ""
             final_result = _decode_unicode_escape(output.strip("'").strip())
-            
-        return "\n\n✅ REASONING:\n\n{}\n\n✅ RESULT:\n\n{}\n".format(reasoning, final_result)
+
+        return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
 
     except GenericError as e:
         print(f"Error formatting final output: {e}")

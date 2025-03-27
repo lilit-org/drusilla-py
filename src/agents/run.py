@@ -30,7 +30,7 @@ from ..util._lifecycle import RunHooks
 from ..util._result import RunResult, RunResultStreaming
 from ..util._run_context import RunContextWrapper, TContext
 from ..util._stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
-from ..util._types import ResponseCompletedEvent, Usage
+from ..util._types import ResponseEvent, Usage
 from .agent import Agent
 from .output import AgentOutputSchema
 from .run_impl import (
@@ -520,7 +520,7 @@ class Runner:
             output_schema,
             handoffs,
         ):
-            if isinstance(event, ResponseCompletedEvent):
+            if isinstance(event, ResponseEvent) and event.type == "completed":
                 usage = (
                     Usage(
                         requests=1,

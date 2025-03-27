@@ -27,13 +27,10 @@ from ..util._types import (
     ChatCompletionToolChoiceOptionParam,
     ChatCompletionToolParam,
     Response,
-    ResponseCompletedEvent,
-    ResponseContentPartAddedEvent,
-    ResponseContentPartDoneEvent,
+    ResponseEvent,
     ResponseFormat,
     ResponseFunctionToolCall,
     ResponseOutputText,
-    ResponseTextDeltaEvent,
 )
 from ..util._usage import Usage
 from .interface import Model
@@ -144,7 +141,8 @@ class ModelChatCompletionsModel(Model):
                         type="output_text",
                         annotations=[],
                     ))
-                    yield ResponseContentPartAddedEvent(
+                    yield ResponseEvent(
+                        type="content_part.added",
                         content_index=state.text_content_index_and_output[0],
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
@@ -153,16 +151,15 @@ class ModelChatCompletionsModel(Model):
                             type="output_text",
                             annotations=[],
                         ),
-                        type="response.content_part.added",
                     )
                 else:
                     state.text_content_index_and_output[1].text += delta["content"]
-                    yield ResponseTextDeltaEvent(
+                    yield ResponseEvent(
+                        type="output_text.delta",
                         content_index=state.text_content_index_and_output[0],
-                        delta=delta["content"],
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
-                        type="response.output_text.delta",
+                        delta=delta["content"],
                     )
 
             if chunk["choices"][0]["delta"]["tool_calls"]:
@@ -187,28 +184,28 @@ class ModelChatCompletionsModel(Model):
 
             if chunk["choices"][0]["finish_reason"] == "stop":
                 if state.text_content_index_and_output:
-                    yield ResponseContentPartDoneEvent(
+                    yield ResponseEvent(
+                        type="content_part.done",
                         content_index=state.text_content_index_and_output[0],
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
                         part=state.text_content_index_and_output[1],
-                        type="response.content_part.done",
                     )
 
                 for i, function_call in state.function_calls.items():
-                    yield ResponseContentPartAddedEvent(
+                    yield ResponseEvent(
+                        type="content_part.added",
                         content_index=i + (1 if state.text_content_index_and_output else 0),
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
                         part=function_call,
-                        type="response.content_part.added",
                     )
-                    yield ResponseContentPartDoneEvent(
+                    yield ResponseEvent(
+                        type="content_part.done",
                         content_index=i + (1 if state.text_content_index_and_output else 0),
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
                         part=function_call,
-                        type="response.content_part.done",
                     )
 
                 final_response = Response(
@@ -238,9 +235,9 @@ class ModelChatCompletionsModel(Model):
                 for function_call in state.function_calls.values():
                     final_response.output.append(function_call)
 
-                yield ResponseCompletedEvent(
+                yield ResponseEvent(
+                    type="completed",
                     response=final_response,
-                    type="response.completed",
                 )
 
     async def _fetch_response(

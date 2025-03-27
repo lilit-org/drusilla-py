@@ -33,8 +33,9 @@ MAX_GUARDRAIL_QUEUE_SIZE = get_env_var("MAX_GUARDRAIL_QUEUE_SIZE", MAX_GUARDRAIL
 T = TypeVar("T")
 
 ########################################################
-#               Data Classes                          #
+#               Data Classes for Results               #
 ########################################################
+
 @dataclass(frozen=True)
 class RunResultBase(abc.ABC):
     input: str | list[TResponseInputItem]

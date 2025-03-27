@@ -14,7 +14,7 @@ T = TypeVar("T")
 MaybeAwaitable = Union[Awaitable[T], T]
 
 ########################################################
-#            Data class for types                      #
+#            Data class for Usage                      #
 ########################################################
 
 @dataclass(frozen=True)
@@ -24,6 +24,34 @@ class Usage:
     input_tokens: int
     output_tokens: int
     total_tokens: int
+
+
+########################################################
+#            TypedDict for Computer Actions            #
+########################################################
+
+class ComputerAction(TypedDict):
+    """Computer interaction actions like clicks, typing, etc."""
+    type: Literal["click", "double_click", "drag", "keypress", "move", "screenshot", "scroll", "type", "wait"]
+    x: NotRequired[int]
+    y: NotRequired[int]
+    button: NotRequired[str]
+    keys: NotRequired[Sequence[str]]
+    path: NotRequired[Sequence[Mapping[str, int]]]
+    scroll_x: NotRequired[int]
+    scroll_y: NotRequired[int]
+    text: NotRequired[str]
+
+class ComputerCallOutput(TypedDict):
+    """Output from a computer tool call."""
+    type: Literal["computer_call_output"]
+    call_id: str
+    output: str
+
+
+########################################################
+#            TypedDict for Response Outputs            #
+########################################################
 
 @dataclass(frozen=True)
 class ResponseCompletedEvent:
@@ -56,39 +84,24 @@ class Response:
     usage: Usage | None = None
     created_at: float | None = None
     model: str | None = None
-    object: str | None = None
-    tool_choice: str | None = None
+    object: Literal["response"] | None = None
+    tool_choice: Literal["auto", "required", "none"] | None = None
     temperature: float | None = None
-    tools: Sequence[Mapping[str, Any]] | None = None
+    tools: Sequence[ChatCompletionToolParam] | None = None
     parallel_tool_calls: bool | None = None
     top_p: float | None = None
-
-
-########################################################
-#            TypedDict for Response Outputs            #
-########################################################
-
-class ComputerAction(TypedDict):
-    """Computer interaction actions like clicks, typing, etc."""
-    type: Literal["click", "double_click", "drag", "keypress", "move", "screenshot", "scroll", "type", "wait"]
-    x: NotRequired[int]
-    y: NotRequired[int]
-    button: NotRequired[str]
-    keys: NotRequired[Sequence[str]]
-    path: NotRequired[Sequence[Mapping[str, int]]]
-    scroll_x: NotRequired[int]
-    scroll_y: NotRequired[int]
-    text: NotRequired[str]
 
 
 class ResponseOutput(TypedDict):
     """Output from an API response with optional content and metadata."""
     type: str
-    content: NotRequired[str]
+    content: NotRequired[str | Sequence[ResponseOutputText | ResponseOutputRefusal]]
     name: NotRequired[str]
     arguments: NotRequired[Mapping[str, Any]]
     call_id: NotRequired[str]
     action: NotRequired[ComputerAction]
+    role: NotRequired[Literal["user", "assistant", "system", "developer"]]
+    status: NotRequired[str]
 
 
 class ResponseOutputText(TypedDict):
@@ -140,34 +153,16 @@ class FunctionCallOutput(TypedDict):
     output: str
 
 
-class ComputerCallOutput(TypedDict):
-    """Output from a computer tool call."""
-    type: Literal["computer_call_output"]
-    call_id: str
-    output: str
-
-
-ResponseOutputItem: TypeAlias = ResponseOutput
-ResponseOutputMessage: TypeAlias = ResponseOutput
-ResponseFileSearchToolCall: TypeAlias = ResponseOutput
-ResponseFunctionWebSearch: TypeAlias = ResponseOutput
-ResponseComputerToolCall: TypeAlias = ResponseOutput
-ResponseReasoningItem: TypeAlias = ResponseOutput
-
-
-########################################################
-#            TypedDict for Input Items                 #
-########################################################
-
-class ResponseInputItemParam(TypedDict):
-    """Input item for API requests."""
-    type: str
-    content: NotRequired[str]
-    role: NotRequired[Literal["user", "assistant", "system", "developer"]]
-    name: NotRequired[str]
-    arguments: NotRequired[Mapping[str, Any]]
-    call_id: NotRequired[str]
-    action: NotRequired[ComputerAction]
+@dataclass(frozen=True)
+class ResponseEvent:
+    """Event indicating a change in response state."""
+    type: Literal["completed", "content_part.added", "content_part.done", "output_text.delta"]
+    response: Response | None = None
+    content_index: int | None = None
+    item_id: str | None = None
+    output_index: int | None = None
+    part: ResponseOutput | None = None
+    delta: str | None = None
 
 
 ########################################################
@@ -203,7 +198,7 @@ class ChatCompletionMessage(TypedDict):
     content: NotRequired[str]
     tool_calls: NotRequired[Sequence[ChatCompletionMessageToolCallParam]]
     refusal: NotRequired[str]
-    audio: NotRequired[Any]
+    audio: NotRequired[Mapping[str, str]]
 
 class ChatCompletionMessageParam(TypedDict):
     """Parameters for a chat completion message."""
@@ -266,8 +261,19 @@ ChatCompletionToolChoiceOptionParam: TypeAlias = Union[Literal["auto", "required
 
 
 ########################################################
-#            TypedDict for Response Format             #
+#            TypedDict for Response Input              #
 ########################################################
+
+class ResponseInputItemParam(TypedDict):
+    """Input item for API requests."""
+    type: str
+    content: NotRequired[str]
+    role: NotRequired[Literal["user", "assistant", "system", "developer"]]
+    name: NotRequired[str]
+    arguments: NotRequired[Mapping[str, Any]]
+    call_id: NotRequired[str]
+    action: NotRequired[ComputerAction]
+
 
 class ResponseFormat(TypedDict):
     """Format specification for API responses."""
@@ -308,3 +314,11 @@ class AsyncDeepSeek:
             ) -> ChatCompletion | AsyncStream:
                 """Create a chat completion with the given parameters."""
                 raise NotImplementedError
+
+
+ResponseOutputItem: TypeAlias = ResponseOutput
+ResponseOutputMessage: TypeAlias = ResponseOutput
+ResponseFileSearchToolCall: TypeAlias = ResponseOutput
+ResponseFunctionWebSearch: TypeAlias = ResponseOutput
+ResponseComputerToolCall: TypeAlias = ResponseOutput
+ResponseReasoningItem: TypeAlias = ResponseOutput
