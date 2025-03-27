@@ -54,7 +54,7 @@ def run_agent() -> str | None:
         setup_client()
         agent = create_agents()
 
-        msg = input("\n✅ Enter text to translate and target languages: ")
+        msg = input("\n❓ Enter text to translate and target languages: ")
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
     except Exception as e:

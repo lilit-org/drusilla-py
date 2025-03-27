@@ -10,8 +10,6 @@ from ._result import RunResult
 ########################################################
 
 THINK_PATTERN: Pattern[str] = re.compile(r'<think>(.*?)</think>(.*)', re.DOTALL)
-RESULT_PATTERN: Pattern[str] = re.compile(r"^([^']*?)(?:',\s*'type':\s*'output_text',\s*'annotations':\s*\[\])?$")
-TEXT_PATTERN: Pattern[str] = re.compile(r"'text':\s*'([^']*)'")
 
 ########################################################
 #               Final Output Section                  #
@@ -24,27 +22,15 @@ def _decode_unicode_escape(text: str) -> str:
 def _format_final_output(raw_response: ModelResponse) -> str:
 
     try:
-        output = str(raw_response.output[0])
+        output = raw_response.output[0]['text']
+
         if match := THINK_PATTERN.search(output):
             reasoning = _decode_unicode_escape(match.group(1).strip())
-            final_result = match.group(2).strip()
-            if result_match := RESULT_PATTERN.match(final_result):
-                final_result = _decode_unicode_escape(result_match.group(1).strip())
-            else:
-                final_result = _decode_unicode_escape(final_result.strip())
-            return f"\n\n✅ REASONING:\n{reasoning}\n\n✅ RESULT:\n{final_result}\n"
-
-        if result_match := RESULT_PATTERN.match(output):
-            final_result = _decode_unicode_escape(result_match.group(1).strip())
-            return f"\n\n✅ RESULT:\n{final_result}\n"
-
-        if text_match := TEXT_PATTERN.search(output):
-            final_result = _decode_unicode_escape(text_match.group(1).strip())
-            return f"\n\n✅ RESULT:\n{final_result}\n"
-
-        output = re.sub(r"',\s*'type':\s*'output_text',\s*'annotations':\s*\[\]", "", output)
-        final_result = _decode_unicode_escape(output.strip("'").strip())
-        return f"\n\n✅ RESULT:\n{final_result}\n"
+            final_result = _decode_unicode_escape(match.group(2).strip())
+        else:
+            reasoning = ""
+            final_result = _decode_unicode_escape(output.strip("'").strip())
+        return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
 
     except GenericError as e:
         print(f"Error formatting final output: {e}")
