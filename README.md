@@ -31,7 +31,7 @@ make install
 
 <br>
 
-create a `.env` file in your project root with your deepseek api endpoint and any customization:
+create a `.env` file in your project root with your deepseek api endpoint and any customization (or you can leave the default values):
 
 ```shell
 BASE_URL = "http://localhost:11434"
@@ -42,6 +42,12 @@ MAX_QUEUE_SIZE = 1000
 MAX_GUARDRAIL_QUEUE_SIZE = 100
 LRU_CACHE_SIZE = 128
 LOG_LEVEL = "DEBUG"  
+HTTP_TIMEOUT_TOTAL = 120.0
+HTTP_TIMEOUT_CONNECT = 30.0
+HTTP_TIMEOUT_READ = 90.0
+HTTP_MAX_KEEPALIVE_CONNECTIONS = 5
+HTTP_MAX_CONNECTIONS = 10
+
 ```
 
 <br>
@@ -110,7 +116,6 @@ you should get something like this:
 
 ```
 ✅ Received Model Response...
-✅ RunResult:
   
   👾 Agent Info:
         Last Agent → Agent Mulder
@@ -183,9 +188,8 @@ make world-traveler
 you can input a sentence in any major language and it will translate it for you:
 
 ```
-✅ Enter text to translate and target languages: eu te amo
+❓ Enter text to translate and target languages: eu te amo
 ✅ Successfully received model response...
-✅ RunResult:
 
   👾 Agent Info:
         Last Agent → Translation Orchestrator

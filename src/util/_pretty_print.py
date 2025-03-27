@@ -23,14 +23,16 @@ def _format_final_output(raw_response: ModelResponse) -> str:
 
     try:
         output = raw_response.output[0]['text']
-
-        if match := THINK_PATTERN.search(output):
+        match = THINK_PATTERN.search(output)
+        
+        if match:
             reasoning = _decode_unicode_escape(match.group(1).strip())
             final_result = _decode_unicode_escape(match.group(2).strip())
         else:
             reasoning = ""
             final_result = _decode_unicode_escape(output.strip("'").strip())
-        return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
+            
+        return "\n\n✅ REASONING:\n\n{}\n\n✅ RESULT:\n\n{}\n".format(reasoning, final_result)
 
     except GenericError as e:
         print(f"Error formatting final output: {e}")
@@ -86,8 +88,7 @@ def _format_stream_object(obj: Any) -> str:
         return "None"
     elif isinstance(obj, bool):
         return "✔️ Enabled" if obj else "❌ Disabled"
-    else:
-        return str(obj)
+    return str(obj)
 
 
 def _format_stream_info(stream: bool, tool_choice: Any) -> str:
@@ -115,5 +116,4 @@ def pretty_print_result(result: RunResult) -> str:
         ),
         _format_final_output(result.raw_responses[0])
     ]
-
     return "".join(parts)
