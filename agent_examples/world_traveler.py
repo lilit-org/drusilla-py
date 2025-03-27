@@ -6,22 +6,24 @@ translation agents to handle user messages.
 """
 
 import sys
-import httpx
 from pathlib import Path
-
 sys.path.append(str(Path(__file__).parent.parent))
-
 from src.agents import Agent, Runner
 from src.util._pretty_print import pretty_print_result
 from src.util._client import setup_client
+from src.util._exceptions import GenericError
 
 from src.util._constants import SUPPORTED_LANGUAGES
 
 
+########################################################
+#           Agent Creation                             #
+########################################################
+
 def create_agents() -> Agent:
 
     orchestrator_agent = Agent(
-        name="World Traveler",
+        name="Agent World Traveler",
         instructions=(
             "Coordinate translation requests using provided tools. "
             "Use appropriate translation tools based on requested languages."
@@ -42,20 +44,22 @@ def create_agents() -> Agent:
     return orchestrator_agent
 
 
-def main() -> str | None:
+########################################################
+#           Agent Runner                               #
+########################################################
+
+def run_agent() -> str | None:
 
     try:
         setup_client()
-        orchestrator_agent = create_agents()
+        agent = create_agents()
+
         msg = input("\n✅ Enter text to translate and target languages: ")
-        result = Runner.run_sync(orchestrator_agent, msg)
-        return pretty_print_result(result)
-    except httpx.HTTPError as e:
-        print(f"HTTP error: {e}", file=sys.stderr)
+        result = Runner.run_sync(agent, msg)
+        print(pretty_print_result(result))
     except Exception as e:
-        print(f"Translation service error: {e}", file=sys.stderr)
+        raise GenericError(e)
 
 
 if __name__ == "__main__":
-    if output := main():
-        print(output)
+    run_agent()

@@ -5,15 +5,17 @@ This script demonstrates basic usage of the DeepSeekClient and Agent classes.
 """
 
 import sys
-import httpx
 from pathlib import Path
-
 sys.path.append(str(Path(__file__).parent.parent))
-
 from src.agents import Agent, Runner
 from src.util._pretty_print import pretty_print_result
 from src.util._client import setup_client
+from src.util._exceptions import GenericError
 
+
+########################################################
+#           Agent Creation                             #
+########################################################
 
 def create_agent() -> Agent:
 
@@ -23,7 +25,11 @@ def create_agent() -> Agent:
     )
 
 
-def main() -> str | None:
+########################################################
+#           Agent Runner                               #
+########################################################
+
+def run_agent() -> str | None:
 
     try:
         setup_client()
@@ -34,13 +40,9 @@ def main() -> str | None:
             "Write a haiku about love in the cypherpunk world."
         )
         print(pretty_print_result(result))
-    except httpx.HTTPError as e:
-        print(f"HTTP error occurred: {e}", file=sys.stderr)
-        sys.exit(1)
     except Exception as e:
-        print(f"Error running poetry generator: {e}", file=sys.stderr)
-        sys.exit(1)
+        raise GenericError(e)
 
 
 if __name__ == "__main__":
-    main()
+    run_agent()
