@@ -13,12 +13,11 @@ from ._env import get_env_var
 from ._guardrail import InputGuardrailResult, OutputGuardrailResult
 from ._items import ModelResponse, RunItem, TResponseInputItem
 from ._logger import logger
-from ._pretty_print import pretty_print_result
 from ._stream_events import StreamEvent
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
-    from ..agents.run_impl import QueueCompleteSentinel
+    from ._pretty_print import pretty_print_result
 
 ########################################################
 #               Constants                               #

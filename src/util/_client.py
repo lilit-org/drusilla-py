@@ -5,15 +5,16 @@ from typing import Any
 
 import httpx
 
+from .. import set_default_model_api, set_default_model_client
 from ._constants import (
     CHAT_COMPLETIONS_ENDPOINT,
     DEFAULT_BASE_URL,
     HEADERS,
-    HTTP_TIMEOUT_TOTAL,
+    HTTP_MAX_CONNECTIONS,
+    HTTP_MAX_KEEPALIVE_CONNECTIONS,
     HTTP_TIMEOUT_CONNECT,
     HTTP_TIMEOUT_READ,
-    HTTP_MAX_KEEPALIVE_CONNECTIONS,
-    HTTP_MAX_CONNECTIONS,
+    HTTP_TIMEOUT_TOTAL,
 )
 from ._types import (
     AsyncDeepSeek,
@@ -24,8 +25,6 @@ from ._types import (
     ChatCompletionToolParam,
     ResponseFormat,
 )
-from .. import set_default_model_client, set_default_model_api
-
 
 ########################################################
 #           Public Classes
