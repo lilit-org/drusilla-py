@@ -11,6 +11,7 @@ from ._usage import Usage
 
 TContext = TypeVar("TContext", default=Any)
 
+
 @dataclass
 class RunContextWrapper(Generic[TContext]):
     """Wrapper for context objects passed to Runner.run().

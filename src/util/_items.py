@@ -74,6 +74,7 @@ RunItem: TypeAlias = Union[
 @dataclass(frozen=True)
 class RunItemBase(Generic[T], abc.ABC):
     """Base class for agent run items."""
+
     agent: Agent[Any]
     raw_item: T
 
@@ -87,13 +88,14 @@ class RunItemBase(Generic[T], abc.ABC):
         return self.raw_item
 
     def to_input_item(self) -> TResponseInputItem:
-        """Convert item to model input format. """
+        """Convert item to model input format."""
         return self.input_item
 
 
 @dataclass(frozen=True)
 class MessageOutputItem(RunItemBase[ResponseOutputItem]):
     """LLM message output."""
+
     raw_item: ResponseOutputItem
     type: Literal["message_output_item"] = "message_output_item"
 
@@ -129,6 +131,7 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
 @dataclass(frozen=True)
 class HandoffCallItem(RunItemBase[ResponseFunctionToolCall]):
     """Agent handoff tool call."""
+
     raw_item: ResponseFunctionToolCall
     type: Literal["handoff_call_item"] = "handoff_call_item"
 
@@ -136,6 +139,7 @@ class HandoffCallItem(RunItemBase[ResponseFunctionToolCall]):
 @dataclass(frozen=True)
 class HandoffOutputItem(RunItemBase[TResponseInputItem]):
     """Agent handoff output."""
+
     raw_item: TResponseInputItem
     source_agent: Agent[Any]
     target_agent: Agent[Any]
@@ -145,6 +149,7 @@ class HandoffOutputItem(RunItemBase[TResponseInputItem]):
 @dataclass(frozen=True)
 class ToolCallItem(RunItemBase[ToolCallItemTypes]):
     """Tool call for function or computer action."""
+
     raw_item: ToolCallItemTypes
     type: Literal["tool_call_item"] = "tool_call_item"
 
@@ -152,6 +157,7 @@ class ToolCallItem(RunItemBase[ToolCallItemTypes]):
 @dataclass(frozen=True)
 class ToolCallOutputItem(RunItemBase[Union[FunctionCallOutput, ComputerCallOutput]]):
     """Tool call execution output."""
+
     raw_item: FunctionCallOutput | ComputerCallOutput
     output: Any
     type: Literal["tool_call_output_item"] = "tool_call_output_item"
@@ -160,6 +166,7 @@ class ToolCallOutputItem(RunItemBase[Union[FunctionCallOutput, ComputerCallOutpu
 @dataclass(frozen=True)
 class ReasoningItem(RunItemBase[ResponseReasoningItem]):
     """LLM reasoning step."""
+
     raw_item: ResponseReasoningItem
     type: Literal["reasoning_item"] = "reasoning_item"
 
@@ -167,6 +174,7 @@ class ReasoningItem(RunItemBase[ResponseReasoningItem]):
 @dataclass(frozen=True)
 class ModelResponse:
     """Model response containing outputs and usage information."""
+
     output: list[TResponseOutputItem]
     usage: Usage
     referenceable_id: str | None
@@ -187,6 +195,7 @@ class ModelResponse:
 ########################################################
 #                   Item Helpers                        #
 ########################################################
+
 
 class ItemHelpers:
     """Helper methods for processing and formatting various item types."""
@@ -223,7 +232,7 @@ class ItemHelpers:
 
     @staticmethod
     def input_to_new_input_list(
-        input: str | list[TResponseInputItem]
+        input: str | list[TResponseInputItem],
     ) -> list[TResponseInputItem]:
         """Convert string or input items to input list."""
         if isinstance(input, str):
@@ -257,7 +266,7 @@ class ItemHelpers:
             lines = []
             current_line = []
 
-            for line in text.split('\n'):
+            for line in text.split("\n"):
                 line = line.strip()
                 if not line:
                     continue
@@ -265,12 +274,12 @@ class ItemHelpers:
                 # Handle think tags
                 if line.startswith(THINK_START):
                     if current_line:
-                        lines.append(' '.join(current_line))
+                        lines.append(" ".join(current_line))
                         current_line = []
                     lines.append(line)
                 elif line.endswith(THINK_END):
                     if current_line:
-                        lines.append(' '.join(current_line))
+                        lines.append(" ".join(current_line))
                         current_line = []
                     lines.append(line)
                 else:
@@ -278,9 +287,9 @@ class ItemHelpers:
 
             # Add any remaining lines
             if current_line:
-                lines.append(' '.join(current_line))
+                lines.append(" ".join(current_line))
 
-            return '\n'.join(lines)
+            return "\n".join(lines)
 
         except (IndexError, KeyError, AttributeError):
             return ""
@@ -302,7 +311,7 @@ class ItemHelpers:
         if not content:
             return ""
         content = content.replace("', 'type': 'output_text', 'annotations': []}", "")
-        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        lines = [line.strip() for line in content.split("\n") if line.strip()]
         if not lines:
             return ""
 
@@ -312,9 +321,9 @@ class ItemHelpers:
         def format_section(section: list[str]) -> list[str]:
             if not section:
                 return []
-            width = max(len(l) for l in section)
+            width = max(len(line) for line in section)
             border = "+" + "-" * (width + 2) + "+"
-            return [border, *[f"| {l:<{width}} |" for l in section], border]
+            return [border, *[f"| {line:<{width}} |" for line in section], border]
 
         for line in lines:
             if line.startswith(ItemHelpers.SPECIAL_LINES):
@@ -322,7 +331,7 @@ class ItemHelpers:
                     formatted_lines.extend(format_section(current_section))
                     current_section = []
                 if line.startswith(ECHOES_START):
-                    formatted_lines.append('')
+                    formatted_lines.append("")
                 formatted_lines.append(line)
             elif line.endswith(THINK_END):
                 formatted_lines.append(line)
@@ -332,4 +341,4 @@ class ItemHelpers:
         if current_section:
             formatted_lines.extend(format_section(current_section))
 
-        return '\n'.join(formatted_lines)
+        return "\n".join(formatted_lines)

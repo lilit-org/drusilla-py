@@ -8,7 +8,7 @@ from httpx import Limits, Timeout
 
 
 class DefaultAsyncHttpxClient(httpx.AsyncClient):
-    """A default async HTTP client for making requests with configurable timeouts and retry logic."""
+    """A default async HTTP client for making requests."""
 
     def __init__(
         self,
@@ -52,4 +52,4 @@ class DefaultAsyncHttpxClient(httpx.AsyncClient):
             except (httpx.ConnectError, httpx.ReadError):
                 if attempt == self.max_retries - 1:
                     raise
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)

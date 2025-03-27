@@ -48,6 +48,7 @@ if TYPE_CHECKING:
 #                    Private Methods
 ########################################################
 
+
 def _create_agent_tool(
     agent: Agent[Any],
     tool_name: str | None,
@@ -71,12 +72,14 @@ def _create_agent_tool(
             return await custom_output_extractor(output)
 
         return ItemHelpers.text_message_outputs(output.new_items)
+
     return run_agent
 
 
 ########################################################
 #                    Aux Data Classes
 ########################################################
+
 
 @dataclass
 class ToolsToFinalOutputResult:
@@ -98,6 +101,7 @@ class StopAtTools(TypedDict):
 ########################################################
 #                    Main Data Class
 ########################################################
+
 
 @dataclass
 class Agent(Generic[TContext]):
@@ -123,7 +127,9 @@ class Agent(Generic[TContext]):
     output_type: type[Any] | None = None
     hooks: AgentHooks[TContext] | None = None
     tool_use_behavior: (
-        Literal["run_llm_again", "stop_on_first_tool"] | StopAtTools | ToolsToFinalOutputFunction
+        Literal["run_llm_again", "stop_on_first_tool"]
+        | StopAtTools
+        | ToolsToFinalOutputFunction
     ) = "run_llm_again"
 
     def clone(self, **kwargs: Any) -> Agent[TContext]:
@@ -137,7 +143,7 @@ class Agent(Generic[TContext]):
             "output_guardrails": [],
             "output_type": None,
             "hooks": None,
-            "tool_use_behavior": "run_llm_again"
+            "tool_use_behavior": "run_llm_again",
         }
         defaults.update(kwargs)
         return dataclasses.replace(self, **defaults)
@@ -149,9 +155,13 @@ class Agent(Generic[TContext]):
         custom_output_extractor: Callable[[RunResult], Awaitable[str]] | None = None,
     ) -> Tool:
         """Converts agent to tool for other agents."""
-        return _create_agent_tool(self, tool_name, tool_description, custom_output_extractor)
+        return _create_agent_tool(
+            self, tool_name, tool_description, custom_output_extractor
+        )
 
-    async def get_system_prompt(self, run_context: RunContextWrapper[TContext]) -> str | None:
+    async def get_system_prompt(
+        self, run_context: RunContextWrapper[TContext]
+    ) -> str | None:
         """Get the system prompt for the agent."""
         if self.instructions is None:
             return None

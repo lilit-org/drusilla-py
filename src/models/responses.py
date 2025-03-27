@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 #           Main Class: Responses Model                #
 ########################################################
 
+
 class ModelResponsesModel(Model):
     """Model implementation using Model Responses API."""
 
@@ -83,7 +84,7 @@ class ModelResponsesModel(Model):
             )
 
         except Exception as e:
-            request_id = getattr(e, 'request_id', None)
+            request_id = getattr(e, "request_id", None)
             logger.error(f"Error getting response: {e}. (request_id: {request_id})")
             raise
 
@@ -100,7 +101,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff]
+        handoffs: list[Handoff],
     ) -> AsyncIterator[ResponseOutput]:
         """Yields a partial message as it is generated, as well as the usage information."""
         try:
@@ -158,7 +159,9 @@ class ModelResponsesModel(Model):
         list_input = ItemHelpers.input_to_new_input_list(input)
 
         parallel_tool_calls = (
-            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else UNSET
+            True
+            if model_settings.parallel_tool_calls and tools and len(tools) > 0
+            else UNSET
         )
 
         tool_choice = Converter.convert_tool_choice(model_settings.tool_choice)
@@ -172,7 +175,7 @@ class ModelResponsesModel(Model):
             f"Stream: {stream}\n"
             f"Tool choice: {tool_choice}\n"
             f"Response format: {response_format}\n"
-            )
+        )
 
         return await self._client.responses.create(
             instructions=self._non_null_or_not_given(system_instructions),
@@ -196,6 +199,7 @@ class ModelResponsesModel(Model):
 #               Data Classes                          #
 ########################################################
 
+
 @dataclass
 class ConvertedTools:
     tools: list[ChatCompletionToolParam]
@@ -205,6 +209,7 @@ class ConvertedTools:
 ########################################################
 #             Main Class: Converter                    #
 ########################################################
+
 
 class Converter:
     """Tool conversion utilities."""
@@ -266,7 +271,9 @@ class Converter:
 
         computer_tools = [tool for tool in tools if isinstance(tool, ComputerTool)]
         if len(computer_tools) > 1:
-            raise UsageError(f"You can only provide one computer tool. Got {len(computer_tools)}")
+            raise UsageError(
+                f"You can only provide one computer tool. Got {len(computer_tools)}"
+            )
 
         for tool in tools:
             converted_tool, include = cls._convert_tool(tool)
@@ -280,7 +287,9 @@ class Converter:
         return ConvertedTools(tools=converted_tools, includes=includes)
 
     @classmethod
-    def _convert_tool(cls, tool: Tool) -> tuple[ChatCompletionToolParam, IncludeLiteral | None]:
+    def _convert_tool(
+        cls, tool: Tool
+    ) -> tuple[ChatCompletionToolParam, IncludeLiteral | None]:
         """Convert tool to API format"""
         converted_tool: ChatCompletionToolParam = {"type": "function"}
         includes: IncludeLiteral | None = None
@@ -316,7 +325,9 @@ class Converter:
             if tool.filters:
                 converted_tool["filters"] = tool.filters
 
-            includes = "file_search_call.results" if tool.include_search_results else None
+            includes = (
+                "file_search_call.results" if tool.include_search_results else None
+            )
             return converted_tool, includes
         elif isinstance(tool, ComputerTool):
             converted_tool = {

@@ -3,11 +3,21 @@ from __future__ import annotations
 import contextlib
 import inspect
 import json
+import logging
 import re
 from collections.abc import Awaitable
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Callable, Literal, Union, get_args, get_origin, get_type_hints, overload
+from typing import (
+    Any,
+    Callable,
+    Literal,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+    overload,
+)
 
 from griffe import Docstring, DocstringSectionKind
 from pydantic import BaseModel, Field, ValidationError, create_model
@@ -29,12 +39,15 @@ from ._types import MaybeAwaitable
 ToolParams = ParamSpec("ToolParams")
 ToolFunctionWithoutContext = Callable[ToolParams, Any]
 ToolFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], ToolParams], Any]
-ToolFunction = Union[ToolFunctionWithoutContext[ToolParams], ToolFunctionWithContext[ToolParams]]
+ToolFunction = Union[
+    ToolFunctionWithoutContext[ToolParams], ToolFunctionWithContext[ToolParams]
+]
 
 
 ########################################################
 #               Data classes                           #
 ########################################################
+
 
 @dataclass(frozen=True)
 class FuncSchema:
@@ -72,10 +85,10 @@ class FuncSchema:
             else:
                 keyword_params.append(name)
 
-        object.__setattr__(self, '_positional_params', positional_params)
-        object.__setattr__(self, '_keyword_params', keyword_params)
-        object.__setattr__(self, '_var_positional', var_positional)
-        object.__setattr__(self, '_var_keyword', var_keyword)
+        object.__setattr__(self, "_positional_params", positional_params)
+        object.__setattr__(self, "_keyword_params", keyword_params)
+        object.__setattr__(self, "_var_positional", var_positional)
+        object.__setattr__(self, "_var_keyword", var_keyword)
 
     def to_call_args(self, data: BaseModel) -> tuple[list[Any], dict[str, Any]]:
         """Convert Pydantic model to function call arguments."""
@@ -102,32 +115,40 @@ class FuncSchema:
 
         return positional_args, keyword_args
 
+
 @dataclass(frozen=True)
 class FuncDocumentation:
     """Function metadata from docstring."""
+
     name: str
     description: str | None
     param_descriptions: dict[str, str] | None
 
+
 @dataclass(frozen=True)
 class FunctionToolResult:
     """Result of running a function tool."""
+
     tool: FunctionTool
     output: Any
     run_item: RunItem
 
+
 @dataclass(frozen=True)
 class FunctionTool:
     """Tool that wraps a Python function."""
+
     name: str
     description: str
     params_json_schema: dict[str, Any]
     on_invoke_tool: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
     strict_json_schema: bool = True
 
+
 @dataclass(frozen=True)
 class FileSearchTool:
     """Tool for searching vector stores."""
+
     vector_store_ids: list[str]
     max_num_results: int | None = None
     include_search_results: bool = False
@@ -138,9 +159,11 @@ class FileSearchTool:
     def name(self):
         return "file_search"
 
+
 @dataclass(frozen=True)
 class WebSearchTool:
     """Tool for web searching."""
+
     user_location: Any | None = None
     search_context_size: Literal["low", "medium", "high"] = "medium"
 
@@ -148,9 +171,11 @@ class WebSearchTool:
     def name(self):
         return "web_search_preview"
 
+
 @dataclass(frozen=True)
 class ComputerTool:
     """Tool for computer control."""
+
     computer: Computer | AsyncComputer
 
     @property
@@ -163,6 +188,8 @@ class ComputerTool:
 ########################################################
 
 DocstringStyle = Literal["google", "numpy", "sphinx"]
+
+
 @lru_cache(maxsize=LRU_CACHE_SIZE)
 def _detect_docstring_style(doc: str) -> DocstringStyle:
     """Detect docstring style using pattern matching."""
@@ -194,7 +221,15 @@ def _detect_docstring_style(doc: str) -> DocstringStyle:
     if max_score == 0:
         return "google"
 
-    return next((style for style in ["sphinx", "numpy", "google"] if scores[style] == max_score), "google")
+    return next(
+        (
+            style
+            for style in ["sphinx", "numpy", "google"]
+            if scores[style] == max_score
+        ),
+        "google",
+    )
+
 
 @contextlib.contextmanager
 def _suppress_griffe_logging():
@@ -207,8 +242,11 @@ def _suppress_griffe_logging():
     finally:
         logger.setLevel(previous_level)
 
+
 @lru_cache(maxsize=LRU_CACHE_SIZE)
-def _process_var_positional(param: inspect.Parameter, ann: Any, field_description: str | None) -> tuple[Any, Field]:
+def _process_var_positional(
+    param: inspect.Parameter, ann: Any, field_description: str | None
+) -> tuple[Any, Field]:
     """Process *args parameters."""
     if get_origin(ann) is tuple:
         args_of_tuple = get_args(ann)
@@ -221,8 +259,11 @@ def _process_var_positional(param: inspect.Parameter, ann: Any, field_descriptio
 
     return ann, Field(default_factory=list, description=field_description)  # type: ignore
 
+
 @lru_cache(maxsize=LRU_CACHE_SIZE)
-def _process_var_keyword(param: inspect.Parameter, ann: Any, field_description: str | None) -> tuple[Any, Field]:
+def _process_var_keyword(
+    param: inspect.Parameter, ann: Any, field_description: str | None
+) -> tuple[Any, Field]:
     """Process **kwargs parameters."""
     if get_origin(ann) is dict:
         dict_args = get_args(ann)
@@ -240,20 +281,30 @@ def _process_var_keyword(param: inspect.Parameter, ann: Any, field_description: 
 #               Public Functions                        #
 ########################################################
 
+
 def generate_func_documentation(
     func: Callable[..., Any], style: DocstringStyle | None = None
 ) -> FuncDocumentation:
     """Extract function metadata from docstring."""
     doc = inspect.getdoc(func)
     if not doc:
-        return FuncDocumentation(name=func.__name__, description=None, param_descriptions=None)
+        return FuncDocumentation(
+            name=func.__name__, description=None, param_descriptions=None
+        )
 
     with _suppress_griffe_logging():
-        docstring = Docstring(doc, lineno=1, parser=style or _detect_docstring_style(doc))
+        docstring = Docstring(
+            doc, lineno=1, parser=style or _detect_docstring_style(doc)
+        )
         parsed = docstring.parse()
 
     description = next(
-        (section.value for section in parsed if section.kind == DocstringSectionKind.text), None
+        (
+            section.value
+            for section in parsed
+            if section.kind == DocstringSectionKind.text
+        ),
+        None,
     )
 
     param_descriptions = {
@@ -269,6 +320,7 @@ def generate_func_documentation(
         param_descriptions=param_descriptions or None,
     )
 
+
 def function_schema(
     func: Callable[..., Any],
     docstring_style: DocstringStyle | None = None,
@@ -279,7 +331,11 @@ def function_schema(
 ) -> FuncSchema:
     """Extract function schema for tool use."""
 
-    doc_info = generate_func_documentation(func, docstring_style) if use_docstring_info else None
+    doc_info = (
+        generate_func_documentation(func, docstring_style)
+        if use_docstring_info
+        else None
+    )
     param_descs = doc_info.param_descriptions or {} if doc_info else {}
     func_name = name_override or doc_info.name if doc_info else func.__name__
 
@@ -307,7 +363,7 @@ def function_schema(
             origin = get_origin(ann) or ann
             if origin is RunContextWrapper:
                 raise UsageError(
-                    f"RunContextWrapper param found at non-first position in function {func.__name__}"
+                    f"RunContextWrapper param found at non-first position in {func.__name__}"
                 )
         filtered_params.append((name, param))
 
@@ -348,14 +404,18 @@ def function_schema(
         strict_json_schema=strict_json_schema,
     )
 
+
 Tool = Union[FunctionTool, FileSearchTool, WebSearchTool, ComputerTool]
 """A tool that can be used in an agent."""
+
 
 def default_tool_error_function(ctx: RunContextWrapper[Any], error: Exception) -> str:
     """Default error handler for tool failures."""
     return f"An error occurred while running the tool. Please try again. Error: {str(error)}"
 
+
 ToolErrorFunction = Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]]
+
 
 @overload
 def function_tool(
@@ -371,6 +431,7 @@ def function_tool(
     """Overload for usage as @function_tool (no parentheses)."""
     ...
 
+
 @overload
 def function_tool(
     *,
@@ -383,6 +444,7 @@ def function_tool(
 ) -> Callable[[ToolFunction[...]], FunctionTool]:
     """Overload for usage as @function_tool(...)."""
     ...
+
 
 def function_tool(
     func: ToolFunction[...] | None = None,
@@ -428,7 +490,9 @@ def function_tool(
                     else schema.params_pydantic_model()
                 )
             except ValidationError as e:
-                raise ModelError(f"Invalid JSON input for tool {schema.name}: {e}") from e
+                raise ModelError(
+                    f"Invalid JSON input for tool {schema.name}: {e}"
+                ) from e
 
             args, kwargs_dict = schema.to_call_args(parsed)
 

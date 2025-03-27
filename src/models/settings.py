@@ -7,6 +7,7 @@ from typing import Literal
 #            Data class for settings                   #
 ########################################################
 
+
 @dataclass(frozen=True)
 class ModelSettings:
     """Optional LLM configuration parameters (temperature, top_p, penalties, etc.)."""
@@ -34,7 +35,7 @@ class ModelSettings:
             raise ValueError("max_tokens must be positive")
 
     def resolve(self, override: ModelSettings | None) -> ModelSettings:
-        """Merge override settings with current settings, preferring non-None values from override."""
+        """Merge override settings with current settings."""
         if override is None:
             return self
         return ModelSettings(
@@ -43,7 +44,8 @@ class ModelSettings:
             frequency_penalty=override.frequency_penalty or self.frequency_penalty,
             presence_penalty=override.presence_penalty or self.presence_penalty,
             tool_choice=override.tool_choice or self.tool_choice,
-            parallel_tool_calls=override.parallel_tool_calls or self.parallel_tool_calls,
+            parallel_tool_calls=override.parallel_tool_calls
+            or self.parallel_tool_calls,
             truncation=override.truncation or self.truncation,
             max_tokens=override.max_tokens or self.max_tokens,
         )

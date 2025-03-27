@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     )
     from .util._usage import Usage
 
+
 def set_default_model_key(key: str) -> None:
     shared.set_default_model_key(key)
 
@@ -73,10 +74,7 @@ def set_default_model_client(client: AsyncDeepSeek) -> None:
 
 
 def set_default_model_api(api: Literal["chat_completions", "responses"]) -> None:
-    if api == "chat_completions":
-        shared.set_use_responses_by_default(False)
-    else:
-        shared.set_use_responses_by_default(True)
+    shared.set_use_responses_by_default(api != "chat_completions")
 
 
 __all__ = [

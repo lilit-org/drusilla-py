@@ -6,7 +6,6 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from ..util._computer import AsyncComputer, Computer
 from ..util._exceptions import AgentError, ModelError, UsageError
 from ..util._guardrail import (
     InputGuardrail,
@@ -48,8 +47,10 @@ if TYPE_CHECKING:
 #               Constants                                #
 ########################################################
 
+
 class QueueCompleteSentinel:
     pass
+
 
 QUEUE_COMPLETE_SENTINEL = QueueCompleteSentinel()
 _NOT_FINAL_OUTPUT = ToolsToFinalOutputResult(is_final_output=False, final_output=None)
@@ -58,6 +59,7 @@ _NOT_FINAL_OUTPUT = ToolsToFinalOutputResult(is_final_output=False, final_output
 ########################################################
 #               Data Classes                            #
 ########################################################
+
 
 @dataclass(frozen=True)
 class ToolRunHandoff:
@@ -119,6 +121,7 @@ class SingleStepResult:
 ########################################################
 #               Main Class: RunImpl                    #
 ########################################################
+
 
 class RunImpl:
     EVENT_MAP = {
@@ -187,7 +190,7 @@ class RunImpl:
                 check_tool_use.final_output = str(check_tool_use.final_output)
 
             if check_tool_use.final_output is None:
-                logger.error("Model returned a final output of None. Not raising an error because we assume you know what you're doing.")
+                logger.error("Model returned None.")
 
             return await cls.execute_final_output(
                 agent=agent,
@@ -200,12 +203,20 @@ class RunImpl:
                 context_wrapper=context_wrapper,
             )
 
-        message_items = [item for item in new_step_items if isinstance(item, MessageOutputItem)]
+        message_items = [
+            item for item in new_step_items if isinstance(item, MessageOutputItem)
+        ]
         potential_final_output_text = (
-            ItemHelpers.extract_last_text(message_items[-1].raw_item) if message_items else None
+            ItemHelpers.extract_last_text(message_items[-1].raw_item)
+            if message_items
+            else None
         )
 
-        if output_schema and not output_schema.is_plain_text() and potential_final_output_text:
+        if (
+            output_schema
+            and not output_schema.is_plain_text()
+            and potential_final_output_text
+        ):
             final_output = output_schema.validate_json(potential_final_output_text)
             return await cls.execute_final_output(
                 agent=agent,
@@ -270,16 +281,20 @@ class RunImpl:
                 message_output = {
                     "type": "message",
                     "content": [output],
-                    "role": "assistant"
+                    "role": "assistant",
                 }
                 items.append(MessageOutputItem(raw_item=message_output, agent=agent))
             elif output_type in ("file_search", "web_search", "computer"):
                 items.append(ToolCallItem(raw_item=output, agent=agent))
                 if output_type == "computer":
                     if not computer_tool:
-                        raise ModelError("Model produced computer action without a computer tool.")
+                        raise ModelError(
+                            "Model produced computer action without a computer tool."
+                        )
                     computer_actions.append(
-                        ToolRunComputerAction(tool_call=output, computer_tool=computer_tool)
+                        ToolRunComputerAction(
+                            tool_call=output, computer_tool=computer_tool
+                        )
                     )
             elif output_type == "reasoning":
                 items.append(ReasoningItem(raw_item=output, agent=agent))
@@ -293,7 +308,9 @@ class RunImpl:
                     run_handoffs.append(handoff)
                 else:
                     if output["name"] not in function_map:
-                        raise ModelError(f"Tool {output['name']} not found in agent {agent.name}")
+                        raise ModelError(
+                            f"Tool {output['name']} not found in agent {agent.name}"
+                        )
                     items.append(ToolCallItem(raw_item=output, agent=agent))
                     functions.append(
                         ToolRunFunction(
@@ -338,17 +355,24 @@ class RunImpl:
                 await asyncio.gather(
                     hooks.on_tool_end(context_wrapper, agent, func_tool, result),
                     (
-                        agent.hooks.on_tool_end(context_wrapper, agent, func_tool, result)
+                        agent.hooks.on_tool_end(
+                            context_wrapper, agent, func_tool, result
+                        )
                         if agent.hooks
                         else noop_coroutine()
                     ),
                 )
             except Exception as e:
-                raise AgentError(e)
+                raise AgentError(e) from e
 
             return result
 
-        results = await asyncio.gather(*[run_single_tool(tool_run.function_tool, tool_run.tool_call) for tool_run in tool_runs])
+        results = await asyncio.gather(
+            *[
+                run_single_tool(tool_run.function_tool, tool_run.tool_call)
+                for tool_run in tool_runs
+            ]
+        )
 
         return [
             FunctionToolResult(
@@ -356,7 +380,9 @@ class RunImpl:
                 output=result,
                 run_item=ToolCallOutputItem(
                     output=result,
-                    raw_item=ItemHelpers.tool_call_output_item(tool_run.tool_call, str(result)),
+                    raw_item=ItemHelpers.tool_call_output_item(
+                        tool_run.tool_call, str(result)
+                    ),
                     agent=agent,
                 ),
             )
@@ -372,15 +398,17 @@ class RunImpl:
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
     ) -> list[RunItem]:
-        return await asyncio.gather(*[
-            ComputerAction.execute(
-                agent=agent,
-                action=action,
-                hooks=hooks,
-                context_wrapper=context_wrapper,
-            )
-            for action in actions
-        ])
+        return await asyncio.gather(
+            *[
+                ComputerAction.execute(
+                    agent=agent,
+                    action=action,
+                    hooks=hooks,
+                    context_wrapper=context_wrapper,
+                )
+                for action in actions
+            ]
+        )
 
     @classmethod
     async def execute_handoffs(
@@ -398,7 +426,9 @@ class RunImpl:
     ) -> SingleStepResult:
         if len(run_handoffs) > 1:
             ignored_handoffs = run_handoffs[1:]
-            output_message = f"Multiple handoffs detected, ignoring {len(ignored_handoffs)} handoffs."
+            output_message = (
+                f"Multiple handoffs, ignoring {len(ignored_handoffs)} handoffs."
+            )
             new_step_items.append(
                 ToolCallOutputItem(
                     output=output_message,
@@ -450,9 +480,11 @@ class RunImpl:
         if input_filter:
             logger.debug("Filtering inputs for handoff")
             handoff_input_data = HandoffInputData(
-                input_history=tuple(original_input)
-                if isinstance(original_input, list)
-                else original_input,
+                input_history=(
+                    tuple(original_input)
+                    if isinstance(original_input, list)
+                    else original_input
+                ),
                 pre_handoff_items=tuple(pre_step_items),
                 new_items=tuple(new_step_items),
             )
@@ -512,7 +544,7 @@ class RunImpl:
         if agent.hooks:
             await asyncio.gather(
                 hooks.on_end(context_wrapper, agent, final_output),
-                agent.hooks.on_end(context_wrapper, agent, final_output)
+                agent.hooks.on_end(context_wrapper, agent, final_output),
             )
         else:
             await hooks.on_end(context_wrapper, agent, final_output)
@@ -535,7 +567,9 @@ class RunImpl:
         agent_output: Any,
         context: RunContextWrapper[TContext],
     ) -> OutputGuardrailResult:
-        return await guardrail.run(agent=agent, agent_output=agent_output, context=context)
+        return await guardrail.run(
+            agent=agent, agent_output=agent_output, context=context
+        )
 
     @classmethod
     def stream_step_result_to_queue(
@@ -589,7 +623,8 @@ class RunImpl:
                     return result
             else:
                 if result := cast(
-                    ToolsToFinalOutputResult, agent.tool_use_behavior(context_wrapper, tool_results)
+                    ToolsToFinalOutputResult,
+                    agent.tool_use_behavior(context_wrapper, tool_results),
                 ):
                     return result
 
@@ -601,99 +636,6 @@ class RunImpl:
 #               Main Class: Computer Action            #
 ########################################################
 
-class ComputerAction:
-    @classmethod
-    async def _execute_computer_action(
-        cls,
-        computer: Computer | AsyncComputer,
-        action: dict[str, Any],
-    ) -> str:
-        action_type = action["type"]
-        if isinstance(computer, AsyncComputer):
-            if action_type == "click":
-                await computer.click(action["x"], action["y"], action["button"])
-            elif action_type == "double_click":
-                await computer.double_click(action["x"], action["y"])
-            elif action_type == "drag":
-                await computer.drag([(p["x"], p["y"]) for p in action["path"]])
-            elif action_type == "keypress":
-                await computer.keypress(action["keys"])
-            elif action_type == "move":
-                await computer.move(action["x"], action["y"])
-            elif action_type == "screenshot":
-                await computer.screenshot()
-            elif action_type == "scroll":
-                await computer.scroll(action["x"], action["y"], action["scroll_x"], action["scroll_y"])
-            elif action_type == "type":
-                await computer.type(action["text"])
-            elif action_type == "wait":
-                await computer.wait()
-            return await computer.screenshot()
-        else:
-            if action_type == "click":
-                computer.click(action["x"], action["y"], action["button"])
-            elif action_type == "double_click":
-                computer.double_click(action["x"], action["y"])
-            elif action_type == "drag":
-                computer.drag([(p["x"], p["y"]) for p in action["path"]])
-            elif action_type == "keypress":
-                computer.keypress(action["keys"])
-            elif action_type == "move":
-                computer.move(action["x"], action["y"])
-            elif action_type == "screenshot":
-                computer.screenshot()
-            elif action_type == "scroll":
-                computer.scroll(action["x"], action["y"], action["scroll_x"], action["scroll_y"])
-            elif action_type == "type":
-                computer.type(action["text"])
-            elif action_type == "wait":
-                computer.wait()
-            return computer.screenshot()
-
-    @classmethod
-    async def execute(
-        cls,
-        *,
-        agent: Agent[TContext],
-        action: ToolRunComputerAction,
-        hooks: RunHooks[TContext],
-        context_wrapper: RunContextWrapper[TContext],
-    ) -> RunItem:
-        output = await cls._execute_computer_action(action.computer_tool.computer, action.tool_call["action"])
-
-        _, _, _ = await asyncio.gather(
-            hooks.on_tool_start(context_wrapper, agent, action.computer_tool),
-            (
-                agent.hooks.on_tool_start(context_wrapper, agent, action.computer_tool)
-                if agent.hooks
-                else noop_coroutine()
-            ),
-            asyncio.sleep(0),
-        )
-
-        await asyncio.gather(
-            hooks.on_tool_end(context_wrapper, agent, action.computer_tool, output),
-            (
-                agent.hooks.on_tool_end(context_wrapper, agent, action.computer_tool, output)
-                if agent.hooks
-                else noop_coroutine()
-            ),
-        )
-
-        image_url = f"data:image/png;base64,{output}"
-        return ToolCallOutputItem(
-            agent=agent,
-            output=image_url,
-            raw_item={
-                "call_id": action.tool_call["call_id"],
-                "output": {
-                    "type": "computer_screenshot",
-                    "image_url": image_url,
-                },
-                "type": "computer_call_output",
-            },
-        )
 
 async def noop_coroutine() -> None:
     """A coroutine that does nothing. Used as a fallback when no hooks are defined."""
-    pass

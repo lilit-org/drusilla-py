@@ -1,6 +1,7 @@
 import re
 from re import Pattern
 from typing import Any
+
 from ._exceptions import GenericError
 from ._items import ModelResponse
 from ._result import RunResult
@@ -9,30 +10,30 @@ from ._result import RunResult
 #               Compiled Regex Patterns                #
 ########################################################
 
-THINK_PATTERN: Pattern[str] = re.compile(r'<think>(.*?)</think>(.*)', re.DOTALL)
+THINK_PATTERN: Pattern[str] = re.compile(r"<think>(.*?)</think>(.*)", re.DOTALL)
 
 ########################################################
 #               Final Output Section                  #
 ########################################################
 
+
 def _decode_unicode_escape(text: str) -> str:
-    return text.encode().decode('unicode-escape')
+    return text.encode().decode("unicode-escape")
 
 
 def _format_final_output(raw_response: ModelResponse) -> str:
-
     try:
-        output = raw_response.output[0]['text']
+        output = raw_response.output[0]["text"]
         match = THINK_PATTERN.search(output)
-        
+
         if match:
             reasoning = _decode_unicode_escape(match.group(1).strip())
             final_result = _decode_unicode_escape(match.group(2).strip())
         else:
             reasoning = ""
             final_result = _decode_unicode_escape(output.strip("'").strip())
-            
-        return "\n\n✅ REASONING:\n\n{}\n\n✅ RESULT:\n\n{}\n".format(reasoning, final_result)
+
+        return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
 
     except GenericError as e:
         print(f"Error formatting final output: {e}")
@@ -43,13 +44,14 @@ def _format_final_output(raw_response: ModelResponse) -> str:
 #               Agent Info Section                    #
 ########################################################
 
+
 def _indent(text: str, indent_level: int) -> str:
     indent_string = "  " * indent_level
     return "\n".join(f"{indent_string}{line}" for line in text.splitlines())
 
 
 def _format_agent_info(result: RunResult) -> str:
-    if hasattr(result, 'is_complete'):
+    if hasattr(result, "is_complete"):
         info = [
             "\n👾 Agent Info:",
             f"      Name   → {result.current_agent.name}",
@@ -68,6 +70,7 @@ def _format_agent_info(result: RunResult) -> str:
 #               Stats Section                         #
 ########################################################
 
+
 def _format_stats(result: RunResult) -> str:
     stats = [
         "\n📊 Statistics:",
@@ -82,6 +85,7 @@ def _format_stats(result: RunResult) -> str:
 ########################################################
 #               Stream Info Section                   #
 ########################################################
+
 
 def _format_stream_object(obj: Any) -> str:
     if obj is None or obj is object():
@@ -104,6 +108,7 @@ def _format_stream_info(stream: bool, tool_choice: Any) -> str:
 #               Public Main Function                  #
 ########################################################
 
+
 def pretty_print_result(result: RunResult) -> str:
 
     parts = [
@@ -111,9 +116,9 @@ def pretty_print_result(result: RunResult) -> str:
         _format_agent_info(result),
         _format_stats(result),
         _format_stream_info(
-            stream=hasattr(result, 'is_complete'),
-            tool_choice=getattr(result, 'tool_choice', None)
+            stream=hasattr(result, "is_complete"),
+            tool_choice=getattr(result, "tool_choice", None),
         ),
-        _format_final_output(result.raw_responses[0])
+        _format_final_output(result.raw_responses[0]),
     ]
     return "".join(parts)

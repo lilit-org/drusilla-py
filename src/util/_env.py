@@ -16,6 +16,7 @@ TRUE_VALUES = {"true", "1", "yes"}
 #              Getters
 ########################################################
 
+
 @lru_cache(maxsize=LRU_CACHE_SIZE)
 def get_env_var(key: str, default: T) -> T:
     """Retrieves and converts an environment variable to the specified type.
@@ -54,7 +55,9 @@ def get_env_var(key: str, default: T) -> T:
             _env_cache[key] = result
             return result
         except (ValueError, TypeError) as e:
-            raise ValueError(f"Failed to convert environment variable '{key}' to type {type(default).__name__}: {e}")
+            raise ValueError(
+                f"Failed to convert env variable '{key}' to {type(default).__name__}: {e}"
+            ) from e
 
     _env_cache[key] = default
     return default

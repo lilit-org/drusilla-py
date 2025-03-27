@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 ########################################################
 
 MAX_QUEUE_SIZE = get_env_var("MAX_QUEUE_SIZE", MAX_QUEUE_SIZE)
-MAX_GUARDRAIL_QUEUE_SIZE = get_env_var("MAX_GUARDRAIL_QUEUE_SIZE", MAX_GUARDRAIL_QUEUE_SIZE)
+MAX_GUARDRAIL_QUEUE_SIZE = get_env_var(
+    "MAX_GUARDRAIL_QUEUE_SIZE", MAX_GUARDRAIL_QUEUE_SIZE
+)
 
 ########################################################
 #               Public Types                           #
@@ -33,8 +35,10 @@ MAX_GUARDRAIL_QUEUE_SIZE = get_env_var("MAX_GUARDRAIL_QUEUE_SIZE", MAX_GUARDRAIL
 T = TypeVar("T")
 
 ########################################################
-#               Data Classes                          #
+#               Data Classes for Results               #
 ########################################################
+
+
 @dataclass(frozen=True)
 class RunResultBase(abc.ABC):
     input: str | list[TResponseInputItem]
@@ -76,18 +80,21 @@ class RunResultStreaming(RunResultBase):
 
     # Optimized queue initialization with max sizes
     _event_queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=MAX_QUEUE_SIZE),
-        repr=False
+        default_factory=lambda: asyncio.Queue(maxsize=MAX_QUEUE_SIZE), repr=False
     )
     _input_guardrail_queue: asyncio.Queue[InputGuardrailResult] = field(
         default_factory=lambda: asyncio.Queue(maxsize=MAX_GUARDRAIL_QUEUE_SIZE),
-        repr=False
+        repr=False,
     )
 
     # Async tasks with improved type hints
     _run_impl_task: asyncio.Task[None] | None = field(default=None, repr=False)
-    _input_guardrails_task: asyncio.Task[list[InputGuardrailResult]] | None = field(default=None, repr=False)
-    _output_guardrails_task: asyncio.Task[list[OutputGuardrailResult]] | None = field(default=None, repr=False)
+    _input_guardrails_task: asyncio.Task[list[InputGuardrailResult]] | None = field(
+        default=None, repr=False
+    )
+    _output_guardrails_task: asyncio.Task[list[OutputGuardrailResult]] | None = field(
+        default=None, repr=False
+    )
     _stored_exception: Exception | None = field(default=None, repr=False)
 
     @property
@@ -96,7 +103,7 @@ class RunResultStreaming(RunResultBase):
         return self.current_agent
 
     async def stream_events(self) -> AsyncIterator[StreamEvent]:
-        """Stream semantic events as they're generated. Raises MaxTurnsError or GuardrailTripwireTriggered on failure."""
+        """Stream semantic events as they're generated."""
         try:
             while True:
                 if self._stored_exception:
@@ -122,7 +129,12 @@ class RunResultStreaming(RunResultBase):
 
     def _cleanup_tasks(self) -> None:
         """Efficiently cleanup all active tasks."""
-        for task in (self._run_impl_task, self._input_guardrails_task, self._output_guardrails_task):
+        tasks = (
+            self._run_impl_task,
+            self._input_guardrails_task,
+            self._output_guardrails_task,
+        )
+        for task in tasks:
             if task and not task.done():
                 task.cancel()
 

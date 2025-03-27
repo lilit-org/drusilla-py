@@ -20,9 +20,11 @@ if TYPE_CHECKING:
 #               Data classes                           #
 ########################################################
 
+
 @dataclass(frozen=True)
 class GuardrailFunctionOutput:
     """Output from a guardrail function."""
+
     tripwire_triggered: bool
     output: Any | None = None
 
@@ -30,6 +32,7 @@ class GuardrailFunctionOutput:
 @dataclass(frozen=True)
 class InputGuardrailResult:
     """Result from running an input guardrail."""
+
     guardrail: InputGuardrail[Any]
     agent: Agent[Any]
     input: str | list[TResponseInputItem]
@@ -39,6 +42,7 @@ class InputGuardrailResult:
 @dataclass(frozen=True)
 class OutputGuardrailResult:
     """Result from running an output guardrail."""
+
     guardrail: OutputGuardrail[Any]
     agent: Agent[Any]
     agent_output: Any
@@ -48,6 +52,7 @@ class OutputGuardrailResult:
 @dataclass(frozen=True)
 class InputGuardrail(Generic[TContext]):
     """Guardrail that validates agent input before execution."""
+
     guardrail_function: Callable[
         [RunContextWrapper[TContext], Agent[Any], str | list[TResponseInputItem]],
         MaybeAwaitable[GuardrailFunctionOutput],
@@ -56,10 +61,15 @@ class InputGuardrail(Generic[TContext]):
     name: str | None = None
 
     async def run(
-        self, context: RunContextWrapper[TContext], agent: Agent[Any], input: str | list[TResponseInputItem]
+        self,
+        context: RunContextWrapper[TContext],
+        agent: Agent[Any],
+        input: str | list[TResponseInputItem],
     ) -> InputGuardrailResult:
         if not callable(self.guardrail_function):
-            raise UsageError(f"Guardrail function must be callable, got {self.guardrail_function}")
+            raise UsageError(
+                f"Guardrail function must be callable, got {self.guardrail_function}"
+            )
 
         if output := self.guardrail_function(context, agent, input):
             if inspect.isawaitable(output):
@@ -92,7 +102,9 @@ class OutputGuardrail(Generic[TContext]):
         self, context: RunContextWrapper[TContext], agent: Agent[Any], agent_output: Any
     ) -> OutputGuardrailResult:
         if not callable(self.guardrail_function):
-            raise UsageError(f"Guardrail function must be callable, got {self.guardrail_function}")
+            raise UsageError(
+                f"Guardrail function must be callable, got {self.guardrail_function}"
+            )
 
         if output := self.guardrail_function(context, agent, agent_output):
             if inspect.isawaitable(output):
@@ -113,11 +125,19 @@ class OutputGuardrail(Generic[TContext]):
 
 TContext_co = TypeVar("TContext_co", bound=Any, covariant=True)
 _InputGuardrailFuncSync = Callable[
-    [RunContextWrapper[TContext_co], "Agent[Any]", Union[str, list[TResponseInputItem]]],
+    [
+        RunContextWrapper[TContext_co],
+        "Agent[Any]",
+        Union[str, list[TResponseInputItem]],
+    ],
     GuardrailFunctionOutput,
 ]
 _InputGuardrailFuncAsync = Callable[
-    [RunContextWrapper[TContext_co], "Agent[Any]", Union[str, list[TResponseInputItem]]],
+    [
+        RunContextWrapper[TContext_co],
+        "Agent[Any]",
+        Union[str, list[TResponseInputItem]],
+    ],
     Awaitable[GuardrailFunctionOutput],
 ]
 
@@ -145,9 +165,11 @@ def input_guardrail(
 
 
 def input_guardrail(
-    func: _InputGuardrailFuncSync[TContext_co]
-    | _InputGuardrailFuncAsync[TContext_co]
-    | None = None,
+    func: (
+        _InputGuardrailFuncSync[TContext_co]
+        | _InputGuardrailFuncAsync[TContext_co]
+        | None
+    ) = None,
     *,
     name: str | None = None,
 ) -> (
@@ -157,7 +179,7 @@ def input_guardrail(
         InputGuardrail[TContext_co],
     ]
 ):
-    """Decorator for creating InputGuardrails. Can be used as @input_guardrail or @input_guardrail(name="name")."""
+    """Decorator for creating InputGuardrails."""
 
     def decorator(
         f: _InputGuardrailFuncSync[TContext_co] | _InputGuardrailFuncAsync[TContext_co],
@@ -203,22 +225,30 @@ def output_guardrail(
 
 
 def output_guardrail(
-    func: _OutputGuardrailFuncSync[TContext_co]
-    | _OutputGuardrailFuncAsync[TContext_co]
-    | None = None,
+    func: (
+        _OutputGuardrailFuncSync[TContext_co]
+        | _OutputGuardrailFuncAsync[TContext_co]
+        | None
+    ) = None,
     *,
     name: str | None = None,
 ) -> (
     OutputGuardrail[TContext_co]
     | Callable[
-        [_OutputGuardrailFuncSync[TContext_co] | _OutputGuardrailFuncAsync[TContext_co]],
+        [
+            _OutputGuardrailFuncSync[TContext_co]
+            | _OutputGuardrailFuncAsync[TContext_co]
+        ],
         OutputGuardrail[TContext_co],
     ]
 ):
-    """Decorator for creating OutputGuardrails. Can be used as @output_guardrail or @output_guardrail(name="name")."""
+    """Decorator for creating OutputGuardrails."""
 
     def decorator(
-        f: _OutputGuardrailFuncSync[TContext_co] | _OutputGuardrailFuncAsync[TContext_co],
+        f: (
+            _OutputGuardrailFuncSync[TContext_co]
+            | _OutputGuardrailFuncAsync[TContext_co]
+        ),
     ) -> OutputGuardrail[TContext_co]:
         return OutputGuardrail(guardrail_function=f, name=name)
 

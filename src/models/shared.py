@@ -9,6 +9,7 @@ from ..util._types import AsyncDeepSeek
 @dataclass
 class SharedConfig:
     """Shared configuration for the DeepSeek framework."""
+
     _model_key: str | None = None
     _model_client: AsyncDeepSeek | None = None
     _use_responses: bool = False
