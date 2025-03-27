@@ -55,11 +55,6 @@ class InputGuardrail(Generic[TContext]):
 
     name: str | None = None
 
-    def get_name(self) -> str:
-        if self.name:
-            return self.name
-        return self.guardrail_function.__name__
-
     async def run(
         self, context: RunContextWrapper[TContext], agent: Agent[Any], input: str | list[TResponseInputItem]
     ) -> InputGuardrailResult:
@@ -92,12 +87,6 @@ class OutputGuardrail(Generic[TContext]):
         MaybeAwaitable[GuardrailFunctionOutput],
     ]
     name: str | None = None
-
-    def get_name(self) -> str:
-        if self.name:
-            return self.name
-
-        return self.guardrail_function.__name__
 
     async def run(
         self, context: RunContextWrapper[TContext], agent: Agent[Any], agent_output: Any

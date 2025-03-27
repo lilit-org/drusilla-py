@@ -141,35 +141,3 @@ def pretty_print_result(result: PrettyPrintable) -> str:
         _format_final_output(result)
     ]
     return "".join(parts)
-
-
-def pretty_print_run_result_streaming(result: PrettyPrintable) -> str:
-    """Pretty print a RunResultStreaming object."""
-    return pretty_print_result(result)
-
-
-def format_json_response(response: dict[str, Any]) -> str:
-    """Format a JSON response to be more readable."""
-    role = response.get("role", "")
-    content = response.get("content", "")
-    header = f"{role.title()}"
-    header_border = "═" * (len(header) + 4)
-    header_text = f"╔{header_border}╗\n║ {header} ║\n╚{header_border}╝"
-
-    formatted_lines = []
-    sections = content.split("</think>")
-
-    if len(sections) > 1:
-        thinking = sections[0].replace("<think>", "").strip()
-        if thinking:
-            formatted_lines.append("💭 Thinking:")
-            formatted_lines.extend(f"  {line.strip()}" for line in thinking.split("\n") if line.strip())
-            formatted_lines.append("")
-
-    final_content = sections[-1].strip()
-    final_content = final_content.replace("**", "").replace("*", "")
-    formatted_lines.extend(_wrap_text(final_content))
-
-    content_text = "\n".join(formatted_lines)
-    bottom_border = "═" * 80
-    return f"{header_text}\n\n{_indent(content_text, 1)}\n\n╔{bottom_border}╗"

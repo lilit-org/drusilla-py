@@ -50,17 +50,6 @@ class RunResultBase(abc.ABC):
     def last_agent(self) -> Agent[Any]:
         """Last agent that was run."""
 
-    def final_output_as(self, cls: type[T], raise_if_incorrect_type: bool = False) -> T:
-        """Cast final output to type T. Raises TypeError if type mismatch and raise_if_incorrect_type=True."""
-        if raise_if_incorrect_type and not isinstance(self.final_output, cls):
-            raise TypeError(f"Final output is not of type {cls.__name__}")
-
-        return cast(T, self.final_output)
-
-    def to_input_list(self) -> list[TResponseInputItem]:
-        """Create new input list by merging original input with new items."""
-        return ItemHelpers.input_to_new_input_list(self.input) + [item.to_input_item() for item in self.new_items]
-
     def __str__(self) -> str:
         """Return pretty-printed string representation."""
         return pretty_print_result(self)
