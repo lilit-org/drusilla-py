@@ -21,8 +21,7 @@ from src.util._constants import SUPPORTED_LANGUAGES
 ########################################################
 
 def create_agents() -> Agent:
-
-    orchestrator_agent = Agent(
+    return Agent(
         name="Agent World Traveler",
         instructions=(
             "Coordinate translation requests using provided tools. "
@@ -41,15 +40,12 @@ def create_agents() -> Agent:
         ],
     )
 
-    return orchestrator_agent
-
 
 ########################################################
 #           Agent Runner                               #
 ########################################################
 
 def run_agent() -> str | None:
-
     try:
         setup_client()
         agent = create_agents()

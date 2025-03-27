@@ -18,7 +18,6 @@ from src.util._exceptions import GenericError
 ########################################################
 
 def create_agent() -> Agent:
-
     return Agent(
         name="Agent Dr. Love",
         instructions="You are a cool special robot who loves"
@@ -30,7 +29,6 @@ def create_agent() -> Agent:
 ########################################################
 
 def run_agent() -> str | None:
-
     try:
         setup_client()
         agent = create_agent()
