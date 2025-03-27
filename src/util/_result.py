@@ -4,14 +4,14 @@ import abc
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from ..agents.agent import Agent
 from ..agents.run_impl import QueueCompleteSentinel
 from ._constants import MAX_GUARDRAIL_QUEUE_SIZE, MAX_QUEUE_SIZE
 from ._env import get_env_var
 from ._guardrail import InputGuardrailResult, OutputGuardrailResult
-from ._items import ItemHelpers, ModelResponse, RunItem, TResponseInputItem
+from ._items import ModelResponse, RunItem, TResponseInputItem
 from ._logger import logger
 from ._pretty_print import pretty_print_result
 from ._stream_events import StreamEvent
