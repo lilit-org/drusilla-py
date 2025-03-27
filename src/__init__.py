@@ -64,6 +64,7 @@ if TYPE_CHECKING:
     )
     from .util._usage import Usage
 
+
 def set_default_model_key(key: str) -> None:
     shared.set_default_model_key(key)
 

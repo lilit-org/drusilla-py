@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 #               Main Class for models                  #
 ########################################################
 
+
 @runtime_checkable
 class Model(Protocol):
     """Base interface for LLM calls.
@@ -38,7 +39,7 @@ class Model(Protocol):
         Args:
             system_instructions: System prompt/instructions for the model. Can be None.
             input: Either a raw string input or a list of structured input items.
-            model_settings: Configuration parameters for the model including temperature, top_p, etc.
+            model_settings: Configuration parameters for the model.
             tools: List of available tools the model can use for function calling.
             output_schema: Optional schema defining the expected output format and structure.
             handoffs: List of available handoffs for model interactions with other agents.
@@ -46,7 +47,6 @@ class Model(Protocol):
         Returns:
             A ModelResponse containing the model's output and usage statistics.
         """
-        pass
 
     async def stream_response(
         self,
@@ -62,7 +62,7 @@ class Model(Protocol):
         Args:
             system_instructions: System prompt/instructions for the model. Can be None.
             input: Either a raw string input or a list of structured input items.
-            model_settings: Configuration parameters for the model including temperature, top_p, etc.
+            model_settings: Configuration parameters for the model.
             tools: List of available tools the model can use for function calling.
             output_schema: Optional schema defining the expected output format and structure.
             handoffs: List of available handoffs for model interactions with other agents.
@@ -71,12 +71,12 @@ class Model(Protocol):
             An async iterator yielding response events as they are generated. Each event
             represents a partial response chunk or completion status.
         """
-        pass
 
 
 ########################################################
 #               Main Class for model providers         #
 ########################################################
+
 
 @runtime_checkable
 class ModelProvider(Protocol):
@@ -88,4 +88,3 @@ class ModelProvider(Protocol):
 
     def get_model(self, model_name: str | None) -> Model:
         """Get a model instance by name."""
-        pass

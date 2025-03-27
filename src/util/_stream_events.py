@@ -12,17 +12,19 @@ from ._items import RunItem, TResponseStreamEvent
 #               Data class RawResponsesStreamEvent      #
 ########################################################
 
+
 @dataclass(frozen=True)
 class RawResponsesStreamEvent:
     """Direct pass-through events from the LLM."""
+
     data: TResponseStreamEvent
     type: Literal["raw_response_event"] = "raw_response_event"
-
 
 
 ########################################################
 #               Data class RunItemStreamEvent          #
 ########################################################
+
 
 @dataclass(frozen=True)
 class RunItemStreamEvent:
@@ -44,6 +46,7 @@ class RunItemStreamEvent:
 #               Data class AgentUpdatedStreamEvent     #
 ########################################################
 
+
 @dataclass(frozen=True)
 class AgentUpdatedStreamEvent:
     """Notification of a new agent instance."""
@@ -56,4 +59,6 @@ class AgentUpdatedStreamEvent:
 #              StreamEvent Type Alias                  #
 ########################################################
 
-StreamEvent: TypeAlias = Union[RawResponsesStreamEvent, RunItemStreamEvent, AgentUpdatedStreamEvent]
+StreamEvent: TypeAlias = Union[
+    RawResponsesStreamEvent, RunItemStreamEvent, AgentUpdatedStreamEvent
+]

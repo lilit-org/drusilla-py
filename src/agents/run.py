@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 from ..models.interface import Model
 from ..models.provider import ModelProvider
@@ -54,6 +54,7 @@ MAX_TURNS = get_env_var("MAX_TURNS", DEFAULT_MAX_TURNS)
 #               Data classes                            #
 ########################################################
 
+
 @dataclass(frozen=True)
 class RunConfig:
     """Settings for agent run."""
@@ -71,6 +72,7 @@ class RunConfig:
 #               Main Class                            #
 ########################################################
 
+
 class Runner:
     @classmethod
     async def _initialize_run(
@@ -81,7 +83,13 @@ class Runner:
         max_turns: int,
         hooks: RunHooks[TContext] | None,
         run_config: RunConfig | None,
-    ) -> tuple[RunHooks[TContext], RunConfig, RunContextWrapper[TContext], str | list[TResponseInputItem], AgentOutputSchema | None]:
+    ) -> tuple[
+        RunHooks[TContext],
+        RunConfig,
+        RunContextWrapper[TContext],
+        str | list[TResponseInputItem],
+        AgentOutputSchema | None,
+    ]:
 
         hooks = hooks or RunHooks[Any]()
         run_config = run_config or RunConfig()
@@ -92,7 +100,7 @@ class Runner:
             handoff_input_filter=run_config.handoff_input_filter,
             input_guardrails=run_config.input_guardrails,
             output_guardrails=run_config.output_guardrails,
-            max_turns=max_turns
+            max_turns=max_turns,
         )
         context_wrapper = RunContextWrapper(context=context)
         output_schema = cls._get_output_schema(starting_agent)
@@ -157,14 +165,18 @@ class Runner:
                         run_config,
                     )
                 elif isinstance(turn_result.next_step, NextStepHandoff):
-                    current_agent = cast(Agent[TContext], turn_result.next_step.new_agent)
+                    current_agent = cast(
+                        Agent[TContext], turn_result.next_step.new_agent
+                    )
                     should_run_agent_start_hooks = True
                 elif isinstance(turn_result.next_step, NextStepRunAgain):
                     continue
                 else:
-                    raise AgentError(f"Unknown next step type: {type(turn_result.next_step)}")
+                    raise AgentError(
+                        f"Unknown next step type: {type(turn_result.next_step)}"
+                    )
         except Exception as e:
-            raise GenericError(e)
+            raise GenericError(e) from e
 
     @classmethod
     def _handle_max_turns_exceeded(cls, max_turns: int) -> None:
@@ -277,8 +289,16 @@ class Runner:
         run_config: RunConfig | None = None,
     ) -> RunResultStreaming:
         """Run agent with streaming events."""
-        hooks, run_config, context_wrapper, input, output_schema = asyncio.get_event_loop().run_until_complete(
-            cls._initialize_run(starting_agent, input, context, max_turns, hooks, run_config)
+        (
+            hooks,
+            run_config,
+            context_wrapper,
+            input,
+            output_schema,
+        ) = asyncio.get_event_loop().run_until_complete(
+            cls._initialize_run(
+                starting_agent, input, context, max_turns, hooks, run_config
+            )
         )
 
         streamed_result = cls._create_streamed_result(
@@ -339,7 +359,9 @@ class Runner:
         current_agent = starting_agent
         current_turn = 0
         should_run_agent_start_hooks = True
-        streamed_result._event_queue.put_nowait(AgentUpdatedStreamEvent(new_agent=current_agent))
+        streamed_result._event_queue.put_nowait(
+            AgentUpdatedStreamEvent(new_agent=current_agent)
+        )
 
         try:
             while not streamed_result.is_complete:
@@ -354,8 +376,11 @@ class Runner:
                     streamed_result._input_guardrails_task = asyncio.create_task(
                         cls._run_input_guardrails_with_queue(
                             starting_agent,
-                            starting_agent.input_guardrails + run_config.input_guardrails,
-                            deepcopy(ItemHelpers.input_to_new_input_list(starting_input)),
+                            starting_agent.input_guardrails
+                            + run_config.input_guardrails,
+                            deepcopy(
+                                ItemHelpers.input_to_new_input_list(starting_input)
+                            ),
                             context_wrapper,
                             streamed_result,
                         )
@@ -399,7 +424,7 @@ class Runner:
             streamed_result.is_complete = True
         except Exception as e:
             streamed_result.is_complete = True
-            raise GenericError(e)
+            raise GenericError(e) from e
 
     @classmethod
     def _update_streamed_result(
@@ -438,9 +463,7 @@ class Runner:
         streamed_result.final_output = turn_result.next_step.output
 
     @classmethod
-    def _handle_streamed_error(
-        cls, streamed_result: RunResultStreaming
-    ) -> None:
+    def _handle_streamed_error(cls, streamed_result: RunResultStreaming) -> None:
 
         streamed_result.is_complete = True
         streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
@@ -467,7 +490,9 @@ class Runner:
 
         guardrail_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_input_guardrail(agent, guardrail, input_to_use, context)
+                RunImpl.run_single_input_guardrail(
+                    agent, guardrail, input_to_use, context
+                )
             )
             for guardrail in guardrails
         ]
@@ -556,7 +581,9 @@ class Runner:
                     run_config=run_config,
                 )
 
-                RunImpl.stream_step_result_to_queue(single_step_result, streamed_result._event_queue)
+                RunImpl.stream_step_result_to_queue(
+                    single_step_result, streamed_result._event_queue
+                )
                 return single_step_result
 
             streamed_result._event_queue.put_nowait(RawResponsesStreamEvent(data=event))
@@ -592,7 +619,9 @@ class Runner:
         output_schema = cls._get_output_schema(agent)
         handoffs = cls._get_handoffs(agent)
         input = ItemHelpers.input_to_new_input_list(original_input)
-        input.extend([generated_item.to_input_item() for generated_item in generated_items])
+        input.extend(
+            [generated_item.to_input_item() for generated_item in generated_items]
+        )
         new_response = await cls._get_new_response(
             agent,
             system_prompt,
@@ -691,7 +720,9 @@ class Runner:
             return []
         guardrail_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_output_guardrail(guardrail, agent, agent_output, context)
+                RunImpl.run_single_output_guardrail(
+                    guardrail, agent, agent_output, context
+                )
             )
             for guardrail in guardrails
         ]
@@ -756,5 +787,3 @@ class Runner:
         if isinstance(agent.model, Model):
             return agent.model
         return run_config.model_provider.get_model(agent.model)
-
-TContext = TypeVar("TContext")

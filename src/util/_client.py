@@ -30,6 +30,7 @@ from ._types import (
 #           Public Classes
 ########################################################
 
+
 class DeepSeekClient(AsyncDeepSeek):
     """Implementation of AsyncDeepSeek client using httpx."""
 
@@ -43,7 +44,9 @@ class DeepSeekClient(AsyncDeepSeek):
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = api_key
-        self.base_url = (base_url or os.getenv("BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
+        self.base_url = (base_url or os.getenv("BASE_URL", DEFAULT_BASE_URL)).rstrip(
+            "/"
+        )
         self.organization = organization
         self.project = project
         self.http_client = http_client or httpx.AsyncClient()
@@ -88,11 +91,17 @@ class DeepSeekClient(AsyncDeepSeek):
                 ollama_messages = []
                 for msg in messages:
                     if msg["role"] == "system":
-                        ollama_messages.append({"role": "system", "content": msg["content"]})
+                        ollama_messages.append(
+                            {"role": "system", "content": msg["content"]}
+                        )
                     elif msg["role"] == "user":
-                        ollama_messages.append({"role": "user", "content": msg["content"]})
+                        ollama_messages.append(
+                            {"role": "user", "content": msg["content"]}
+                        )
                     elif msg["role"] == "assistant":
-                        ollama_messages.append({"role": "assistant", "content": msg["content"]})
+                        ollama_messages.append(
+                            {"role": "assistant", "content": msg["content"]}
+                        )
 
                 data: dict[str, Any] = {
                     "model": model,
@@ -107,7 +116,9 @@ class DeepSeekClient(AsyncDeepSeek):
                 }
                 data.update({k: v for k, v in optional_params.items() if v is not None})
 
-                endpoint = os.getenv("CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT)
+                endpoint = os.getenv(
+                    "CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT
+                )
                 response = await client.http_client.post(
                     f"{client.base_url}{endpoint}",
                     headers=headers,
@@ -125,14 +136,18 @@ class DeepSeekClient(AsyncDeepSeek):
                     object="chat.completion",
                     created=int(ollama_response.get("created", 0)),
                     model=model,
-                    choices=[{
-                        "index": 0,
-                        "message": {
-                            "role": "assistant",
-                            "content": ollama_response.get("message", {}).get("content", ""),
-                        },
-                        "finish_reason": "stop",
-                    }],
+                    choices=[
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": ollama_response.get("message", {}).get(
+                                    "content", ""
+                                ),
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
                     usage={
                         "prompt_tokens": 0,  # Ollama doesn't provide token counts
                         "completion_tokens": 0,
@@ -145,19 +160,18 @@ class DeepSeekClient(AsyncDeepSeek):
 #           Public Methods
 ########################################################
 
+
 def setup_client() -> DeepSeekClient:
     """Set up and configure the DeepSeek client with optimal settings."""
     client = DeepSeekClient(
         http_client=httpx.AsyncClient(
             timeout=httpx.Timeout(
-                HTTP_TIMEOUT_TOTAL,
-                connect=HTTP_TIMEOUT_CONNECT,
-                read=HTTP_TIMEOUT_READ
+                HTTP_TIMEOUT_TOTAL, connect=HTTP_TIMEOUT_CONNECT, read=HTTP_TIMEOUT_READ
             ),
             limits=httpx.Limits(
                 max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
-                max_connections=HTTP_MAX_CONNECTIONS
-            )
+                max_connections=HTTP_MAX_CONNECTIONS,
+            ),
         )
     )
     set_default_model_client(client)

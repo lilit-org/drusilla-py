@@ -36,13 +36,25 @@ from ..util._usage import Usage
 from .interface import Model
 from .settings import ModelSettings
 
+
+class NotGivenEncoder(json.JSONEncoder):
+    """JSON encoder that handles UNSET values."""
+
+    def default(self, obj):
+        if obj is UNSET:
+            return None
+        return super().default(obj)
+
+
 ########################################################
 #           Data Classes                               #
 ########################################################
 
+
 @dataclass(frozen=True)
 class _StreamingState:
     """Maintains the current state of streaming responses."""
+
     text_content_index_and_output: tuple[int, ResponseOutputText] | None = None
     function_calls: dict[int, ResponseFunctionToolCall] = field(default_factory=dict)
 
@@ -50,6 +62,7 @@ class _StreamingState:
 ########################################################
 #           Main Class: Chat Completions Model         #
 ########################################################
+
 
 class ModelChatCompletionsModel(Model):
     """Handles chat completion requests to the API model."""
@@ -95,15 +108,17 @@ class ModelChatCompletionsModel(Model):
         usage = (
             Usage(
                 requests=1,
-                input_tokens=response_obj['usage']['prompt_tokens'],
-                output_tokens=response_obj['usage']['completion_tokens'],
-                total_tokens=response_obj['usage']['total_tokens'],
+                input_tokens=response_obj["usage"]["prompt_tokens"],
+                output_tokens=response_obj["usage"]["completion_tokens"],
+                total_tokens=response_obj["usage"]["total_tokens"],
             )
-            if response_obj.get('usage')
+            if response_obj.get("usage")
             else Usage()
         )
 
-        items = _Converter.message_to_output_items(response_obj['choices'][0]['message'])
+        items = _Converter.message_to_output_items(
+            response_obj["choices"][0]["message"]
+        )
 
         return ModelResponse(
             output=items,
@@ -136,11 +151,14 @@ class ModelChatCompletionsModel(Model):
             if chunk["choices"][0]["delta"]["content"]:
                 delta = chunk["choices"][0]["delta"]
                 if not state.text_content_index_and_output:
-                    state.text_content_index_and_output = (0, ResponseOutputText(
-                        text=delta["content"],
-                        type="output_text",
-                        annotations=[],
-                    ))
+                    state.text_content_index_and_output = (
+                        0,
+                        ResponseOutputText(
+                            text=delta["content"],
+                            type="output_text",
+                            annotations=[],
+                        ),
+                    )
                     yield ResponseEvent(
                         type="content_part.added",
                         content_index=state.text_content_index_and_output[0],
@@ -165,12 +183,14 @@ class ModelChatCompletionsModel(Model):
             if chunk["choices"][0]["delta"]["tool_calls"]:
                 for tc_delta in chunk["choices"][0]["delta"]["tool_calls"]:
                     if tc_delta["index"] not in state.function_calls:
-                        state.function_calls[tc_delta["index"]] = ResponseFunctionToolCall(
-                            id=FAKE_RESPONSES_ID,
-                            arguments="",
-                            name="",
-                            type="function_call",
-                            call_id="",
+                        state.function_calls[tc_delta["index"]] = (
+                            ResponseFunctionToolCall(
+                                id=FAKE_RESPONSES_ID,
+                                arguments="",
+                                name="",
+                                type="function_call",
+                                call_id="",
+                            )
                         )
                     tc_function = tc_delta["function"]
 
@@ -180,7 +200,9 @@ class ModelChatCompletionsModel(Model):
                     state.function_calls[tc_delta["index"]].name += (
                         tc_function["name"] if tc_function else ""
                     ) or ""
-                    state.function_calls[tc_delta["index"]].call_id += tc_delta["id"] or ""
+                    state.function_calls[tc_delta["index"]].call_id += (
+                        tc_delta["id"] or ""
+                    )
 
             if chunk["choices"][0]["finish_reason"] == "stop":
                 if state.text_content_index_and_output:
@@ -195,14 +217,16 @@ class ModelChatCompletionsModel(Model):
                 for i, function_call in state.function_calls.items():
                     yield ResponseEvent(
                         type="content_part.added",
-                        content_index=i + (1 if state.text_content_index_and_output else 0),
+                        content_index=i
+                        + (1 if state.text_content_index_and_output else 0),
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
                         part=function_call,
                     )
                     yield ResponseEvent(
                         type="content_part.done",
-                        content_index=i + (1 if state.text_content_index_and_output else 0),
+                        content_index=i
+                        + (1 if state.text_content_index_and_output else 0),
                         item_id=FAKE_RESPONSES_ID,
                         output_index=0,
                         part=function_call,
@@ -263,11 +287,15 @@ class ModelChatCompletionsModel(Model):
             )
 
         parallel_tool_calls = (
-            True if model_settings.parallel_tool_calls and tools and len(tools) > 0 else UNSET
+            True
+            if model_settings.parallel_tool_calls and tools and len(tools) > 0
+            else UNSET
         )
         tool_choice = _Converter.convert_tool_choice(model_settings.tool_choice)
         response_format = _Converter.convert_response_format(output_schema)
-        converted_tools = [ToolConverter.to_api_format(tool) for tool in tools] if tools else []
+        converted_tools = (
+            [ToolConverter.to_api_format(tool) for tool in tools] if tools else []
+        )
 
         for handoff in handoffs:
             converted_tools.append(ToolConverter.convert_handoff_tool(handoff))
@@ -277,8 +305,12 @@ class ModelChatCompletionsModel(Model):
             "messages": converted_messages,
             "temperature": self._non_null_or_not_given(model_settings.temperature),
             "top_p": self._non_null_or_not_given(model_settings.top_p),
-            "frequency_penalty": self._non_null_or_not_given(model_settings.frequency_penalty),
-            "presence_penalty": self._non_null_or_not_given(model_settings.presence_penalty),
+            "frequency_penalty": self._non_null_or_not_given(
+                model_settings.frequency_penalty
+            ),
+            "presence_penalty": self._non_null_or_not_given(
+                model_settings.presence_penalty
+            ),
             "max_tokens": self._non_null_or_not_given(model_settings.max_tokens),
             "stream": stream,
             "extra_headers": HEADERS,
@@ -304,9 +336,11 @@ class ModelChatCompletionsModel(Model):
                 model=self.model,
                 object="response",
                 output=[],
-                tool_choice=cast(Literal["auto", "required", "none"], tool_choice)
-                if tool_choice != UNSET
-                else "auto",
+                tool_choice=(
+                    cast(Literal["auto", "required", "none"], tool_choice)
+                    if tool_choice != UNSET
+                    else "auto"
+                ),
                 top_p=model_settings.top_p,
                 temperature=model_settings.temperature,
                 tools=[],
@@ -324,6 +358,7 @@ class ModelChatCompletionsModel(Model):
 ########################################################
 #           Main Class: Converter                      #
 ########################################################
+
 
 class _Converter:
     """Converts between API and internal data formats."""
@@ -366,27 +401,29 @@ class _Converter:
         }
 
     @classmethod
-    def message_to_output_items(cls, message: ChatCompletionMessage | dict[str, Any]) -> list[TResponseOutputItem]:
+    def message_to_output_items(
+        cls, message: ChatCompletionMessage | dict[str, Any]
+    ) -> list[TResponseOutputItem]:
         """Convert message to output items."""
         items: list[TResponseOutputItem] = []
         message_dict = message if isinstance(message, dict) else message.__dict__
 
-        if message_dict.get('content'):
+        if message_dict.get("content"):
             items.append(
                 ResponseOutputText(
-                    text=message_dict['content'],
+                    text=message_dict["content"],
                     type="output_text",
                     annotations=[],
                 )
             )
-        if message_dict.get('tool_calls'):
-            for tool_call in message_dict['tool_calls']:
+        if message_dict.get("tool_calls"):
+            for tool_call in message_dict["tool_calls"]:
                 items.append(
                     ResponseFunctionToolCall(
-                        name=tool_call['function']['name'],
-                        arguments=tool_call['function']['arguments'],
+                        name=tool_call["function"]["name"],
+                        arguments=tool_call["function"]["arguments"],
                         type="function_call",
-                        call_id=tool_call.get('id', ''),
+                        call_id=tool_call.get("id", ""),
                         referenceable_id=None,
                     )
                 )
@@ -479,22 +516,30 @@ class _Converter:
                 continue
 
             if c.get("type") == "input_text":
-                out.append({
-                    "type": "text",
-                    "text": c["text"],
-                })
+                out.append(
+                    {
+                        "type": "text",
+                        "text": c["text"],
+                    }
+                )
             elif c.get("type") == "input_image":
                 if "image_url" not in c or not c["image_url"]:
-                    raise AgentError(f"Only image URLs are supported for input_image {c}")
-                out.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": c["image_url"],
-                        "detail": c["detail"],
-                    },
-                })
+                    raise AgentError(
+                        f"Only image URLs are supported for input_image {c}"
+                    )
+                out.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": c["image_url"],
+                            "detail": c["detail"],
+                        },
+                    }
+                )
             elif c.get("type") == "input_file":
-                raise UsageError(f"File uploads are not supported for chat completions {c}")
+                raise UsageError(
+                    f"File uploads are not supported for chat completions {c}"
+                )
             else:
                 raise UsageError(f"Unknown content: {c}")
         return out
@@ -623,7 +668,9 @@ class _Converter:
                             f"Only audio IDs are supported for chat completions, but got: {c}"
                         )
                     else:
-                        raise UsageError(f"Unknown content type in ResponseOutputMessage: {c}")
+                        raise UsageError(
+                            f"Unknown content type in ResponseOutputMessage: {c}"
+                        )
 
                 if text_segments:
                     combined = "\n".join(text_segments)
@@ -646,7 +693,7 @@ class _Converter:
                                 "queries": file_search.get("queries", []),
                                 "status": file_search.get("status"),
                             },
-                            cls=NotGivenEncoder
+                            cls=NotGivenEncoder,
                         ),
                     },
                 }
@@ -693,6 +740,7 @@ class _Converter:
 ########################################################
 #           Main Class: Tool Converter                #
 ########################################################
+
 
 class ToolConverter:
     """Converts tool definitions to API format."""

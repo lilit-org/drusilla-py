@@ -31,6 +31,7 @@ OnHandoffWithoutInput = Callable[[RunContextWrapper[Any]], Any]
 #               Data classes                           #
 ########################################################
 
+
 @dataclass(frozen=True)
 class HandoffInputData:
     input_history: str | tuple[TResponseInputItem, ...]
@@ -44,13 +45,14 @@ HandoffInputFilter: TypeAlias = Callable[[HandoffInputData], HandoffInputData]
 
 @dataclass
 class Handoff(Generic[TContext]):
-    """Represents delegation of a task from one agent to another.
-    Example: A triage agent delegating to specialized agents for billing, account management, etc."""
+    """Represents delegation of a task from one agent to another."""
 
     tool_name: str
     tool_description: str
     input_json_schema: dict[str, Any]
-    on_invoke_handoff: Callable[[RunContextWrapper[Any], str], Awaitable[Agent[TContext]]]
+    on_invoke_handoff: Callable[
+        [RunContextWrapper[Any], str], Awaitable[Agent[TContext]]
+    ]
     """Invokes handoff with:
     1. Handoff run context
     2. LLM arguments as JSON string (empty if no input)
@@ -130,7 +132,9 @@ def handoff(
         input_filter: Function to filter inputs passed to next agent
     """
     if bool(on_handoff) != bool(input_type):
-        raise UsageError("You must provide either both on_input and input_type, or neither")
+        raise UsageError(
+            "You must provide either both on_input and input_type, or neither"
+        )
 
     type_adapter: TypeAdapter[Any] | None = None
     input_json_schema: dict[str, Any] = {}
@@ -155,7 +159,9 @@ def handoff(
     ) -> Agent[Any]:
         if input_type is not None and type_adapter is not None:
             if input_json is None:
-                raise ModelError("Handoff function expected non-null input, but got None")
+                raise ModelError(
+                    "Handoff function expected non-null input, but got None"
+                )
 
             validated_input = validate_json(
                 json_str=input_json,
@@ -177,7 +183,9 @@ def handoff(
         return agent
 
     tool_name = tool_name_override or Handoff.default_tool_name(agent)
-    tool_description = tool_description_override or Handoff.default_tool_description(agent)
+    tool_description = tool_description_override or Handoff.default_tool_description(
+        agent
+    )
     input_json_schema = ensure_strict_json_schema(input_json_schema)
 
     return Handoff(
