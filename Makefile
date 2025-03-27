@@ -31,3 +31,7 @@ cypherpunk-love:
 .PHONY: world-traveler
 world-traveler:
 	poetry run python agent_examples/world_traveler.py
+
+.PHONY: summer-chaser
+summer-chaser:
+	poetry run python agent_examples/summer_chaser.py
