@@ -40,22 +40,21 @@ def get_env_var(key: str, default: T) -> T:
     if key in _env_cache:
         return _env_cache[key]
 
-    value = os.getenv(key)
-    if value is None:
-        _env_cache[key] = default
-        return default
+    if value := os.getenv(key):
+        try:
+            if isinstance(default, bool):
+                result = value.lower() in TRUE_VALUES
+            elif isinstance(default, int):
+                result = int(value)
+            elif isinstance(default, float):
+                result = float(value)
+            else:
+                result = value
 
-    try:
-        if isinstance(default, bool):
-            result = value.lower() in TRUE_VALUES
-        elif isinstance(default, int):
-            result = int(value)
-        elif isinstance(default, float):
-            result = float(value)
-        else:
-            result = value
+            _env_cache[key] = result
+            return result
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Failed to convert environment variable '{key}' to type {type(default).__name__}: {e}")
 
-        _env_cache[key] = result
-        return result
-    except (ValueError, TypeError) as e:
-        raise ValueError(f"Failed to convert environment variable '{key}' to type {type(default).__name__}: {e}")
+    _env_cache[key] = default
+    return default

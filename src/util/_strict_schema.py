@@ -32,9 +32,8 @@ def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
     if not ref.startswith("#/"):
         raise ValueError(f"Invalid $ref format {ref!r}; must start with #/")
 
-    path = ref[2:].split("/")
     resolved = root
-    for key in path:
+    for key in (path := ref[2:].split("/")):
         resolved = resolved[key]
         if not is_dict(resolved):
             raise ValueError(f"Invalid resolution path for {ref} - encountered non-dictionary at {resolved}")
@@ -101,15 +100,15 @@ def _enforce_strict_schema_rules(
         schema.pop("default")
 
     # Handle schema references
-    ref = schema.get("$ref")
-    if ref and has_more_than_n_keys(schema, 1):
-        if not isinstance(ref, str):
-            raise ValueError(f"$ref must be a string, got {ref}")
+    if ref := schema.get("$ref"):
+        if has_more_than_n_keys(schema, 1):
+            if not isinstance(ref, str):
+                raise ValueError(f"$ref must be a string, got {ref}")
 
-        resolved = _resolve_schema_ref_cached(root=root, ref=ref)
-        schema.update({**resolved, **schema})
-        schema.pop("$ref")
-        return _enforce_strict_schema_rules(schema, path=path, root=root)
+            resolved = _resolve_schema_ref_cached(root=root, ref=ref)
+            schema.update({**resolved, **schema})
+            schema.pop("$ref")
+            return _enforce_strict_schema_rules(schema, path=path, root=root)
 
     return schema
 

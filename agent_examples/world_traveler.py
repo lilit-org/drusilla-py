@@ -85,8 +85,7 @@ def main() -> str | None:
         
         for item in orchestrator_result.new_items:
             if isinstance(item, MessageOutputItem):
-                text = ItemHelpers.text_message_output(item)
-                if text:
+                if text := ItemHelpers.text_message_output(item):
                     print(f"        📝Translation: {text}")
         
         return pretty_print_result(orchestrator_result)

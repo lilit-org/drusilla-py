@@ -96,22 +96,20 @@ def _format_final_output(result: PrettyPrintable) -> str:
     """Format the final output section."""
     try:
         output = str(result.raw_responses[0].output[0])
-        match = THINK_PATTERN.search(output)
-
-        if match:
+        if match := THINK_PATTERN.search(output):
             reasoning = _decode_unicode_escape(match.group(1).strip())
             final_result = match.group(2).strip()
-            result_match = RESULT_PATTERN.match(final_result)
-            final_result = _decode_unicode_escape(result_match.group(1).strip() if result_match else final_result.strip())
+            if result_match := RESULT_PATTERN.match(final_result):
+                final_result = _decode_unicode_escape(result_match.group(1).strip())
+            else:
+                final_result = _decode_unicode_escape(final_result.strip())
             return f"\n\n✅ REASONING:\n{reasoning}\n\n✅ RESULT:\n{final_result}\n"
 
-        result_match = RESULT_PATTERN.match(output)
-        if result_match:
+        if result_match := RESULT_PATTERN.match(output):
             final_result = _decode_unicode_escape(result_match.group(1).strip())
             return f"\n\n✅ RESULT:\n{final_result}\n"
 
-        text_match = TEXT_PATTERN.search(output)
-        if text_match:
+        if text_match := TEXT_PATTERN.search(output):
             final_result = _decode_unicode_escape(text_match.group(1).strip())
             return f"\n\n✅ RESULT:\n{final_result}\n"
 

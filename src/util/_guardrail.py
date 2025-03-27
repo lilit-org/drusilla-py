@@ -61,14 +61,14 @@ class InputGuardrail(Generic[TContext]):
         if not callable(self.guardrail_function):
             raise UsageError(f"Guardrail function must be callable, got {self.guardrail_function}")
 
-        output = self.guardrail_function(context, agent, input)
-        if inspect.isawaitable(output):
-            return InputGuardrailResult(
-                guardrail=self,
-                agent=agent,
-                input=input,
-                output=await output,
-            )
+        if output := self.guardrail_function(context, agent, input):
+            if inspect.isawaitable(output):
+                return InputGuardrailResult(
+                    guardrail=self,
+                    agent=agent,
+                    input=input,
+                    output=await output,
+                )
 
         return InputGuardrailResult(
             guardrail=self,
@@ -94,14 +94,14 @@ class OutputGuardrail(Generic[TContext]):
         if not callable(self.guardrail_function):
             raise UsageError(f"Guardrail function must be callable, got {self.guardrail_function}")
 
-        output = self.guardrail_function(context, agent, agent_output)
-        if inspect.isawaitable(output):
-            return OutputGuardrailResult(
-                guardrail=self,
-                agent=agent,
-                agent_output=agent_output,
-                output=await output,
-            )
+        if output := self.guardrail_function(context, agent, agent_output):
+            if inspect.isawaitable(output):
+                return OutputGuardrailResult(
+                    guardrail=self,
+                    agent=agent,
+                    agent_output=agent_output,
+                    output=await output,
+                )
 
         return OutputGuardrailResult(
             guardrail=self,

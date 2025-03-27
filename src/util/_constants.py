@@ -101,5 +101,4 @@ SUPPORTED_LANGUAGES = {
     "ms": "Malay",
     "th": "Thai",
     "vi": "Vietnamese",
-    
 }
