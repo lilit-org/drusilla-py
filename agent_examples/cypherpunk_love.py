@@ -33,12 +33,12 @@ def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agent()
-
         result = Runner.run_sync(
             agent, "Write a haiku about love in the cypherpunk world."
         )
         print(pretty_print_result(result))
     except Exception as e:
+        print(f"Error occurred: {str(e)}")
         raise GenericError(e) from e
 
 

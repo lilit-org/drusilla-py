@@ -24,7 +24,7 @@ def create_agents() -> Agent:
     return Agent(
         name="Agent World Traveler",
         instructions=(
-            "Coordinate translation requests using provided tools. "
+            "You are a cool special robot who coordinates translation requests."
             "Use appropriate translation tools based on requested languages."
         ),
         tools=[
@@ -50,11 +50,11 @@ def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agents()
-
         msg = input("\n❓ Enter text to translate and target languages: ")
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
     except Exception as e:
+        print(f"Error occurred: {str(e)}")
         raise GenericError(e) from e
 
 
