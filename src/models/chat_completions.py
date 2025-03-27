@@ -729,8 +729,3 @@ class ToolConverter:
                 "parameters": handoff.input_json_schema,
             },
         }
-
-class NotGivenEncoder(json.JSONEncoder):
-    """JSON encoder that converts UNSET values to None."""
-    def default(self, obj):
-        return None if obj is UNSET else super().default(obj)

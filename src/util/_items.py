@@ -4,7 +4,16 @@ import abc
 import copy
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Literal, TypeVar, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from pydantic import BaseModel
 from typing_extensions import TypeAlias
@@ -43,19 +52,28 @@ THINK_START = "<think>"
 THINK_END = "</think>"
 ECHOES_START = "Echoes of encrypted hearts"
 
+# Type aliases for tool calls
+ToolCallItemTypes: TypeAlias = Union[
+    ResponseFunctionToolCall,
+    ResponseComputerToolCall,
+    ResponseFileSearchToolCall,
+    ResponseFunctionWebSearch,
+]
 
-########################################################
-#            Data Classes for Outputs                  #
-########################################################
+# Type alias for all possible run items
+RunItem: TypeAlias = Union[
+    "MessageOutputItem",
+    "HandoffCallItem",
+    "HandoffOutputItem",
+    "ToolCallItem",
+    "ToolCallOutputItem",
+    "ReasoningItem",
+]
+
 
 @dataclass(frozen=True)
 class RunItemBase(Generic[T], abc.ABC):
-    """Base class for agent run items.
-
-    Args:
-        agent: The agent instance associated with this item
-        raw_item: The raw item data
-    """
+    """Base class for agent run items."""
     agent: Agent[Any]
     raw_item: T
 
@@ -66,15 +84,10 @@ class RunItemBase(Generic[T], abc.ABC):
             return self.raw_item
         elif isinstance(self.raw_item, BaseModel):
             return self.raw_item.model_dump(exclude_unset=True)
-        else:
-            return self.raw_item
+        return self.raw_item
 
     def to_input_item(self) -> TResponseInputItem:
-        """Convert item to model input format.
-
-        Returns:
-            The item converted to input format
-        """
+        """Convert item to model input format. """
         return self.input_item
 
 
@@ -95,7 +108,6 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
             if not content:
                 return ""
 
-            # Handle both list of dicts and list of objects
             texts = []
             for item in content:
                 if isinstance(item, dict):
@@ -130,14 +142,6 @@ class HandoffOutputItem(RunItemBase[TResponseInputItem]):
     type: Literal["handoff_output_item"] = "handoff_output_item"
 
 
-ToolCallItemTypes: TypeAlias = Union[
-    ResponseFunctionToolCall,
-    ResponseComputerToolCall,
-    ResponseFileSearchToolCall,
-    ResponseFunctionWebSearch,
-]
-
-
 @dataclass(frozen=True)
 class ToolCallItem(RunItemBase[ToolCallItemTypes]):
     """Tool call for function or computer action."""
@@ -160,25 +164,9 @@ class ReasoningItem(RunItemBase[ResponseReasoningItem]):
     type: Literal["reasoning_item"] = "reasoning_item"
 
 
-RunItem: TypeAlias = Union[
-    MessageOutputItem,
-    HandoffCallItem,
-    HandoffOutputItem,
-    ToolCallItem,
-    ToolCallOutputItem,
-    ReasoningItem,
-]
-
-
 @dataclass(frozen=True)
 class ModelResponse:
-    """Model response containing outputs and usage information.
-
-    Args:
-        output: List of response output items
-        usage: Usage statistics for the response
-        referenceable_id: Optional ID for referencing this response
-    """
+    """Model response containing outputs and usage information."""
     output: list[TResponseOutputItem]
     usage: Usage
     referenceable_id: str | None
@@ -254,22 +242,44 @@ class ItemHelpers:
     def text_message_output(message: MessageOutputItem) -> str:
         """Extract and format text from a message output efficiently."""
         try:
-            text = message.text_content
-            if not text:
+            if not (text := message.text_content):
                 return ""
 
-            # Clean up the text by removing any JSON-like artifacts
+            # Clean up the raw text
             text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
             text = text.replace("'text': '", "")
             text = text.replace("'", "")
-
-            # Clean up any remaining whitespace and format
             text = text.strip()
             if not text:
                 return ""
 
-            # Format the text with proper spacing
-            lines = [line.strip() for line in text.split('\n') if line.strip()]
+            # Split into lines and process
+            lines = []
+            current_line = []
+
+            for line in text.split('\n'):
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Handle think tags
+                if line.startswith(THINK_START):
+                    if current_line:
+                        lines.append(' '.join(current_line))
+                        current_line = []
+                    lines.append(line)
+                elif line.endswith(THINK_END):
+                    if current_line:
+                        lines.append(' '.join(current_line))
+                        current_line = []
+                    lines.append(line)
+                else:
+                    current_line.append(line)
+
+            # Add any remaining lines
+            if current_line:
+                lines.append(' '.join(current_line))
+
             return '\n'.join(lines)
 
         except (IndexError, KeyError, AttributeError):
@@ -291,7 +301,6 @@ class ItemHelpers:
         """Format content with proper indentation and borders efficiently."""
         if not content:
             return ""
-        # Remove the pattern anywhere in the content
         content = content.replace("', 'type': 'output_text', 'annotations': []}", "")
         lines = [line.strip() for line in content.split('\n') if line.strip()]
         if not lines:

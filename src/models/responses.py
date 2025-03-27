@@ -191,9 +191,6 @@ class ModelResponsesModel(Model):
             text=response_format,
         )
 
-    def _get_client(self) -> AsyncDeepSeek:
-        return self._client or AsyncDeepSeek()
-
 
 ########################################################
 #               Data Classes                          #

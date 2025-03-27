@@ -582,14 +582,16 @@ class RunImpl:
             return _NOT_FINAL_OUTPUT
         elif callable(agent.tool_use_behavior):
             if inspect.iscoroutinefunction(agent.tool_use_behavior):
-                return await cast(
+                if result := await cast(
                     Awaitable[ToolsToFinalOutputResult],
                     agent.tool_use_behavior(context_wrapper, tool_results),
-                )
+                ):
+                    return result
             else:
-                return cast(
+                if result := cast(
                     ToolsToFinalOutputResult, agent.tool_use_behavior(context_wrapper, tool_results)
-                )
+                ):
+                    return result
 
         logger.error(f"Invalid tool_use_behavior: {agent.tool_use_behavior}")
         raise UsageError(f"Invalid tool_use_behavior: {agent.tool_use_behavior}")

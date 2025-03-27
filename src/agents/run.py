@@ -347,7 +347,6 @@ class Runner:
                 streamed_result.current_turn = current_turn
 
                 if current_turn > max_turns:
-                    raise MaxTurnsError(f"Max turns ({max_turns}) exceeded")
                     streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
                     break
 

@@ -31,7 +31,7 @@ make install
 
 <br>
 
-create a `.env` file in your project root with your deepseek api endpoint and any customization:
+create a `.env` file in your project root with your deepseek api endpoint and any customization (or you can leave the default values):
 
 ```shell
 BASE_URL = "http://localhost:11434"
@@ -42,6 +42,12 @@ MAX_QUEUE_SIZE = 1000
 MAX_GUARDRAIL_QUEUE_SIZE = 100
 LRU_CACHE_SIZE = 128
 LOG_LEVEL = "DEBUG"  
+HTTP_TIMEOUT_TOTAL = 120.0
+HTTP_TIMEOUT_CONNECT = 30.0
+HTTP_TIMEOUT_READ = 90.0
+HTTP_MAX_KEEPALIVE_CONNECTIONS = 5
+HTTP_MAX_CONNECTIONS = 10
+
 ```
 
 <br>
@@ -70,19 +76,7 @@ make cypherpunk-love
 
 which creates and runs the following agent:
 
-```shell
-def setup_client() -> DeepSeekClient:
-    client = DeepSeekClient(
-        http_client=httpx.AsyncClient(
-            timeout=httpx.Timeout(120.0, connect=30.0, read=90.0),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
-        )
-    )
-    set_default_model_client(client)
-    set_default_model_api("chat_completions")
-    return client
-
-
+```python
 def create_agent() -> Agent:
     return Agent(
         name="Agent Dr. Love",
@@ -90,7 +84,7 @@ def create_agent() -> Agent:
     )
 
 
-def main() -> Optional[str]:
+def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agent()
@@ -99,9 +93,13 @@ def main() -> Optional[str]:
             agent,
             "Write a haiku about love in the cypherpunk world."
         )
-        return result.final_output
+        print(pretty_print_result(result))
     except Exception as e:
-        print(f"Error running sanity test: {e}", file=sys.stderr)
+        raise GenericError(e)
+
+
+if __name__ == "__main__":
+    run_agent()
 ```
 
 <br>
@@ -110,7 +108,6 @@ you should get something like this:
 
 ```
 ✅ Received Model Response...
-✅ RunResult:
   
   👾 Agent Info:
         Last Agent → Agent Mulder
@@ -180,12 +177,53 @@ make world-traveler
 
 <br>
 
+which creates and runs the following agent:
+
+```python
+def create_agents() -> Agent:
+    return Agent(
+        name="Agent World Traveler",
+        instructions=(
+            "Coordinate translation requests using provided tools. "
+            "Use appropriate translation tools based on requested languages."
+        ),
+        tools=[
+            Agent(
+                name=f"{lang_name} Translator",
+                instructions=f"Translate English text to {lang_name}",
+                handoff_description=f"English to {lang_name} translator",
+            ).as_tool(
+                tool_name=f"translate_to_{lang_key.lower()}",
+                tool_description=f"Translate text to {lang_name}",
+            )
+            for lang_key, lang_name in SUPPORTED_LANGUAGES.items()
+        ],
+    )
+
+
+def run_agent() -> str | None:
+    try:
+        setup_client()
+        agent = create_agents()
+
+        msg = input("\n❓ Enter text to translate and target languages: ")
+        result = Runner.run_sync(agent, msg)
+        print(pretty_print_result(result))
+    except Exception as e:
+        raise GenericError(e)
+
+
+if __name__ == "__main__":
+    run_agent()
+```
+
+<br>
+
 you can input a sentence in any major language and it will translate it for you:
 
 ```
-✅ Enter text to translate and target languages: eu te amo
+❓ Enter text to translate and target languages: eu te amo
 ✅ Successfully received model response...
-✅ RunResult:
 
   👾 Agent Info:
         Last Agent → Translation Orchestrator

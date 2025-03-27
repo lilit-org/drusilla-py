@@ -5,7 +5,17 @@ from typing import Any
 
 import httpx
 
-from ._constants import CHAT_COMPLETIONS_ENDPOINT, DEFAULT_BASE_URL, HEADERS
+from .. import set_default_model_api, set_default_model_client
+from ._constants import (
+    CHAT_COMPLETIONS_ENDPOINT,
+    DEFAULT_BASE_URL,
+    HEADERS,
+    HTTP_MAX_CONNECTIONS,
+    HTTP_MAX_KEEPALIVE_CONNECTIONS,
+    HTTP_TIMEOUT_CONNECT,
+    HTTP_TIMEOUT_READ,
+    HTTP_TIMEOUT_TOTAL,
+)
 from ._types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -16,6 +26,9 @@ from ._types import (
     ResponseFormat,
 )
 
+########################################################
+#           Public Classes
+########################################################
 
 class DeepSeekClient(AsyncDeepSeek):
     """Implementation of AsyncDeepSeek client using httpx."""
@@ -126,3 +139,27 @@ class DeepSeekClient(AsyncDeepSeek):
                         "total_tokens": 0,
                     },
                 )
+
+
+########################################################
+#           Public Methods
+########################################################
+
+def setup_client() -> DeepSeekClient:
+    """Set up and configure the DeepSeek client with optimal settings."""
+    client = DeepSeekClient(
+        http_client=httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                HTTP_TIMEOUT_TOTAL,
+                connect=HTTP_TIMEOUT_CONNECT,
+                read=HTTP_TIMEOUT_READ
+            ),
+            limits=httpx.Limits(
+                max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                max_connections=HTTP_MAX_CONNECTIONS
+            )
+        )
+    )
+    set_default_model_client(client)
+    set_default_model_api("chat_completions")
+    return client

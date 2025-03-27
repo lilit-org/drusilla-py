@@ -4,21 +4,20 @@ import abc
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from ..agents.agent import Agent
 from ..agents.run_impl import QueueCompleteSentinel
 from ._constants import MAX_GUARDRAIL_QUEUE_SIZE, MAX_QUEUE_SIZE
 from ._env import get_env_var
 from ._guardrail import InputGuardrailResult, OutputGuardrailResult
-from ._items import ItemHelpers, ModelResponse, RunItem, TResponseInputItem
+from ._items import ModelResponse, RunItem, TResponseInputItem
 from ._logger import logger
-from ._pretty_print import pretty_print_result
 from ._stream_events import StreamEvent
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
-    from ..agents.run_impl import QueueCompleteSentinel
+    from ._pretty_print import pretty_print_result
 
 ########################################################
 #               Constants                               #
@@ -49,17 +48,6 @@ class RunResultBase(abc.ABC):
     @abc.abstractmethod
     def last_agent(self) -> Agent[Any]:
         """Last agent that was run."""
-
-    def final_output_as(self, cls: type[T], raise_if_incorrect_type: bool = False) -> T:
-        """Cast final output to type T. Raises TypeError if type mismatch and raise_if_incorrect_type=True."""
-        if raise_if_incorrect_type and not isinstance(self.final_output, cls):
-            raise TypeError(f"Final output is not of type {cls.__name__}")
-
-        return cast(T, self.final_output)
-
-    def to_input_list(self) -> list[TResponseInputItem]:
-        """Create new input list by merging original input with new items."""
-        return ItemHelpers.input_to_new_input_list(self.input) + [item.to_input_item() for item in self.new_items]
 
     def __str__(self) -> str:
         """Return pretty-printed string representation."""

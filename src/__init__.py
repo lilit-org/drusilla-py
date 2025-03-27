@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from .util import _config
+from .models import shared
 from .util._types import AsyncDeepSeek
 
 if TYPE_CHECKING:
@@ -65,15 +65,18 @@ if TYPE_CHECKING:
     from .util._usage import Usage
 
 def set_default_model_key(key: str) -> None:
-    _config.set_default_model_key(key)
+    shared.set_default_model_key(key)
 
 
 def set_default_model_client(client: AsyncDeepSeek) -> None:
-    _config.set_default_model_client(client)
+    shared.set_default_model_client(client)
 
 
 def set_default_model_api(api: Literal["chat_completions", "responses"]) -> None:
-    _config.set_default_model_api(api)
+    if api == "chat_completions":
+        shared.set_use_responses_by_default(False)
+    else:
+        shared.set_use_responses_by_default(True)
 
 
 __all__ = [
