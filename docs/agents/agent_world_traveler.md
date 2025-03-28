@@ -72,6 +72,7 @@ you can input a sentence in any major language and it will translate it for you:
         Tools     → Available (2 tools)
         Tool Mode → None
 
+
 ✅ REASONING:
 
 Okay, so the user just sent "eu te amo" which is Portuguese for "I love you."

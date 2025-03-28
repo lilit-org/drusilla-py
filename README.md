@@ -19,7 +19,6 @@ this project was inspired by many open-source frameworks and our own local workf
 
 <br>
 
----
 
 ### primitives
 
@@ -90,6 +89,11 @@ ___
 
 <br>
 
+
+### hello world: agent cypherpunk love
+
+<br>
+
 test your configuration by running our hello world example:
 
 ```shell
@@ -147,6 +151,7 @@ you should get something like this:
         Tools     → None
         Tool Mode → None
 
+
 ✅ REASONING:
 
 Okay, so I have to write a Haiku about love in the cyberpunk world.
@@ -188,7 +193,9 @@ Secret love in code.
 
 <br>
 
-now check other examples:
+### other examples
+
+<br>
 
 #### simple reasoning agents:
 
@@ -199,8 +206,6 @@ now check other examples:
 * [agent world traveler](docs/agents/agent_world_traveler.md)
 * [agent summer chaser](docs/agents/agent_summer_chaser.md)
 
-
-<br>
 
 #### using streaming:
 
