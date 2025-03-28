@@ -39,9 +39,7 @@ class HookProtocol(Protocol[TContext]):
 class BaseHooks(ABC, Generic[TContext], HookProtocol[TContext]):
     """Base class for lifecycle hooks with common method signatures."""
 
-    async def on_start(
-        self, context: RunContextWrapper[TContext], agent: Agent[TContext]
-    ) -> None:
+    async def on_start(self, context: RunContextWrapper[TContext], agent: Agent[TContext]) -> None:
         """Called before agent invocation."""
 
     async def on_end(

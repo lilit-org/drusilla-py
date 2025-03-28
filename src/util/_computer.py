@@ -78,9 +78,7 @@ class _BaseComputerMixin:
     def _validate_coordinates(self, x: int, y: int) -> None:
         width, height = self.dimensions
         if not (0 <= x < width and 0 <= y < height):
-            raise ValueError(
-                f"Coordinates ({x}, {y}) outside screen bounds ({width}x{height})"
-            )
+            raise ValueError(f"Coordinates ({x}, {y}) outside screen bounds ({width}x{height})")
 
     def _validate_path(self, path: Sequence[tuple[int, int]]) -> None:
         if not path:

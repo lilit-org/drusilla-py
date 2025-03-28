@@ -60,9 +60,8 @@ create a `.env` file in your project root with your deepseek api endpoint and an
 BASE_URL = "http://localhost:11434"
 MODEL = "deepseek-r1"
 MAX_TURNS = 10
-WRAPPER_DICT_KEY = "response"
 MAX_QUEUE_SIZE = 1000
-MAX_GUARDRAIL_QUEUE_SIZE = 100
+MAX_SHIELD_QUEUE_SIZE = 100
 LRU_CACHE_SIZE = 128
 LOG_LEVEL = "DEBUG"  
 HTTP_TIMEOUT_TOTAL = 120.0
@@ -88,7 +87,6 @@ ___
 ## agents
 
 <br>
-
 
 ### hello world: agent cypherpunk love
 
@@ -162,12 +160,15 @@ The first and third lines are five syllables, and the middle line is seven.
 So I need to make sure each line meets that syllable count.
 
 Now, the subject is "love" in the cyberpunk setting.
-Cyberpunk usually involves futuristic cities, neon lights, abandoned places, high-tech but often dystopian environments.
-Love in such a setting could be portrayed through themes like overcoming connections through technology, or ideals versus reality.
+Cyberpunk usually involves futuristic cities, neon lights, abandoned places, 
+high-tech but often dystopian environments.
+Love in such a setting could be portrayed through themes like overcoming 
+connections through technology, or ideals versus reality.
 
 I should think about metaphors or symbols related to love that fit into this genre.
-Maybe something like signals, connection points that bring people together who wouldn't normally
-interact like how cyberpunk often features isolated individuals connected by these futuristic means.
+Maybe something like signals, connection points that bring people together who
+wouldn't normally interact like how cyberpunk often features isolated individuals 
+connected by these futuristic means.
 
 In the first line, I want to set a scene or an emotion that starts with "loving."
 Maybe starting with "Love" and then moving into the environment.
@@ -176,11 +177,13 @@ So maybe love as something that exists not just in person but also in digital sp
 
 The second line should be longer with seven syllables.
 Here, I can introduce a setting where this love takes place amidst the cyberpunk elements.
-Perhaps mentioning how the environment is both bright and broken, providing contrast between light and darkness,
+Perhaps mentioning how the environment is both bright and broken, providing contrast between 
+light and darkness,
 like neon signs against decay or preserved ruins next to glowing tech.
 
-For the third line, focusing on emotions that come from such love perhaps the connection between two people who've
-been apart for a long time but find each other through this digital lens.
+For the third line, focusing on emotions that come from such love perhaps the connection
+between two people who've been apart for a long time but find each other through 
+this digital lens.
 Maybe something about memories connecting them now with the help of technology.
 
 
@@ -192,6 +195,8 @@ Secret love in code.
 ```
 
 <br>
+
+---
 
 ### other examples
 

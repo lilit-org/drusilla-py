@@ -67,9 +67,7 @@ class InputShield(Generic[TContext]):
         input: str | list[TResponseInputItem],
     ) -> InputShieldResult:
         if not callable(self.shield_function):
-            raise UsageError(
-                f"Shield function must be callable, got {self.shield_function}"
-            )
+            raise UsageError(f"Shield function must be callable, got {self.shield_function}")
 
         if output := self.shield_function(context, agent, input):
             if inspect.isawaitable(output):
@@ -102,9 +100,7 @@ class OutputShield(Generic[TContext]):
         self, context: RunContextWrapper[TContext], agent: Agent[Any], agent_output: Any
     ) -> OutputShieldResult:
         if not callable(self.shield_function):
-            raise UsageError(
-                f"Shield function must be callable, got {self.shield_function}"
-            )
+            raise UsageError(f"Shield function must be callable, got {self.shield_function}")
 
         if output := self.shield_function(context, agent, agent_output):
             if inspect.isawaitable(output):
@@ -165,9 +161,7 @@ def input_shield(
 
 
 def input_shield(
-    func: (
-        _InputShieldFuncSync[TContext_co] | _InputShieldFuncAsync[TContext_co] | None
-    ) = None,
+    func: _InputShieldFuncSync[TContext_co] | _InputShieldFuncAsync[TContext_co] | None = None,
     *,
     name: str | None = None,
 ) -> (
@@ -223,9 +217,7 @@ def output_shield(
 
 
 def output_shield(
-    func: (
-        _OutputShieldFuncSync[TContext_co] | _OutputShieldFuncAsync[TContext_co] | None
-    ) = None,
+    func: _OutputShieldFuncSync[TContext_co] | _OutputShieldFuncAsync[TContext_co] | None = None,
     *,
     name: str | None = None,
 ) -> (

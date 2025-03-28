@@ -101,9 +101,7 @@ class ModelChatCompletionsModel(Model):
             else Usage()
         )
 
-        items = _Converter.message_to_output_items(
-            response_obj["choices"][0]["message"]
-        )
+        items = _Converter.message_to_output_items(response_obj["choices"][0]["message"])
 
         return ModelResponse(
             output=items,
@@ -156,9 +154,7 @@ class ModelChatCompletionsModel(Model):
                             part=state.text_content_index_and_output[1],
                         )
                     else:
-                        state.text_content_index_and_output[1]["text"] += delta[
-                            "content"
-                        ]
+                        state.text_content_index_and_output[1]["text"] += delta["content"]
                         yield ResponseEvent(
                             type="output_text.delta",
                             content_index=state.text_content_index_and_output[0],
@@ -202,14 +198,10 @@ class ModelChatCompletionsModel(Model):
                 },
             )
 
-        parallel_tool_calls = (
-            True if model_settings.parallel_tool_calls and tools else UNSET
-        )
+        parallel_tool_calls = True if model_settings.parallel_tool_calls and tools else UNSET
         tool_choice = _Converter.convert_tool_choice(model_settings.tool_choice)
         response_format = _Converter.convert_response_format(output_schema)
-        converted_tools = (
-            [ToolConverter.to_api_format(tool) for tool in tools] if tools else []
-        )
+        converted_tools = [ToolConverter.to_api_format(tool) for tool in tools] if tools else []
         converted_tools.extend(ToolConverter.convert_orb_tool(orb) for orb in orbs)
 
         request_params = {
@@ -217,12 +209,8 @@ class ModelChatCompletionsModel(Model):
             "messages": converted_messages,
             "temperature": self._non_null_or_not_given(model_settings.temperature),
             "top_p": self._non_null_or_not_given(model_settings.top_p),
-            "frequency_penalty": self._non_null_or_not_given(
-                model_settings.frequency_penalty
-            ),
-            "presence_penalty": self._non_null_or_not_given(
-                model_settings.presence_penalty
-            ),
+            "frequency_penalty": self._non_null_or_not_given(model_settings.frequency_penalty),
+            "presence_penalty": self._non_null_or_not_given(model_settings.presence_penalty),
             "max_tokens": self._non_null_or_not_given(model_settings.max_tokens),
             "stream": stream,
             "extra_headers": HEADERS,
@@ -336,10 +324,7 @@ class _Converter:
         if not isinstance(item, dict) or item.keys() != {"content", "role"}:
             return None
         role = item.get("role")
-        if (
-            role not in ("user", "assistant", "system", "developer")
-            or "content" not in item
-        ):
+        if role not in ("user", "assistant", "system", "developer") or "content" not in item:
             return None
         return cast(dict[str, Any], item)
 
@@ -406,9 +391,7 @@ class _Converter:
                 out.append({"type": "text", "text": c["text"]})
             elif c.get("type") == "input_image":
                 if "image_url" not in c or not c["image_url"]:
-                    raise AgentError(
-                        f"Only image URLs are supported for input_image {c}"
-                    )
+                    raise AgentError(f"Only image URLs are supported for input_image {c}")
                 out.append(
                     {
                         "type": "image_url",
@@ -419,9 +402,7 @@ class _Converter:
                     }
                 )
             elif c.get("type") == "input_file":
-                raise UsageError(
-                    f"File uploads are not supported for chat completions {c}"
-                )
+                raise UsageError(f"File uploads are not supported for chat completions {c}")
             else:
                 raise UsageError(f"Unknown content: {c}")
         return out
@@ -533,9 +514,7 @@ class _Converter:
                             f"Only audio IDs are supported for chat completions, but got: {c}"
                         )
                     else:
-                        raise UsageError(
-                            f"Unknown content type in ResponseOutputMessage: {c}"
-                        )
+                        raise UsageError(f"Unknown content type in ResponseOutputMessage: {c}")
 
                 if text_segments:
                     new_asst["content"] = "\n".join(text_segments)
@@ -589,9 +568,7 @@ class _Converter:
                 )
 
             elif cls.maybe_item_reference(item):
-                raise UsageError(
-                    "Encountered an item_reference, which is not supported"
-                )
+                raise UsageError("Encountered an item_reference, which is not supported")
 
             else:
                 raise UsageError(f"Unhandled item type or structure: {item}")

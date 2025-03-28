@@ -57,6 +57,4 @@ class AgentUpdatedStreamEvent:
 #              StreamEvent Type Alias                  #
 ########################################################
 
-StreamEvent: TypeAlias = (
-    RawResponsesStreamEvent | RunItemStreamEvent | AgentUpdatedStreamEvent
-)
+StreamEvent: TypeAlias = RawResponsesStreamEvent | RunItemStreamEvent | AgentUpdatedStreamEvent

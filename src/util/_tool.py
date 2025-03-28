@@ -38,9 +38,7 @@ from ._types import MaybeAwaitable
 ToolParams = ParamSpec("ToolParams")
 ToolFunctionWithoutContext = Callable[ToolParams, Any]
 ToolFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], ToolParams], Any]
-ToolFunction = (
-    ToolFunctionWithoutContext[ToolParams] | ToolFunctionWithContext[ToolParams]
-)
+ToolFunction = ToolFunctionWithoutContext[ToolParams] | ToolFunctionWithContext[ToolParams]
 
 
 ########################################################
@@ -50,7 +48,6 @@ ToolFunction = (
 
 @dataclass(frozen=True)
 class FuncSchema:
-
     name: str
     description: str | None
     params_pydantic_model: type[BaseModel]
@@ -64,7 +61,7 @@ class FuncSchema:
     _var_keyword: str | None = field(init=False)
 
     def __post_init__(self) -> None:
-        """Pre-compute parameter order and types."""
+        """Set up parameter order and types."""
         positional_params: list[str] = []
         keyword_params: list[str] = []
         var_positional: str | None = None
@@ -202,9 +199,7 @@ def _detect_docstring_style(doc: str) -> DocstringStyle:
     }
 
     scores = {
-        style: sum(
-            1 for pattern in style_patterns if re.search(pattern, doc, re.MULTILINE)
-        )
+        style: sum(1 for pattern in style_patterns if re.search(pattern, doc, re.MULTILINE))
         for style, style_patterns in patterns.items()
     }
 
@@ -271,22 +266,14 @@ def generate_func_documentation(
     """Extract function metadata from docstring."""
     doc = inspect.getdoc(func)
     if not doc:
-        return FuncDocumentation(
-            name=func.__name__, description=None, param_descriptions=None
-        )
+        return FuncDocumentation(name=func.__name__, description=None, param_descriptions=None)
 
     with _suppress_griffe_logging():
-        docstring = Docstring(
-            doc, lineno=1, parser=style or _detect_docstring_style(doc)
-        )
+        docstring = Docstring(doc, lineno=1, parser=style or _detect_docstring_style(doc))
         parsed = docstring.parse()
 
     description = next(
-        (
-            section.value
-            for section in parsed
-            if section.kind == DocstringSectionKind.text
-        ),
+        (section.value for section in parsed if section.kind == DocstringSectionKind.text),
         None,
     )
 
@@ -314,11 +301,7 @@ def function_schema(
 ) -> FuncSchema:
     """Extract function schema for tool use."""
 
-    doc_info = (
-        generate_func_documentation(func, docstring_style)
-        if use_docstring_info
-        else None
-    )
+    doc_info = generate_func_documentation(func, docstring_style) if use_docstring_info else None
     param_descs = doc_info.param_descriptions or {} if doc_info else {}
     func_name = name_override or doc_info.name if doc_info else func.__name__
 
@@ -443,11 +426,7 @@ def function_tool(
     failure_error_function: ToolErrorFunction | None = default_tool_error_function,
     strict_mode: bool = True,
 ) -> FunctionTool | Callable[[ToolFunction[...]], FunctionTool]:
-    """
-    Decorator to create a FunctionTool from a function.
-    Creates JSON schema from signature and uses docstring for descriptions.
-    If function takes RunContextWrapper as first arg, it must match agent's context type.
-    """
+    """Create FunctionTool from function with JSON schema and docstring."""
 
     def _create_function_tool(the_func: ToolFunction[...]) -> FunctionTool:
         schema = function_schema(
@@ -476,13 +455,9 @@ def function_tool(
                 return str(result)
             except json.JSONDecodeError as e:
                 logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
-                raise ModelError(
-                    f"Invalid JSON input for tool {schema.name}: {input}"
-                ) from e
+                raise ModelError(f"Invalid JSON input for tool {schema.name}: {input}") from e
             except ValidationError as e:
-                raise ModelError(
-                    f"Invalid JSON input for tool {schema.name}: {e}"
-                ) from e
+                raise ModelError(f"Invalid JSON input for tool {schema.name}: {e}") from e
             except Exception as e:
                 if failure_error_function:
                     error_msg = failure_error_function(ctx, e)

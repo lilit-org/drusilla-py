@@ -131,9 +131,7 @@ def orb(
         input_filter: Function to filter inputs passed to next agent
     """
     if bool(on_orb) != bool(input_type):
-        raise UsageError(
-            "You must provide either both on_input and input_type, or neither"
-        )
+        raise UsageError("You must provide either both on_input and input_type, or neither")
 
     type_adapter: TypeAdapter[Any] | None = None
     input_json_schema: dict[str, Any] = {}
@@ -153,14 +151,8 @@ def orb(
         if len(sig.parameters) != 1:
             raise UsageError("on_orb must take one argument: context")
 
-    async def _invoke_orb(
-        ctx: RunContextWrapper[Any], input_json: str | None = None
-    ) -> Agent[Any]:
-        if (
-            input_type is not None
-            and type_adapter is not None
-            and input_json is not None
-        ):
+    async def _invoke_orb(ctx: RunContextWrapper[Any], input_json: str | None = None) -> Agent[Any]:
+        if input_type is not None and type_adapter is not None and input_json is not None:
             validated_input = validate_json(
                 json_str=input_json,
                 type_adapter=type_adapter,

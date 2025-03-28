@@ -158,16 +158,12 @@ class Runner:
                         run_config,
                     )
                 elif isinstance(turn_result.next_step, NextStepHandoff):
-                    current_agent = cast(
-                        Agent[TContext], turn_result.next_step.new_agent
-                    )
+                    current_agent = cast(Agent[TContext], turn_result.next_step.new_agent)
                     should_run_agent_start_hooks = True
                 elif isinstance(turn_result.next_step, NextStepRunAgain):
                     continue
                 else:
-                    raise AgentError(
-                        f"Unknown next step type: {type(turn_result.next_step)}"
-                    )
+                    raise AgentError(f"Unknown next step type: {type(turn_result.next_step)}")
         except Exception as e:
             raise GenericError(e) from e
 
@@ -282,9 +278,7 @@ class Runner:
             context_wrapper,
             input,
             output_schema,
-        ) = await cls._initialize_run(
-            starting_agent, input, context, max_turns, hooks, run_config
-        )
+        ) = await cls._initialize_run(starting_agent, input, context, max_turns, hooks, run_config)
 
         streamed_result = cls._create_streamed_result(
             input=input,
@@ -357,9 +351,7 @@ class Runner:
                 streamed_result.current_turn = current_turn
 
                 if current_turn > max_turns:
-                    await cls._queue_event(
-                        streamed_result._event_queue, QueueCompleteSentinel()
-                    )
+                    await cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
                     break
 
                 if current_turn == 1:
@@ -368,8 +360,7 @@ class Runner:
                             agent=starting_agent,
                             input=starting_input,
                             context=context_wrapper,
-                            shields=starting_agent.input_shields
-                            + run_config.input_shields,
+                            shields=starting_agent.input_shields + run_config.input_shields,
                             streamed_result=streamed_result,
                         )
                     )
@@ -410,9 +401,7 @@ class Runner:
                         streamed_result.is_complete = True
                         try:
                             await asyncio.wait_for(
-                                streamed_result._event_queue.put(
-                                    QueueCompleteSentinel()
-                                ),
+                                streamed_result._event_queue.put(QueueCompleteSentinel()),
                                 timeout=1.0,
                             )
                         except (asyncio.TimeoutError, asyncio.QueueFull):
@@ -474,9 +463,7 @@ class Runner:
     @classmethod
     def _handle_streamed_error(cls, streamed_result: RunResultStreaming) -> None:
         streamed_result.is_complete = True
-        asyncio.create_task(
-            cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
-        )
+        asyncio.create_task(cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel()))
 
     @classmethod
     async def _run_input_shields_with_queue(
@@ -624,9 +611,7 @@ class Runner:
         output_schema = cls._get_output_schema(agent)
         orbs = cls._get_handoffs(agent)
         input = ItemHelpers.input_to_new_input_list(original_input)
-        input.extend(
-            [generated_item.to_input_item() for generated_item in generated_items]
-        )
+        input.extend([generated_item.to_input_item() for generated_item in generated_items])
         new_response = await cls._get_new_response(
             agent,
             system_prompt,
@@ -694,9 +679,7 @@ class Runner:
             return []
 
         shield_tasks = [
-            asyncio.create_task(
-                RunImpl.run_single_input_shield(agent, shield, input, context)
-            )
+            asyncio.create_task(RunImpl.run_single_input_shield(agent, shield, input, context))
             for shield in shields
         ]
 
@@ -775,10 +758,7 @@ class Runner:
     @classmethod
     def _get_handoffs(cls, agent: Agent[Any]) -> list[Orb]:
         """Get list of handoffs from agent, converting Agent instances to Orb objects."""
-        return [
-            orb_item if isinstance(orb_item, Orb) else orb(orb_item)
-            for orb_item in agent.orbs
-        ]
+        return [orb_item if isinstance(orb_item, Orb) else orb(orb_item) for orb_item in agent.orbs]
 
     @classmethod
     def _get_model(cls, agent: Agent[Any], run_config: RunConfig) -> Model:
@@ -801,9 +781,5 @@ class Runner:
         """Run the start hooks for an agent."""
         await asyncio.gather(
             hooks.on_start(context_wrapper, agent),
-            (
-                agent.hooks.on_start(context_wrapper, agent)
-                if agent.hooks
-                else noop_coroutine()
-            ),
+            (agent.hooks.on_start(context_wrapper, agent) if agent.hooks else noop_coroutine()),
         )

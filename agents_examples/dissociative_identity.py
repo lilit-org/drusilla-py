@@ -93,9 +93,7 @@ STYLE_INSTRUCTIONS = {
 }
 
 
-def get_style_instructions(
-    run_context: RunContextWrapper[Style], _: Agent[Style]
-) -> str:
+def get_style_instructions(run_context: RunContextWrapper[Style], _: Agent[Style]) -> str:
     return STYLE_INSTRUCTIONS[run_context.context]
 
 

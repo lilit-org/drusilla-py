@@ -208,20 +208,12 @@ class RunImpl:
                 context_wrapper=context_wrapper,
             )
 
-        message_items = [
-            item for item in new_step_items if isinstance(item, MessageOutputItem)
-        ]
+        message_items = [item for item in new_step_items if isinstance(item, MessageOutputItem)]
         potential_final_output_text = (
-            ItemHelpers.extract_last_text(message_items[-1].raw_item)
-            if message_items
-            else None
+            ItemHelpers.extract_last_text(message_items[-1].raw_item) if message_items else None
         )
 
-        if (
-            output_schema
-            and not output_schema.is_plain_text()
-            and potential_final_output_text
-        ):
+        if output_schema and not output_schema.is_plain_text() and potential_final_output_text:
             final_output = output_schema.validate_json(potential_final_output_text)
             return await cls.execute_final_output(
                 agent=agent,
@@ -293,13 +285,9 @@ class RunImpl:
                 items.append(ToolCallItem(raw_item=output, agent=agent))
                 if output_type == "computer":
                     if not computer_tool:
-                        raise ModelError(
-                            "Model produced computer action without a computer tool."
-                        )
+                        raise ModelError("Model produced computer action without a computer tool.")
                     computer_actions.append(
-                        ToolRunComputerAction(
-                            tool_call=output, computer_tool=computer_tool
-                        )
+                        ToolRunComputerAction(tool_call=output, computer_tool=computer_tool)
                     )
             elif output_type == "reasoning":
                 items.append(ReasoningItem(raw_item=output, agent=agent))
@@ -313,9 +301,7 @@ class RunImpl:
                     run_handoffs.append(handoff)
                 else:
                     if output["name"] not in function_map:
-                        raise ModelError(
-                            f"Tool {output['name']} not found in agent {agent.name}"
-                        )
+                        raise ModelError(f"Tool {output['name']} not found in agent {agent.name}")
                     items.append(ToolCallItem(raw_item=output, agent=agent))
                     functions.append(
                         ToolRunFunction(
@@ -360,9 +346,7 @@ class RunImpl:
                 await asyncio.gather(
                     hooks.on_tool_end(context_wrapper, agent, func_tool, result),
                     (
-                        agent.hooks.on_tool_end(
-                            context_wrapper, agent, func_tool, result
-                        )
+                        agent.hooks.on_tool_end(context_wrapper, agent, func_tool, result)
                         if agent.hooks
                         else noop_coroutine()
                     ),
@@ -373,10 +357,7 @@ class RunImpl:
             return result
 
         results = await asyncio.gather(
-            *[
-                run_single_tool(tool_run.function_tool, tool_run.tool_call)
-                for tool_run in tool_runs
-            ]
+            *[run_single_tool(tool_run.function_tool, tool_run.tool_call) for tool_run in tool_runs]
         )
 
         return [
@@ -385,9 +366,7 @@ class RunImpl:
                 output=result,
                 run_item=ToolCallOutputItem(
                     output=result,
-                    raw_item=ItemHelpers.tool_call_output_item(
-                        tool_run.tool_call, str(result)
-                    ),
+                    raw_item=ItemHelpers.tool_call_output_item(tool_run.tool_call, str(result)),
                     agent=agent,
                 ),
             )
@@ -477,16 +456,12 @@ class RunImpl:
             ),
         )
 
-        input_filter = orb.input_filter or (
-            run_config.orb_input_filter if run_config else None
-        )
+        input_filter = orb.input_filter or (run_config.orb_input_filter if run_config else None)
         if input_filter:
             logger.debug("Filtering inputs for handoff")
             orb_input_data = OrbInputData(
                 input_history=(
-                    tuple(original_input)
-                    if isinstance(original_input, list)
-                    else original_input
+                    tuple(original_input) if isinstance(original_input, list) else original_input
                 ),
                 pre_orb_items=tuple(pre_step_items),
                 new_items=tuple(new_step_items),

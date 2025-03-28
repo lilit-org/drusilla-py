@@ -43,9 +43,7 @@ def is_summer(city: str) -> bool:
         _, max_temp = map(int, weather["temperature_range"].split("-")[1].rstrip("C"))
         return max_temp >= 25
     except (ValueError, AttributeError) as e:
-        raise UsageError(
-            f"Invalid temperature range format: {weather['temperature_range']}"
-        ) from e
+        raise UsageError(f"Invalid temperature range format: {weather['temperature_range']}") from e
 
 
 ########################################################
