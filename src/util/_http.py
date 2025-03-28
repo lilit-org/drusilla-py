@@ -28,7 +28,7 @@ class DefaultAsyncHttpxClient(httpx.AsyncClient):
     ) -> None:
         timeout = (
             Timeout(timeout=timeout, connect=connect_timeout, read=read_timeout)
-            if isinstance(timeout, (int, float))
+            if isinstance(timeout, int | float)
             else timeout
         )
 

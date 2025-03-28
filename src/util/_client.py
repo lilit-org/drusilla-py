@@ -5,7 +5,7 @@ from typing import Any
 
 import httpx
 
-from .. import set_default_model_api, set_default_model_client
+from ..models.shared import set_default_model_client
 from ._constants import (
     CHAT_COMPLETIONS_ENDPOINT,
     DEFAULT_BASE_URL,
@@ -27,7 +27,7 @@ from ._types import (
 )
 
 ########################################################
-#           Public Classes
+#           Main Class: DeepSeekClient
 ########################################################
 
 
@@ -104,11 +104,13 @@ class DeepSeekClient(AsyncDeepSeek):
                 endpoint = os.getenv(
                     "CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT
                 )
+                url = f"{client.base_url}{endpoint}"
                 response = await client.http_client.post(
-                    f"{client.base_url}{endpoint}",
+                    url,
                     headers=headers,
                     json=data,
                 )
+
                 response.raise_for_status()
 
                 if stream:
@@ -116,6 +118,7 @@ class DeepSeekClient(AsyncDeepSeek):
 
                 # Convert Ollama response to ChatCompletion format
                 ollama_response = response.json()
+                message = ollama_response.get("message", {}).get("content", "")
                 return ChatCompletion(
                     id=f"ollama-{hash(str(ollama_response))}",
                     object="chat.completion",
@@ -124,12 +127,7 @@ class DeepSeekClient(AsyncDeepSeek):
                     choices=[
                         {
                             "index": 0,
-                            "message": {
-                                "role": "assistant",
-                                "content": ollama_response.get("message", {}).get(
-                                    "content", ""
-                                ),
-                            },
+                            "message": {"role": "assistant", "content": message},
                             "finish_reason": "stop",
                         }
                     ],
@@ -160,5 +158,4 @@ def setup_client() -> DeepSeekClient:
         )
     )
     set_default_model_client(client)
-    set_default_model_api("chat_completions")
     return client

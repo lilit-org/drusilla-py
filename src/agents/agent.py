@@ -17,11 +17,9 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, cast
-
-from typing_extensions import TypeAlias
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, cast
 
 from ..gear.orbs import Orb
 from ..gear.shields import InputShield, OutputShield

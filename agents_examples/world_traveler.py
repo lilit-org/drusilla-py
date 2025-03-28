@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
-from src.agents import Agent, Runner
+from src.agents.agent import Agent
+from src.agents.run import Runner
 from src.util._client import setup_client
 from src.util._constants import SUPPORTED_LANGUAGES
 from src.util._exceptions import AgentExecutionError
@@ -50,7 +51,7 @@ def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agents()
-        msg = input("\n❓ Enter text to translate and target languages: ")
+        msg = input("\n❓ Enter text to translate: ")
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
     except Exception as e:

@@ -266,7 +266,7 @@ class Runner:
         )
 
     @classmethod
-    def run_streamed(
+    async def run_streamed(
         cls,
         starting_agent: Agent[TContext],
         input: str | list[TResponseInputItem],
@@ -282,10 +282,8 @@ class Runner:
             context_wrapper,
             input,
             output_schema,
-        ) = asyncio.get_event_loop().run_until_complete(
-            cls._initialize_run(
-                starting_agent, input, context, max_turns, hooks, run_config
-            )
+        ) = await cls._initialize_run(
+            starting_agent, input, context, max_turns, hooks, run_config
         )
 
         streamed_result = cls._create_streamed_result(
@@ -328,7 +326,6 @@ class Runner:
             max_turns=max_turns,
             input_shield_results=[],
             output_shield_results=[],
-            _current_agent_output_schema=output_schema,
         )
 
     @classmethod
@@ -346,9 +343,13 @@ class Runner:
         current_agent = starting_agent
         current_turn = 0
         should_run_agent_start_hooks = True
-        streamed_result._event_queue.put_nowait(
-            AgentUpdatedStreamEvent(new_agent=current_agent)
-        )
+        try:
+            await cls._queue_event(
+                streamed_result._event_queue,
+                AgentUpdatedStreamEvent(new_agent=current_agent),
+            )
+        except (asyncio.TimeoutError, asyncio.QueueFull):
+            pass
 
         try:
             while not streamed_result.is_complete:
@@ -356,7 +357,9 @@ class Runner:
                 streamed_result.current_turn = current_turn
 
                 if current_turn > max_turns:
-                    streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
+                    await cls._queue_event(
+                        streamed_result._event_queue, QueueCompleteSentinel()
+                    )
                     break
 
                 if current_turn == 1:
@@ -387,9 +390,15 @@ class Runner:
                     if isinstance(turn_result.next_step, NextStepHandoff):
                         current_agent = turn_result.next_step.new_agent
                         should_run_agent_start_hooks = True
-                        streamed_result._event_queue.put_nowait(
-                            AgentUpdatedStreamEvent(new_agent=current_agent)
-                        )
+                        try:
+                            await asyncio.wait_for(
+                                streamed_result._event_queue.put(
+                                    AgentUpdatedStreamEvent(new_agent=current_agent)
+                                ),
+                                timeout=1.0,
+                            )
+                        except (asyncio.TimeoutError, asyncio.QueueFull):
+                            pass
                     elif isinstance(turn_result.next_step, NextStepFinalOutput):
                         await cls._handle_streamed_final_output(
                             current_agent,
@@ -399,7 +408,15 @@ class Runner:
                             run_config,
                         )
                         streamed_result.is_complete = True
-                        streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
+                        try:
+                            await asyncio.wait_for(
+                                streamed_result._event_queue.put(
+                                    QueueCompleteSentinel()
+                                ),
+                                timeout=1.0,
+                            )
+                        except (asyncio.TimeoutError, asyncio.QueueFull):
+                            pass
                     elif isinstance(turn_result.next_step, NextStepRunAgain):
                         continue
                 except Exception:
@@ -410,6 +427,13 @@ class Runner:
         except Exception as e:
             streamed_result.is_complete = True
             raise GenericError(e) from e
+
+    @classmethod
+    async def _queue_event(cls, queue: asyncio.Queue, event: Any) -> None:
+        try:
+            await asyncio.wait_for(queue.put(event), timeout=1.0)
+        except (asyncio.TimeoutError, asyncio.QueueFull):
+            pass
 
     @classmethod
     def _update_streamed_result(
@@ -449,9 +473,10 @@ class Runner:
 
     @classmethod
     def _handle_streamed_error(cls, streamed_result: RunResultStreaming) -> None:
-
         streamed_result.is_complete = True
-        streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
+        asyncio.create_task(
+            cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
+        )
 
     @classmethod
     async def _run_input_shields_with_queue(
@@ -505,7 +530,7 @@ class Runner:
                 context_wrapper,
             )
 
-        system_prompt = agent.system_prompt
+        system_prompt = await agent.get_system_prompt(context_wrapper)
         input = streamed_result.input
         output_schema = cls._get_output_schema(agent)
         orbs = cls._get_handoffs(agent)
@@ -530,7 +555,12 @@ class Runner:
                         total_tokens=event.response.usage.total_tokens,
                     )
                     if event.response.usage
-                    else Usage()
+                    else Usage(
+                        requests=1,
+                        input_tokens=0,
+                        output_tokens=0,
+                        total_tokens=0,
+                    )
                 )
                 final_response = ModelResponse(
                     output=event.response.output,
@@ -557,12 +587,16 @@ class Runner:
                     run_config=run_config,
                 )
 
-                RunImpl.stream_step_result_to_queue(
+                # Queue the step result events
+                await RunImpl.stream_step_result_to_queue(
                     single_step_result, streamed_result._event_queue
                 )
                 return single_step_result
 
-            streamed_result._event_queue.put_nowait(RawResponsesStreamEvent(data=event))
+            # Queue raw response events
+            await cls._queue_event(
+                streamed_result._event_queue, RawResponsesStreamEvent(data=event)
+            )
 
         raise ModelError("Model did not produce a final response!")
 
@@ -580,13 +614,10 @@ class Runner:
     ) -> SingleStepResult:
 
         if should_run_agent_start_hooks:
-            await asyncio.gather(
-                hooks.on_start(context_wrapper, agent),
-                (
-                    agent.hooks.on_start(context_wrapper, agent)
-                    if agent.hooks
-                    else noop_coroutine()
-                ),
+            await cls._run_agent_start_hooks(
+                agent,
+                hooks,
+                context_wrapper,
             )
 
         system_prompt = await agent.get_system_prompt(context_wrapper)
@@ -759,3 +790,20 @@ class Runner:
         if isinstance(agent.model, Model):
             return agent.model
         return run_config.model_provider.get_model(agent.model)
+
+    @classmethod
+    async def _run_agent_start_hooks(
+        cls,
+        agent: Agent[TContext],
+        hooks: RunHooks[TContext],
+        context_wrapper: RunContextWrapper[TContext],
+    ) -> None:
+        """Run the start hooks for an agent."""
+        await asyncio.gather(
+            hooks.on_start(context_wrapper, agent),
+            (
+                agent.hooks.on_start(context_wrapper, agent)
+                if agent.hooks
+                else noop_coroutine()
+            ),
+        )

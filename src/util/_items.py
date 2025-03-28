@@ -9,13 +9,13 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    TypeAlias,
     TypeVar,
     Union,
     cast,
 )
 
 from pydantic import BaseModel
-from typing_extensions import TypeAlias
 
 from ._types import (
     ComputerCallOutput,
@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 TResponseInputItem = ResponseInputItemParam
 TResponseOutputItem = ResponseOutputItem
 TResponseStreamEvent = ResponseStreamEvent
-T = TypeVar("T", bound=Union[TResponseOutputItem, TResponseInputItem])
+T = TypeVar("T", bound=TResponseOutputItem | TResponseInputItem)
 
 MESSAGE_TYPE = "message"
 OUTPUT_TEXT_TYPE = "output_text"
@@ -51,12 +51,12 @@ THINK_START = "<think>"
 THINK_END = "</think>"
 ECHOES_START = "Echoes of encrypted hearts"
 
-ToolCallItemTypes: TypeAlias = Union[
-    ResponseFunctionToolCall,
-    ResponseComputerToolCall,
-    ResponseFileSearchToolCall,
-    ResponseFunctionWebSearch,
-]
+ToolCallItemTypes: TypeAlias = (
+    ResponseFunctionToolCall
+    | ResponseComputerToolCall
+    | ResponseFileSearchToolCall
+    | ResponseFunctionWebSearch
+)
 
 RunItem: TypeAlias = Union[
     "MessageOutputItem",
@@ -108,17 +108,18 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
             for item in content:
                 if isinstance(item, dict):
                     if item.get("type") == OUTPUT_TEXT_TYPE:
-                        text = item.get("text", "")
+                        text = item.get("text", "").strip()
                         if text:
                             texts.append(text)
                 elif hasattr(item, "type") and item.type == OUTPUT_TEXT_TYPE:
-                    text = getattr(item, "text", "")
+                    text = getattr(item, "text", "").strip()
                     if text:
                         texts.append(text)
 
-            return " ".join(texts).strip()
+            return " ".join(texts)
 
-        except (AttributeError, KeyError, TypeError, IndexError):
+        except (AttributeError, KeyError, TypeError, IndexError) as e:
+            print(f"Error getting text content: {e}")
             return ""
 
 
@@ -143,7 +144,7 @@ class ToolCallItem(RunItemBase[ToolCallItemTypes]):
 
 
 @dataclass(frozen=True)
-class ToolCallOutputItem(RunItemBase[Union[FunctionCallOutput, ComputerCallOutput]]):
+class ToolCallOutputItem(RunItemBase[FunctionCallOutput | ComputerCallOutput]):
     raw_item: FunctionCallOutput | ComputerCallOutput
     output: Any
     type: Literal["tool_call_output_item"] = "tool_call_output_item"
@@ -219,41 +220,60 @@ class ItemHelpers:
     @staticmethod
     def text_message_output(message: MessageOutputItem) -> str:
         try:
-            if not (text := message.text_content):
+            if not hasattr(message, "raw_item"):
                 return ""
 
-            text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
-            text = text.replace("'text': '", "").replace("'", "").strip()
-            if not text:
-                return ""
+            if isinstance(message.raw_item, dict):
+                content = message.raw_item.get("content", [])
+                if not content:
+                    return ""
 
-            lines = []
-            current_line = []
+                text_parts = []
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == OUTPUT_TEXT_TYPE:
+                        text = item.get("text", "").strip()
+                        if text:
+                            text_parts.append(text)
 
-            for line in text.split("\n"):
-                line = line.strip()
-                if not line:
-                    continue
+                if not text_parts:
+                    return ""
 
-                if line.startswith(THINK_START):
-                    if current_line:
-                        lines.append(" ".join(current_line))
-                        current_line = []
-                    lines.append(line)
-                elif line.endswith(THINK_END):
-                    if current_line:
-                        lines.append(" ".join(current_line))
-                        current_line = []
-                    lines.append(line)
-                else:
-                    current_line.append(line)
+                text = " ".join(text_parts)
+                text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
+                text = text.replace("'text': '", "").replace("'", "").strip()
 
-            if current_line:
-                lines.append(" ".join(current_line))
+                if not text:
+                    return ""
 
-            return "\n".join(lines)
+                lines = []
+                current_section = []
 
-        except (IndexError, KeyError, AttributeError):
+                for line in text.split("\n"):
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    if line.startswith(THINK_START):
+                        if current_section:
+                            lines.append(" ".join(current_section))
+                            current_section = []
+                        lines.append(line)
+                    elif line.endswith(THINK_END):
+                        if current_section:
+                            lines.append(" ".join(current_section))
+                            current_section = []
+                        lines.append(line)
+                    else:
+                        current_section.append(line)
+
+                if current_section:
+                    lines.append(" ".join(current_section))
+
+                return "\n".join(lines)
+
+            return ""
+        except Exception as e:
+            print(f"Error processing message output: {e}")
             return ""
 
     @staticmethod

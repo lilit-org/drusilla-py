@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+
+"""
+This script demonstrates the streaming functionality of the agent framework,
+showing how to handle different types of stream events in real-time.
+"""
+
+import asyncio
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent))
+from src.agents.agent import Agent
+from src.agents.run import Runner
+from src.util._client import setup_client
+from src.util._constants import DEFAULT_MAX_TURNS
+from src.util._env import get_env_var
+from src.util._exceptions import AgentExecutionError
+from src.util._items import ItemHelpers
+
+########################################################
+#           Constants
+########################################################
+
+MAX_TURNS = int(get_env_var("MAX_TURNS", str(DEFAULT_MAX_TURNS)))
+
+
+########################################################
+#           Agent Creation                             #
+########################################################
+
+
+def create_agent() -> Agent:
+    return Agent(
+        name="Agent Cypherpunk Joker",
+        instructions=(
+            "You are a cool special robot who tells jokes. Follow these steps exactly:\n"
+            "1. First, parse the number of jokes requested from the input message\n"
+            "2. After getting the number N, tell exactly N jokes\n"
+            "3. Each joke should be on its own line\n"
+            "4. Make the jokes cyberpunk-themed and entertaining\n"
+            "5. Number each joke clearly"
+        ),
+        tools=[],
+    )
+
+
+########################################################
+#           Private methods
+########################################################
+
+
+def _get_number_of_jokes() -> int:
+    while True:
+        try:
+            n = int(input("\n❓ How many jokes would you like to hear? (1-10): "))
+            if 1 <= n <= 10:
+                return n
+            print("❌ Please enter a number between 1 and 10.")
+        except ValueError:
+            print("❌ Please enter a valid number.")
+
+
+async def _handle_stream_events(result, num_jokes):
+    try:
+        async for event in result.stream_events():
+            if event.type == "raw_response_event":
+                if hasattr(event.data, "delta") and event.data.delta:
+                    print(event.data.delta, end="", flush=True)
+                elif hasattr(event.data, "part") and event.data.part:
+                    if isinstance(event.data.part, dict) and event.data.part.get(
+                        "text"
+                    ):
+                        print(event.data.part["text"], end="", flush=True)
+                elif event.data:
+                    print(str(event.data), end="", flush=True)
+            elif event.type == "agent_updated_stream_event":
+                print(f"\n✅ {event.new_agent.name} is telling {num_jokes} jokes...")
+            elif event.type == "run_item_stream_event":
+                if event.name == "message_output_created":
+                    if message := ItemHelpers.text_message_output(event.item):
+                        print(f"\n💬 Message:\n{message}")
+                elif event.name in ("tool_called", "tool_output"):
+                    msg = (
+                        "🛠️  Tool called"
+                        if event.name == "tool_called"
+                        else f"📊 Tool output: {event.item.output}"
+                    )
+                    print(f"\n{msg}")
+
+            await asyncio.sleep(0)
+    except asyncio.CancelledError as e:
+        print("\n❌ Stream processing was cancelled")
+        raise AgentExecutionError("Stream processing was cancelled") from e
+
+
+########################################################
+#           Agent Runner                               #
+########################################################
+
+
+async def run_agent():
+    try:
+        setup_client()
+        agent = create_agent()
+        num_jokes = _get_number_of_jokes()
+
+        result = await Runner.run_streamed(
+            agent,
+            f"Tell me exactly {num_jokes} cypherpunk jokes!",
+            max_turns=DEFAULT_MAX_TURNS,
+        )
+
+        await _handle_stream_events(result, num_jokes)
+
+        print("\n\n✅ Stream complete")
+        items = len(result.new_items)
+        responses = len(result.raw_responses)
+        print(f"✅ Final state has {items} items and {responses} responses\n")
+
+    except Exception as e:
+        raise AgentExecutionError(e) from e
+
+
+if __name__ == "__main__":
+    asyncio.run(run_agent())

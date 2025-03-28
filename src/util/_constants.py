@@ -10,12 +10,10 @@ This module contains API configurations, environment settings, and default value
 """
 
 __all__ = (
-    "FAKE_RESPONSES_ID",
     "HEADERS",
     "Environment",
     "Button",
     "IncludeLiteral",
-    "UNSET",
     "DEFAULT_MODEL",
     "DEFAULT_BASE_URL",
     "DEFAULT_WRAPPER_DICT_KEY",
@@ -30,6 +28,8 @@ __all__ = (
     "HTTP_MAX_KEEPALIVE_CONNECTIONS",
     "HTTP_MAX_CONNECTIONS",
     "LRU_CACHE_SIZE",
+    "UNSET",
+    "FAKE_RESPONSES_ID",
 )
 
 # Type Definitions
@@ -41,9 +41,11 @@ IncludeLiteral = Literal[
     "computer_call_output.output.image_url",
 ]
 
-# Special Constants
+# Sentinel value for unset values
 UNSET = object()
-FAKE_RESPONSES_ID = "__fake_id__"
+
+# Fake response identifier for testing
+FAKE_RESPONSES_ID = "fake_responses"
 
 # API Configuration
 _USER_AGENT = f"Agents/Python {__version__}"
@@ -57,8 +59,8 @@ DEFAULT_WRAPPER_DICT_KEY = "response"
 DEFAULT_MAX_TURNS = 10
 
 # Queue and Cache Limits
-MAX_QUEUE_SIZE = 1000
-MAX_GUARDRAIL_QUEUE_SIZE = 100
+MAX_QUEUE_SIZE = 100
+MAX_GUARDRAIL_QUEUE_SIZE = 50
 LRU_CACHE_SIZE = 128
 
 # HTTP Client Configuration

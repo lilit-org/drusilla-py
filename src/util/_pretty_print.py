@@ -1,9 +1,14 @@
 import re
 from typing import Any
 
-from ._exceptions import GenericError
 from ._items import ModelResponse
 from ._result import RunResult
+
+########################################################
+#               Constants
+########################################################
+
+_THINK_PATTERN = re.compile(r"<think>(.*?)</think>(.*)", re.DOTALL)
 
 ########################################################
 #          Final Output private method
@@ -11,27 +16,21 @@ from ._result import RunResult
 
 
 def _indent(text: str, indent_level: int) -> str:
-    indent_string = "  " * indent_level
-    return "\n".join(f"{indent_string}{line}" for line in text.splitlines())
+    return "\n".join("  " * indent_level + line for line in text.splitlines())
 
 
 def _format_final_output(raw_response: ModelResponse) -> str:
-    try:
-        output = raw_response.output[0]["text"]
-        match = re.search(r"<think>(.*?)</think>(.*)", output, re.DOTALL)
+    output = raw_response.output[0]["text"]
+    match = _THINK_PATTERN.search(output)
 
-        if match:
-            reasoning = match.group(1).strip().encode().decode("unicode-escape")
-            final_result = match.group(2).strip().encode().decode("unicode-escape")
-        else:
-            reasoning = ""
-            final_result = output.strip("'").strip().encode().decode("unicode-escape")
+    if match:
+        reasoning = match.group(1).strip().encode().decode("unicode-escape")
+        final_result = match.group(2).strip().encode().decode("unicode-escape")
+    else:
+        reasoning = ""
+        final_result = output.strip("'").strip().encode().decode("unicode-escape")
 
-        return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
-
-    except GenericError as e:
-        print(f"Error formatting final output: {e}")
-        return ""
+    return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
 
 
 ########################################################
@@ -39,8 +38,8 @@ def _format_final_output(raw_response: ModelResponse) -> str:
 ########################################################
 
 
-def _format_agent_info(result: RunResult) -> str:
-    info = ["\n👾 Agent Info:"]
+def _format_agent_info(result: Any) -> str:
+    info: list[str] = ["\n👾 Agent Info:"]
     if hasattr(result, "is_complete"):
         info.extend(
             [
@@ -59,7 +58,7 @@ def _format_agent_info(result: RunResult) -> str:
 ########################################################
 
 
-def _format_stats(result: RunResult) -> str:
+def _format_stats(result: Any) -> str:
     stats = [
         "\n📊 Statistics:",
         f"      Items     → {len(result.new_items)}",
@@ -75,19 +74,22 @@ def _format_stats(result: RunResult) -> str:
 ########################################################
 
 
-def _format_stream_info(stream: bool, tool_choice: Any) -> str:
+def _format_stream_info(stream: bool, tool_choice: Any, result: Any) -> str:
     def format_obj(x: Any) -> str:
         if x is None or x is object():
             return "None"
         if isinstance(x, bool):
             return "✔️ Enabled" if x else "❌ Disabled"
+        if isinstance(x, list):
+            return f"Available ({len(x)} tools)" if x else "None"
         return str(x)
 
-    info = [
-        "\n🦾 Configuration:",
-        f"      Streaming → {format_obj(stream)}",
-        f"      Tool Mode → {format_obj(tool_choice)}",
-    ]
+    info = ["\n🦾 Configuration:"]
+    tools = getattr(result, "last_agent", None)
+    info.append(f"      Streaming → {format_obj(stream)}")
+    if tools and hasattr(tools, "tools"):
+        info.append(f"      Tools     → {format_obj(tools.tools)}")
+    info.append(f"      Tool Mode → {format_obj(tool_choice)}")
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
@@ -104,6 +106,7 @@ def pretty_print_result(result: RunResult) -> str:
         _format_stream_info(
             stream=hasattr(result, "is_complete"),
             tool_choice=getattr(result, "tool_choice", None),
+            result=result,
         ),
         _format_final_output(result.raw_responses[0]),
     ]

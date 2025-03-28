@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncIterator, Awaitable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal, NotRequired, TypeAlias, TypedDict, Union
+from typing import Any, Literal, NotRequired, TypeAlias, TypedDict
 
 from typing_extensions import TypeVar
 
@@ -11,11 +12,11 @@ from typing_extensions import TypeVar
 ########################################################
 
 T = TypeVar("T")
-MaybeAwaitable = Union[Awaitable[T], T]
+MaybeAwaitable = Awaitable[T] | T
 
 ########################################################
 #            Data class for Usage
-# ######################################################
+########################################################
 
 
 @dataclass(frozen=True)
@@ -317,9 +318,9 @@ class ChatCompletionChunk(TypedDict):
     usage: NotRequired[ChatCompletionUsage]
 
 
-ChatCompletionToolChoiceOptionParam: TypeAlias = Union[
-    Literal["auto", "required", "none"], Mapping[str, Any]
-]
+ChatCompletionToolChoiceOptionParam: TypeAlias = (
+    Literal["auto", "required", "none"] | Mapping[str, Any]
+)
 
 
 ########################################################
@@ -354,8 +355,57 @@ class ResponseFormat(TypedDict):
 class AsyncStream(AsyncIterator[ChatCompletionChunk]):
     """Async iterator for streaming chat completion chunks."""
 
+    def __init__(self, stream: AsyncIterator[str]):
+        self._stream = stream
+
     async def __anext__(self) -> ChatCompletionChunk:
-        raise NotImplementedError
+        try:
+            line = await anext(self._stream)
+            if line.startswith("data: "):
+                line = line[6:]
+            if line == "[DONE]":
+                raise StopAsyncIteration
+            import json
+
+            data = json.loads(line)
+
+            # Handle Ollama's specific response format
+            if "message" in data:
+                content = data["message"].get("content", "")
+                data = {
+                    "id": data.get("id", "ollama-" + str(hash(content))),
+                    "object": "chat.completion.chunk",
+                    "created": data.get("created", int(time.time())),
+                    "model": data.get("model", "unknown"),
+                    "choices": [{"index": 0, "delta": {"content": content}}],
+                }
+            # If the response doesn't match the expected structure, create a valid chunk
+            elif not isinstance(data, dict):
+                data = {
+                    "id": "fallback-id",
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": "unknown",
+                    "choices": [{"index": 0, "delta": {"content": str(data)}}],
+                }
+            elif "choices" not in data:
+                data = {
+                    "id": data.get("id", "fallback-id"),
+                    "object": "chat.completion.chunk",
+                    "created": data.get("created", int(time.time())),
+                    "model": data.get("model", "unknown"),
+                    "choices": [{"index": 0, "delta": {"content": str(data)}}],
+                }
+            elif not data["choices"]:
+                data["choices"] = [{"index": 0, "delta": {"content": ""}}]
+            elif "delta" not in data["choices"][0]:
+                data["choices"][0]["delta"] = {"content": str(data["choices"][0])}
+
+            return data
+        except StopAsyncIteration:
+            raise
+        except Exception as e:
+            raise RuntimeError(f"Error parsing stream chunk: {e}") from e
 
 
 class AsyncDeepSeek:

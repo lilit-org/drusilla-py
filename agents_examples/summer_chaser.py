@@ -7,11 +7,11 @@ A weather information agent that demonstrates the usage of tools this framework.
 import sys
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from src.agents import Agent, Runner
+from src.agents.agent import Agent
+from src.agents.run import Runner
 from src.util._client import setup_client
 from src.util._env import get_env_var
 from src.util._exceptions import AgentExecutionError, UsageError
@@ -53,7 +53,7 @@ def is_summer(city: str) -> bool:
 ########################################################
 
 
-@lru_cache(maxsize=1)
+@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
 def create_agent() -> Agent:
     return Agent(
         name="Agent Summer Chaser",
@@ -73,7 +73,7 @@ def create_agent() -> Agent:
 ########################################################
 
 
-def run_agent() -> Optional[str]:
+def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agent()
