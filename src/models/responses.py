@@ -202,7 +202,7 @@ class ModelResponsesModel(Model):
 class Converter:
     @staticmethod
     def convert_tool_choice(
-        tool_choice: Literal["auto", "required", "none"] | str | None
+        tool_choice: Literal["auto", "required", "none"] | str | None,
     ) -> ChatCompletionToolChoiceOptionParam:
         if tool_choice is None:
             return UNSET
