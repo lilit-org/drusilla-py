@@ -238,9 +238,7 @@ class Converter:
 
         computer_tools = [tool for tool in tools if isinstance(tool, ComputerTool)]
         if len(computer_tools) > 1:
-            raise UsageError(
-                f"You can only provide one computer tool. Got {len(computer_tools)}"
-            )
+            raise UsageError(f"You can only provide one computer tool. Got {len(computer_tools)}")
 
         for tool in tools:
             converted_tool, include = cls._convert_tool(tool)

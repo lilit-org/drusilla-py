@@ -9,7 +9,7 @@ from typing import Any
 from ..agents.agent import Agent
 from ..agents.run_impl import QueueCompleteSentinel
 from ..gear.shields import InputShieldResult, OutputShieldResult
-from ._constants import MAX_GUARDRAIL_QUEUE_SIZE, MAX_QUEUE_SIZE
+from ._constants import MAX_QUEUE_SIZE, MAX_SHIELD_QUEUE_SIZE
 from ._env import get_env_var
 from ._items import ModelResponse, RunItem, TResponseInputItem
 from ._logger import logger
@@ -20,9 +20,7 @@ from ._stream_events import StreamEvent
 ########################################################
 
 MAX_QUEUE_SIZE = get_env_var("MAX_QUEUE_SIZE", MAX_QUEUE_SIZE)
-MAX_GUARDRAIL_QUEUE_SIZE = get_env_var(
-    "MAX_GUARDRAIL_QUEUE_SIZE", MAX_GUARDRAIL_QUEUE_SIZE
-)
+MAX_SHIELD_QUEUE_SIZE = get_env_var("MAX_SHIELD_QUEUE_SIZE", MAX_SHIELD_QUEUE_SIZE)
 
 ########################################################
 #               Data Classes for Results
@@ -44,9 +42,7 @@ class RunResultBase(abc.ABC):
         """Last agent that was run."""
 
     def __str__(self) -> str:
-        stream_status = (
-            "Complete" if getattr(self, "is_complete", False) else "In Progress"
-        )
+        stream_status = "Complete" if getattr(self, "is_complete", False) else "In Progress"
         tool_choice = getattr(self, "tool_choice", "N/A")
         return (
             f"✅ {self.__class__.__name__}:\n"
@@ -87,7 +83,7 @@ class RunResultStreaming:
         default_factory=lambda: asyncio.Queue(maxsize=MAX_QUEUE_SIZE), repr=False
     )
     _input_shield_queue: asyncio.Queue[InputShieldResult] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=MAX_GUARDRAIL_QUEUE_SIZE),
+        default_factory=lambda: asyncio.Queue(maxsize=MAX_SHIELD_QUEUE_SIZE),
         repr=False,
     )
     _run_impl_task: asyncio.Task[None] | None = field(default=None, repr=False)

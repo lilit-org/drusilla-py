@@ -20,9 +20,10 @@ test:
 
 .PHONY: format
 format:
+	poetry install --with dev --no-root
 	poetry run ruff check src --fix --unsafe-fixes
-	autoflake -r --in-place --remove-unused-variables src/
-	black src/
+	poetry run autoflake -r --in-place --remove-unused-variables src/ agents_examples/
+	poetry run black src/ agents_examples/
 
 .PHONY: cypherpunk-love
 cypherpunk-love:

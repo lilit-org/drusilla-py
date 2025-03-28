@@ -21,9 +21,7 @@ from src.util._pretty_print import pretty_print_result
 
 
 def create_agent() -> Agent:
-    return Agent(
-        name="Agent Dr. Love", instructions="You are a cool special robot who loves"
-    )
+    return Agent(name="Agent Dr. Love", instructions="You are a cool special robot who loves")
 
 
 ########################################################
@@ -35,9 +33,7 @@ def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agent()
-        result = Runner.run_sync(
-            agent, "Write a haiku about love in the cypherpunk world."
-        )
+        result = Runner.run_sync(agent, "Write a haiku about love in the cypherpunk world.")
         print(pretty_print_result(result))
     except Exception as e:
         raise AgentExecutionError(e) from e

@@ -60,9 +60,7 @@ class ModelProvider(BaseModelProvider):
         """
         if model_client is not None:
             if api_key is not None or base_url is not None:
-                raise ValueError(
-                    "Don't provide api_key or base_url if you provide model_client"
-                )
+                raise ValueError("Don't provide api_key or base_url if you provide model_client")
             self._client = model_client
         else:
             self._client = None
@@ -72,9 +70,7 @@ class ModelProvider(BaseModelProvider):
             self._stored_project = project
 
         self._use_responses = (
-            use_responses
-            if use_responses is not None
-            else shared.get_use_responses_by_default()
+            use_responses if use_responses is not None else shared.get_use_responses_by_default()
         )
 
     def _get_client(self) -> AsyncDeepSeek:

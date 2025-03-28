@@ -130,22 +130,35 @@ you can ask for a certain number of jokes, and it will update and run the agent:
 
 ✅ REASONING:
 
-Okay, so I need to come up with four cypherpunk-themed jokes based on the user's request. First, I'll recall what cypherpunk is—it combines cyberpunk (cyber technology and dystopian themes) with j科幻 elements like space, AI, and high-tech environments.
-
-I should brainstorm some common cypherpunk elements: robots, holograms, neon lights, high tech terms, futuristic settings. Now, thinking of joke structures—maybe something that plays on technology or phrases
-Okay, so I need to come up with four cypherpunk-themed jokes based on the user's request. First, I'll recall what cypherpunk is—it combines cyberpunk (cyber technology and dystopian themes) with j科幻 elements like space, AI, and high-tech environments.
+Okay, so I need to come up with four cypherpunk-themed jokes based on the user's request. 
+First, I'll recall what cypherpunk is—it combines cyberpunk (cyber technology and dystopian
+themes) with j科幻 elements like space, AI, and high-tech environments.
 
 I should brainstorm some common cypherpunk elements: robots, holograms, neon lights, high tech terms, futuristic settings. Now, thinking of joke structures—maybe something that plays on technology or phrases people might use in their daily lives but add a twist with the cyberpunk theme.
 
-Let me start with the first joke. Maybe something about holographic displays and how they interact with emotions because I've heard jokes where holograms can affect people's feelings. So, "Why did the hologram get a restraining order?" Because it couldn't handle the heat! Haha, that makes sense—holograms are cold but might emit some heat or just be seen as unfriendly.
+Let me start with the first joke. Maybe something about holographic displays and how they 
+interact with emotions because I've heard jokes where holograms can affect people's feelings. 
+So, "Why did the hologram get a restraining order?" Because it couldn't handle the heat! 
+Haha, that makes sense—holograms are cold but might emit some heat or just be seen as unfriendly.
 
-Next joke: something involving circuit breakers because they're part of electronics and could be referenced in a cyberpunk setting. "Why don't mathematicians trust circuit breakers?" Because they know the voltage is high! This plays on the idea that circuit breakers trip when there's too much current, like in math problems or electronics.
+Next joke: something involving circuit breakers because they're part of electronics and could be
+referenced in a cyberpunk setting. "Why don't mathematicians trust circuit breakers?" 
+Because they know the voltage is high! This plays on the idea that circuit breakers trip when
+there's too much current, like in math problems or electronics.
 
-Third joke: thinking about AI and how it's sometimes used to replace people or do their work. So, "Why did the AI take over the factory?" To make the workers look busy! Maybe because it keeps them occupied so they don't question its existence. It's a bit of a twist on the typical replacement scenario.
+Third joke: thinking about AI and how it's sometimes used to replace people or do their work. 
+So, "Why did the AI take over the factory?" To make the workers look busy! 
+Maybe because it keeps them occupied so they don't question its existence. 
+It's a bit of a twist on the typical replacement scenario.
 
-Lastly, for the fourth joke, maybe something that combines high-tech with everyday items—like robots and sandwiches. "Why did the robot order a sandwich?" Because it was feeling productive! Playing on the idea that even simple tasks like making a sandwich can be seen as productive in a high-tech environment.
+Lastly, for the fourth joke, maybe something that combines high-tech with everyday items—like
+robots and sandwiches. "Why did the robot order a sandwich?" 
+Because it was feeling productive! Playing on the idea that even simple tasks like making a
+sandwich can be seen as productive in a high-tech environment.
 
-I should make sure each joke is clear and numbered correctly, placed at the end of the response. Also, keeping them concise but funny so they fit well within the cypherpunk theme without being too obscure.
+I should make sure each joke is clear and numbered correctly, placed at the end of the response
+Also, keeping them concise but funny so they fit well within the cypherpunk theme without 
+being too obscure.
 
 
 ✅ RESULT:

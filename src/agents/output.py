@@ -44,9 +44,7 @@ def _type_to_str(t: type[Any]) -> str:
 
 
 @lru_cache(maxsize=LRU_CACHE_SIZE)
-def _get_type_adapter(
-    output_type: type[Any], is_wrapped: bool = False
-) -> TypeAdapter[Any]:
+def _get_type_adapter(output_type: type[Any], is_wrapped: bool = False) -> TypeAdapter[Any]:
     """Get or create a type adapter with caching."""
     if output_type is None or output_type is str:
         return TypeAdapter(output_type)
@@ -114,14 +112,8 @@ class AgentOutputSchema:
 
     def validate_json(self, json_str: str, partial: bool = False) -> Any:
         validated = _json.validate_json(json_str, self._type_adapter, partial)
-        if (
-            self._is_wrapped
-            and isinstance(validated, dict)
-            and WRAPPER_DICT_KEY not in validated
-        ):
-            raise ModelError(
-                f"Could not find key {WRAPPER_DICT_KEY} in JSON: {json_str}"
-            )
+        if self._is_wrapped and isinstance(validated, dict) and WRAPPER_DICT_KEY not in validated:
+            raise ModelError(f"Could not find key {WRAPPER_DICT_KEY} in JSON: {json_str}")
         return (
             validated[WRAPPER_DICT_KEY]
             if self._is_wrapped and isinstance(validated, dict)

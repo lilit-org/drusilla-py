@@ -189,9 +189,7 @@ class FunctionCallOutput(TypedDict):
 class ResponseEvent:
     """Event indicating a change in response state."""
 
-    type: Literal[
-        "completed", "content_part.added", "content_part.done", "output_text.delta"
-    ]
+    type: Literal["completed", "content_part.added", "content_part.done", "output_text.delta"]
     response: Response | None = None
     content_index: int | None = None
     item_id: str | None = None
@@ -201,12 +199,12 @@ class ResponseEvent:
 
 
 ########################################################
-#           Main classes for Chat Completion
+#           Chat Completion Types
 ########################################################
 
 
 class ChatCompletionFunctionParam(TypedDict):
-    """Parameters for a function call in chat completion."""
+    """Function call params for chat completion."""
 
     name: str
     description: str
@@ -214,7 +212,7 @@ class ChatCompletionFunctionParam(TypedDict):
 
 
 class ChatCompletionToolParam(TypedDict):
-    """Tool parameters for chat completion."""
+    """Tool params for chat completion."""
 
     type: Literal["function"]
     function: ChatCompletionFunctionParam
@@ -297,7 +295,7 @@ class ChatCompletionChoice(TypedDict):
 
 
 class ChatCompletion(TypedDict):
-    """Complete chat completion response."""
+    """Chat completion response."""
 
     id: str
     object: Literal["chat.completion"]
@@ -308,7 +306,7 @@ class ChatCompletion(TypedDict):
 
 
 class ChatCompletionChunk(TypedDict):
-    """Chunk in a streaming chat completion response."""
+    """Streaming response chunk."""
 
     id: str
     object: Literal["chat.completion.chunk"]
@@ -409,7 +407,7 @@ class AsyncStream(AsyncIterator[ChatCompletionChunk]):
 
 
 class AsyncDeepSeek:
-    """Async client for DeepSeek API interactions."""
+    """Async DeepSeek API client."""
 
     class chat:
         class completions:
@@ -431,7 +429,7 @@ class AsyncDeepSeek:
                 stream_options: Mapping[str, bool] | None = None,
                 extra_headers: Mapping[str, str] | None = None,
             ) -> ChatCompletion | AsyncStream:
-                """Create a chat completion with the given parameters."""
+                """Create chat completion."""
                 raise NotImplementedError
 
 

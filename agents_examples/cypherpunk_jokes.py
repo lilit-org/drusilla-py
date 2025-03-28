@@ -16,7 +16,6 @@ from src.util._client import setup_client
 from src.util._constants import DEFAULT_MAX_TURNS
 from src.util._env import get_env_var
 from src.util._exceptions import AgentExecutionError
-from src.util._items import ItemHelpers
 from src.util._pretty_print import pretty_print_result_stats, pretty_print_result_stream
 
 ########################################################
@@ -70,30 +69,13 @@ async def _handle_stream_events(result, num_jokes):
                 print(f"\n✅ {event.new_agent.name} is telling {num_jokes} jokes...")
 
             if event.type == "raw_response_event":
-                if (
-                    hasattr(event.data, "type")
-                    and event.data.type == "content_part.done"
-                ):
-                    if isinstance(event.data.part, dict) and event.data.part.get(
-                        "text"
-                    ):
+                if hasattr(event.data, "type") and event.data.type == "content_part.done":
+                    if isinstance(event.data.part, dict) and event.data.part.get("text"):
                         print(
                             pretty_print_result_stream(event.data.part["text"]),
                             end="",
                             flush=True,
                         )
-
-            elif event.type == "run_item_stream_event":
-                if event.name == "message_output_created":
-                    if message := ItemHelpers.text_message_output(event.item):
-                        print(f"\n💬 Message:\n{message}")
-                elif event.name in ("tool_called", "tool_output"):
-                    msg = (
-                        "🛠️  Tool called"
-                        if event.name == "tool_called"
-                        else f"📊 Tool output: {event.item.output}"
-                    )
-                    print(f"\n{msg}")
 
             await asyncio.sleep(0)
         print(pretty_print_result_stats(result))

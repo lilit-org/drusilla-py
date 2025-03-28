@@ -27,7 +27,7 @@ from ._types import (
 )
 
 ########################################################
-#           Main Class: DeepSeekClient
+#           DeepSeek Client
 ########################################################
 
 
@@ -44,9 +44,7 @@ class DeepSeekClient(AsyncDeepSeek):
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = api_key
-        self.base_url = (base_url or os.getenv("BASE_URL", DEFAULT_BASE_URL)).rstrip(
-            "/"
-        )
+        self.base_url = (base_url or os.getenv("BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
         self.organization = organization
         self.project = project
         self.http_client = http_client or httpx.AsyncClient()
@@ -101,9 +99,7 @@ class DeepSeekClient(AsyncDeepSeek):
                 if max_tokens is not None:
                     data["max_tokens"] = max_tokens
 
-                endpoint = os.getenv(
-                    "CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT
-                )
+                endpoint = os.getenv("CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT)
                 url = f"{client.base_url}{endpoint}"
                 response = await client.http_client.post(
                     url,

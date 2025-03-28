@@ -1,28 +1,28 @@
 from dataclasses import dataclass
 
 ########################################################
-#               Data class Usage
+#               Usage Tracking
 ########################################################
 
 
 @dataclass
 class Usage:
-    """Tracks token usage and request counts for LLM API calls."""
+    """Track LLM API token usage and requests."""
 
     requests: int = 0
-    """Number of API requests made."""
+    """API request count."""
 
     input_tokens: int = 0
-    """Total tokens sent to the API."""
+    """Tokens sent to API."""
 
     output_tokens: int = 0
-    """Total tokens received from the API."""
+    """Tokens received from API."""
 
     total_tokens: int = 0
-    """Combined input and output tokens."""
+    """Total tokens used."""
 
     def add(self, other: "Usage") -> None:
-        """Combines usage statistics from another Usage instance."""
+        """Merge usage stats from another instance."""
         self.requests += other.requests or 0
         self.input_tokens += other.input_tokens or 0
         self.output_tokens += other.output_tokens or 0

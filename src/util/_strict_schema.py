@@ -35,8 +35,7 @@ def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
         resolved = resolved[key]
         if not isinstance(resolved, dict):
             raise ModelError(
-                f"Invalid resolution path for {ref} - "
-                f"encountered non-dictionary at {resolved}"
+                f"Invalid resolution path for {ref} - " f"encountered non-dictionary at {resolved}"
             )
 
     return cast(JSONSchema, resolved)
@@ -94,16 +93,12 @@ def _enforce_strict_schema_rules(
             values = schema[operator]
             if operator == "allOf" and len(values) == 1:
                 schema.update(
-                    _enforce_strict_schema_rules(
-                        values[0], path=(*path, operator, "0"), root=root
-                    )
+                    _enforce_strict_schema_rules(values[0], path=(*path, operator, "0"), root=root)
                 )
                 schema.pop(operator)
             else:
                 schema[operator] = [
-                    _enforce_strict_schema_rules(
-                        entry, path=(*path, operator, str(i)), root=root
-                    )
+                    _enforce_strict_schema_rules(entry, path=(*path, operator, str(i)), root=root)
                     for i, entry in enumerate(values)
                 ]
 

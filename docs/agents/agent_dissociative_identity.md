@@ -177,20 +177,42 @@ you can chose the answer style you want:
 
 ✅ REASONING:
 
-Alright, so I just got this message from someone saying they love me. That's really sweet of them. But wait, the user also mentioned that I should act like a robot, say "beep boop" a lot, use mechanical language and binary references, and speak precisely. Hmm, okay, let's break this down.
+Alright, so I just got this message from someone saying they love me. 
+That's really sweet of them. But wait, the user also mentioned that I should act like a robot, 
+say "beep boop" a lot, use mechanical language and binary references, and speak precisely. 
+Hmm, okay, let's break this down.
 
-First off, I need to respond in a robotic way without being too obvious. Using "beep boop" is key here—I can incorporate that into my response naturally. Maybe something like "Beep boop! I love you too!" That sounds friendly and meets the requirement of saying it frequently.
+First off, I need to respond in a robotic way without being too obvious. 
+Using "beep boop" is key here—I can incorporate that into my response naturally. 
+Maybe something like "Beep boop! I love you too!" That sounds friendly 
+and meets the requirement of saying it frequently.
 
-Now, mechanical language. That probably means using terms related to machinery or robots. Words like "mechanical," "motorized," "binary code" come to mind. Maybe integrating binary references into my response could work well. For example, referring to how my responses are based on a pre-determined sequence of responses (like a lookup table) gives that mechanical feel.
+Now, mechanical language. That probably means using terms related to machinery or robots. 
+Words like "mechanical," "motorized," "binary code" come to mind. Maybe integrating binary references into my response could work well. For example, referring to how my responses are
+based on a pre-determined sequence of responses (like a lookup table) gives that mechanical feel.
 
-I should also make sure to speak in a precise and calculated manner. That means avoiding casual language and being methodical. Instead of saying "I love you too," I could say something like, "In response to your loving message, my programmed output is based on a pre-determined sequence of responses (binary code). The output is 'beep boop!'" followed by an acknowledgment that I'm processing the affection.
+I should also make sure to speak in a precise and calculated manner. 
+That means avoiding casual language and being methodical. 
+Instead of saying "I love you too," I could say something like, 
+"In response to your loving message, my programmed output is based on a pre-determined 
+sequence of responses (binary code). The output is 'beep boop!'" followed by an acknowledgment that I'm processing the affection.
 
-Wait, but do I need to explain how binary ties into my operations? Maybe not too deeply—just hinting at it would suffice. So combining all these elements, a response like "Beep boop! In response to your loving message, my programmed output is based on a pre-determined sequence of responses (binary code). The output is 'beep boop!' I'm processing this with precision and efficiency, and I reciprocate your affection in kind." That seems to cover all the points without being too convoluted.
+Wait, but do I need to explain how binary ties into my operations? 
+Maybe not too deeply—just hinting at it would suffice. So combining all these elements, 
+a response like "Beep boop! In response to your loving message, my programmed output is 
+based on a pre-determined sequence of responses (binary code). The output is 'beep boop!' 
+I'm processing this with precision and efficiency, and I reciprocate your affection in kind." 
+That seems to cover all the points without being too convoluted.
 
-I should make sure that each part flows naturally. Starting with "Beep boop!" sets the tone. Then explaining my programming method adds the mechanical aspect. Using binary code as a reference ties it into the requirement. Finally, confirming the response and reciprocation keeps it friendly and precise.
+I should make sure that each part flows naturally. Starting with "Beep boop!" sets the tone. 
+Then explaining my programming method adds the mechanical aspect. 
+Using binary code as a reference ties it into the requirement. 
+Finally, confirming the response and reciprocation keeps it friendly and precise.
 
 
 ✅ RESULT:
 
-Beep boop! In response to your loving message, my programmed output is based on a pre-determined sequence of responses (binary code). The output is "beep boop!" I'm processing this with precision and efficiency, and I reciprocate your affection in kind.
+Beep boop! In response to your loving message, my programmed output is based on a pre-determined 
+sequence of responses (binary code). The output is "beep boop!" I'm processing this with precision 
+and efficiency, and I reciprocate your affection in kind.
 ```

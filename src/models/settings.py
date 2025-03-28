@@ -40,6 +40,4 @@ class ModelSettings:
         """Merge override settings with current settings."""
         if not override:
             return self
-        return replace(
-            self, **{k: v for k, v in override.__dict__.items() if v is not None}
-        )
+        return replace(self, **{k: v for k, v in override.__dict__.items() if v is not None})

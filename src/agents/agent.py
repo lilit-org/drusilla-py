@@ -142,13 +142,9 @@ class Agent(Generic[TContext]):
         custom_output_extractor: Callable[[RunResult], Awaitable[str]] | None = None,
     ) -> Tool:
         """Converts agent to tool for other agents."""
-        return _create_agent_tool(
-            self, tool_name, tool_description, custom_output_extractor
-        )
+        return _create_agent_tool(self, tool_name, tool_description, custom_output_extractor)
 
-    async def get_system_prompt(
-        self, run_context: RunContextWrapper[TContext]
-    ) -> str | None:
+    async def get_system_prompt(self, run_context: RunContextWrapper[TContext]) -> str | None:
         """Get the system prompt for the agent."""
         if self.instructions is None:
             return None

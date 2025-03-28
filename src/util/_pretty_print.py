@@ -41,9 +41,7 @@ def _format_final_output(raw_response: ModelResponse) -> str:
         result = result.strip()
 
         # Remove "Here are the jokes:" if present
-        result = re.sub(
-            r"^Here are the jokes?:", "", result, flags=re.IGNORECASE
-        ).strip()
+        result = re.sub(r"^Here are the jokes?:", "", result, flags=re.IGNORECASE).strip()
 
     return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{result}\n"
 
@@ -128,9 +126,7 @@ def pretty_print_result_stats(result: RunResult) -> str:
 
 
 def pretty_print_result(result: RunResult) -> str:
-    return pretty_print_result_stats(result) + _format_final_output(
-        result.raw_responses[0]
-    )
+    return pretty_print_result_stats(result) + _format_final_output(result.raw_responses[0])
 
 
 def pretty_print_result_stream(result: RunResultStreaming):

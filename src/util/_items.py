@@ -164,10 +164,7 @@ class ModelResponse:
 
     @cached_property
     def input_items(self) -> list[TResponseInputItem]:
-        return [
-            cast(TResponseInputItem, it.model_dump(exclude_unset=True))
-            for it in self.output
-        ]
+        return [cast(TResponseInputItem, it.model_dump(exclude_unset=True)) for it in self.output]
 
     def to_input_items(self) -> list[TResponseInputItem]:
         return self.input_items
@@ -213,8 +210,7 @@ class ItemHelpers:
     @staticmethod
     def text_message_outputs(items: list[RunItem]) -> str:
         return "".join(
-            item.text_content if isinstance(item, MessageOutputItem) else ""
-            for item in items
+            item.text_content if isinstance(item, MessageOutputItem) else "" for item in items
         ).strip()
 
     @staticmethod
