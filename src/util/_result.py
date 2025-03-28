@@ -4,7 +4,7 @@ import abc
 import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from typing import Any
 
 from ..agents.agent import Agent
 from ..agents.run_impl import QueueCompleteSentinel
@@ -23,12 +23,6 @@ MAX_QUEUE_SIZE = get_env_var("MAX_QUEUE_SIZE", MAX_QUEUE_SIZE)
 MAX_GUARDRAIL_QUEUE_SIZE = get_env_var(
     "MAX_GUARDRAIL_QUEUE_SIZE", MAX_GUARDRAIL_QUEUE_SIZE
 )
-
-########################################################
-#               Public Types
-########################################################
-
-T = TypeVar("T")
 
 ########################################################
 #               Data Classes for Results
@@ -108,18 +102,6 @@ class RunResultStreaming:
     @property
     def last_agent(self) -> Agent[Any]:
         return self.current_agent
-
-    def __str__(self) -> str:
-        stream_status = "Complete" if self.is_complete else "In Progress"
-        tool_choice = getattr(self, "tool_choice", "N/A")
-        return (
-            f"✅ {self.__class__.__name__}:\n"
-            f"Agent: {self.last_agent.name}\n"
-            f"Stats: {len(self.new_items)} items, {len(self.raw_responses)} responses\n"
-            f"Stream: {stream_status}\n"
-            f"Tool Choice: {tool_choice}\n"
-            f"Final Output: {self.final_output}"
-        )
 
     async def stream_events(self) -> AsyncIterator[StreamEvent]:
         try:

@@ -1,14 +1,8 @@
 import re
 from typing import Any
 
-from ._items import ModelResponse
-from ._result import RunResult
-
-########################################################
-#               Constants
-########################################################
-
-_THINK_PATTERN = re.compile(r"<think>(.*?)</think>(.*)", re.DOTALL)
+from ._items import ModelResponse, Usage
+from ._result import RunResult, RunResultStreaming
 
 ########################################################
 #          Final Output private method
@@ -20,17 +14,38 @@ def _indent(text: str, indent_level: int) -> str:
 
 
 def _format_final_output(raw_response: ModelResponse) -> str:
-    output = raw_response.output[0]["text"]
-    match = _THINK_PATTERN.search(output)
+    if not raw_response.output:
+        return ""
 
-    if match:
-        reasoning = match.group(1).strip().encode().decode("unicode-escape")
-        final_result = match.group(2).strip().encode().decode("unicode-escape")
-    else:
-        reasoning = ""
-        final_result = output.strip("'").strip().encode().decode("unicode-escape")
+    # Get text from the first output item
+    output_text = str(raw_response.output[0].get("text", raw_response.output[0]))
+    output_text = output_text.strip("'").strip().encode().decode("unicode-escape")
 
-    return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
+    # Extract everything between think tags for reasoning
+    reasoning = ""
+    result = output_text
+
+    if "<think>" in output_text and "</think>" in output_text:
+        # Find the start and end positions
+        start = output_text.find("<think>") + len("<think>")
+        end = output_text.find("</think>")
+
+        # Extract the reasoning (everything between think tags)
+        reasoning = output_text[start:end].strip()
+
+        # Extract the result (everything after </think>)
+        result = output_text[end + len("</think>") :].strip()
+
+        # Clean up any leading/trailing whitespace or newlines
+        reasoning = reasoning.strip()
+        result = result.strip()
+
+        # Remove "Here are the jokes:" if present
+        result = re.sub(
+            r"^Here are the jokes?:", "", result, flags=re.IGNORECASE
+        ).strip()
+
+    return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{result}\n"
 
 
 ########################################################
@@ -98,9 +113,9 @@ def _format_stream_info(stream: bool, tool_choice: Any, result: Any) -> str:
 ########################################################
 
 
-def pretty_print_result(result: RunResult) -> str:
+def pretty_print_result_stats(result: RunResult) -> str:
     parts = [
-        f"✅ {result.__class__.__name__}:",
+        f"\n✅ {result.__class__.__name__} Performance:",
         _format_agent_info(result),
         _format_stats(result),
         _format_stream_info(
@@ -108,6 +123,17 @@ def pretty_print_result(result: RunResult) -> str:
             tool_choice=getattr(result, "tool_choice", None),
             result=result,
         ),
-        _format_final_output(result.raw_responses[0]),
     ]
     return "".join(parts)
+
+
+def pretty_print_result(result: RunResult) -> str:
+    return pretty_print_result_stats(result) + _format_final_output(
+        result.raw_responses[0]
+    )
+
+
+def pretty_print_result_stream(result: RunResultStreaming):
+    return _format_final_output(
+        ModelResponse(output=[{"text": result}], usage=Usage(), referenceable_id=None)
+    )

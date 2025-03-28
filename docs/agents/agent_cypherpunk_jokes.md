@@ -44,18 +44,24 @@ def _get_number_of_jokes() -> int:
 async def _handle_stream_events(result, num_jokes):
     try:
         async for event in result.stream_events():
+
+            if event.type == "agent_updated_stream_event":
+                print(f"\n✅ {event.new_agent.name} is telling {num_jokes} jokes...")
+
             if event.type == "raw_response_event":
-                if hasattr(event.data, "delta") and event.data.delta:
-                    print(event.data.delta, end="", flush=True)
-                elif hasattr(event.data, "part") and event.data.part:
+                if (
+                    hasattr(event.data, "type")
+                    and event.data.type == "content_part.done"
+                ):
                     if isinstance(event.data.part, dict) and event.data.part.get(
                         "text"
                     ):
-                        print(event.data.part["text"], end="", flush=True)
-                elif event.data:
-                    print(str(event.data), end="", flush=True)
-            elif event.type == "agent_updated_stream_event":
-                print(f"\n✅ {event.new_agent.name} is telling {num_jokes} jokes...")
+                        print(
+                            pretty_print_result_stream(event.data.part["text"]),
+                            end="",
+                            flush=True,
+                        )
+
             elif event.type == "run_item_stream_event":
                 if event.name == "message_output_created":
                     if message := ItemHelpers.text_message_output(event.item):
@@ -69,8 +75,8 @@ async def _handle_stream_events(result, num_jokes):
                     print(f"\n{msg}")
 
             await asyncio.sleep(0)
+        print(pretty_print_result_stats(result))
     except asyncio.CancelledError as e:
-        print("\n❌ Stream processing was cancelled")
         raise AgentExecutionError("Stream processing was cancelled") from e
 
 
@@ -83,15 +89,10 @@ async def run_agent():
         result = await Runner.run_streamed(
             agent,
             f"Tell me exactly {num_jokes} cypherpunk jokes!",
-            max_turns=DEFAULT_MAX_TURNS,
+            max_turns=MAX_TURNS,
         )
 
         await _handle_stream_events(result, num_jokes)
-
-        print("\n\n✅ Stream complete")
-        items = len(result.new_items)
-        responses = len(result.raw_responses)
-        print(f"✅ Final state has {items} items and {responses} responses\n")
 
     except Exception as e:
         raise AgentExecutionError(e) from e
@@ -109,20 +110,23 @@ you can ask for a certain number of jokes, and it will update and run the agent:
 ❓ How many jokes would you like to hear? (1-10): 4
 
 ✅ Agent Cypherpunk Joker is telling 4 jokes...
-
+  
   👾 Agent Info:
-        Last Agent → Agent Cypherpunk Joker
-
+        Name   → Agent Cypherpunk Joker
+        Turn   → 1/10
+        Status → ✔️  Complete
+  
   📊 Statistics:
-        Items     → 1
+        Items     → 0
         Responses → 1
         Input GR  → 0
         Output GR → 0
-
+  
   🦾 Configuration:
-        Streaming → ✅ Enabled
+        Streaming → ✔️ Enabled
         Tools     → None
         Tool Mode → None
+
 
 ✅ REASONING:
 
