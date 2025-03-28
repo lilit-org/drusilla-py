@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 import httpx
 from httpx import Limits, Timeout
+
+########################################################
+#              Main class: Async HTTP Client
+########################################################
 
 
 class DefaultAsyncHttpxClient(httpx.AsyncClient):
@@ -21,31 +24,27 @@ class DefaultAsyncHttpxClient(httpx.AsyncClient):
         max_retries: int = 3,
         verify: bool | str = True,
         http2: bool = True,
-        **kwargs: Any,
+        **kwargs,
     ) -> None:
-        if isinstance(timeout, (int, float)):
-            timeout = Timeout(
-                timeout=timeout,
-                connect=connect_timeout,
-                read=read_timeout,
-            )
-        limits = Limits(
-            max_keepalive_connections=max_keepalive_connections,
-            max_connections=max_connections,
+        timeout = (
+            Timeout(timeout=timeout, connect=connect_timeout, read=read_timeout)
+            if isinstance(timeout, (int, float))
+            else timeout
         )
 
         super().__init__(
             timeout=timeout,
             verify=verify,
             http2=http2,
-            limits=limits,
+            limits=Limits(
+                max_keepalive_connections=max_keepalive_connections,
+                max_connections=max_connections,
+            ),
             **kwargs,
         )
-
         self.max_retries = max_retries
 
-    async def request(self, *args: Any, **kwargs: Any) -> httpx.Response:
-        """Send a request with retry logic."""
+    async def request(self, *args, **kwargs) -> httpx.Response:
         for attempt in range(self.max_retries):
             try:
                 return await super().request(*args, **kwargs)

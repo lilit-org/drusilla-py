@@ -8,7 +8,7 @@ from ._run_context import RunContextWrapper, TContext
 from ._tool import Tool
 
 ########################################################
-#             Class Run Hooks
+#             Main Classes for Lifecycle Hooks
 ########################################################
 
 
@@ -74,11 +74,6 @@ class RunHooks(BaseHooks[TContext]):
         to_agent: Agent[TContext],
     ) -> None:
         """Called during agent handoff."""
-
-
-########################################################
-#             Class Agent Hooks
-########################################################
 
 
 class AgentHooks(BaseHooks[TContext]):

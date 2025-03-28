@@ -1,5 +1,9 @@
 from dataclasses import dataclass
 
+########################################################
+#               Data class Usage
+########################################################
+
 
 @dataclass
 class Usage:
@@ -18,11 +22,7 @@ class Usage:
     """Combined input and output tokens."""
 
     def add(self, other: "Usage") -> None:
-        """Combines usage statistics from another Usage instance.
-
-        Args:
-            other: Usage instance to combine with
-        """
+        """Combines usage statistics from another Usage instance."""
         self.requests += other.requests or 0
         self.input_tokens += other.input_tokens or 0
         self.output_tokens += other.output_tokens or 0

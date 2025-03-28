@@ -1,18 +1,26 @@
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ._guardrail import InputGuardrailResult, OutputGuardrailResult
+    from ..gear.shields import InputShieldResult, OutputShieldResult
 
 
 class AgentError(Exception):
     """Base exception for Agents SDK."""
 
 
+class AgentExecutionError(AgentError):
+    """Raised when an error occurs during agent execution."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        super().__init__(f"Agent execution failed: {str(error)}")
+
+
 class GenericError(AgentError):
     """Raised when an unexpected error occurs during agent execution."""
 
     def __init__(self, error: Exception) -> None:
-        self.error: Exception = error
+        self.error = error
         super().__init__(str(error))
 
 
@@ -20,7 +28,7 @@ class MessageError(AgentError):
     """Base class for exceptions with a message attribute."""
 
     def __init__(self, message: str) -> None:
-        self.message: str = message
+        self.message = message
         super().__init__(message)
 
 
@@ -36,21 +44,17 @@ class UsageError(MessageError):
     """Raised for SDK usage errors."""
 
 
-class InputGuardrailError(AgentError):
-    """Raised when input guardrail tripwire is triggered."""
+class InputShieldError(AgentError):
+    """Raised when an input shield's tripwire is triggered."""
 
-    def __init__(self, guardrail_result: "InputGuardrailResult") -> None:
-        self.guardrail_result: InputGuardrailResult = guardrail_result
-        super().__init__(
-            f"Guardrail {guardrail_result.guardrail.__class__.__name__} triggered tripwire"
-        )
+    def __init__(self, result: "InputShieldResult") -> None:
+        self.result = result
+        super().__init__(f"Input shield {result.shield.name or 'unnamed'} triggered")
 
 
-class OutputGuardrailError(AgentError):
-    """Raised when output guardrail tripwire is triggered."""
+class OutputShieldError(AgentError):
+    """Raised when an output shield's tripwire is triggered."""
 
-    def __init__(self, guardrail_result: "OutputGuardrailResult") -> None:
-        self.guardrail_result: OutputGuardrailResult = guardrail_result
-        super().__init__(
-            f"Guardrail {guardrail_result.guardrail.__class__.__name__} triggered tripwire"
-        )
+    def __init__(self, result: "OutputShieldResult") -> None:
+        self.result = result
+        super().__init__(f"Output shield {result.shield.name or 'unnamed'} triggered")

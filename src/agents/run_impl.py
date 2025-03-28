@@ -6,14 +6,14 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from ..util._exceptions import AgentError, ModelError, UsageError
-from ..util._guardrail import (
-    InputGuardrail,
-    InputGuardrailResult,
-    OutputGuardrail,
-    OutputGuardrailResult,
+from ..gear.orbs import Orb, OrbInputData
+from ..gear.shields import (
+    InputShield,
+    InputShieldResult,
+    OutputShield,
+    OutputShieldResult,
 )
-from ..util._handoffs import Handoff, HandoffInputData
+from ..util._exceptions import AgentError, ModelError, UsageError
 from ..util._items import (
     HandoffCallItem,
     HandoffOutputItem,
@@ -44,8 +44,13 @@ if TYPE_CHECKING:
 
 
 ########################################################
-#               Constants                                #
+#               Constants
 ########################################################
+
+
+async def noop_coroutine() -> None:
+    """A coroutine that does nothing. Used as a fallback when no hooks are defined."""
+    return None
 
 
 class QueueCompleteSentinel:
@@ -57,13 +62,13 @@ _NOT_FINAL_OUTPUT = ToolsToFinalOutputResult(is_final_output=False, final_output
 
 
 ########################################################
-#               Data Classes                            #
+#               Data Classes for Tools
 ########################################################
 
 
 @dataclass(frozen=True)
 class ToolRunHandoff:
-    handoff: Handoff
+    orb: Orb
     tool_call: ResponseFunctionToolCall
 
 
@@ -82,12 +87,12 @@ class ToolRunComputerAction:
 @dataclass
 class ProcessedResponse:
     new_items: list[RunItem]
-    handoffs: list[ToolRunHandoff]
+    orbs: list[ToolRunHandoff]
     functions: list[ToolRunFunction]
     computer_actions: list[ToolRunComputerAction]
 
     def has_tools_to_run(self) -> bool:
-        return bool(self.handoffs or self.functions or self.computer_actions)
+        return bool(self.orbs or self.functions or self.computer_actions)
 
 
 @dataclass(frozen=True)
@@ -119,7 +124,7 @@ class SingleStepResult:
 
 
 ########################################################
-#               Main Class: RunImpl                    #
+#               Main Class: RunImpl
 ########################################################
 
 
@@ -166,7 +171,7 @@ class RunImpl:
         new_step_items.extend([result.run_item for result in function_results])
         new_step_items.extend(computer_results)
 
-        if run_handoffs := processed_response.handoffs:
+        if run_handoffs := processed_response.orbs:
             return await cls.execute_handoffs(
                 agent=agent,
                 original_input=original_input,
@@ -257,13 +262,13 @@ class RunImpl:
         agent: Agent[Any],
         response: ModelResponse,
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
     ) -> ProcessedResponse:
         items: list[RunItem] = []
         run_handoffs: list[ToolRunHandoff] = []
         functions: list[ToolRunFunction] = []
         computer_actions: list[ToolRunComputerAction] = []
-        handoff_map = {handoff.tool_name: handoff for handoff in handoffs}
+        orb_map = {orb.tool_name: orb for orb in orbs}
         function_map = {}
         computer_tool = None
 
@@ -299,11 +304,11 @@ class RunImpl:
             elif output_type == "reasoning":
                 items.append(ReasoningItem(raw_item=output, agent=agent))
             elif output_type == "function":
-                if output["name"] in handoff_map:
+                if output["name"] in orb_map:
                     items.append(HandoffCallItem(raw_item=output, agent=agent))
                     handoff = ToolRunHandoff(
+                        orb=orb_map[output["name"]],
                         tool_call=output,
-                        handoff=handoff_map[output["name"]],
                     )
                     run_handoffs.append(handoff)
                 else:
@@ -324,7 +329,7 @@ class RunImpl:
 
         return ProcessedResponse(
             new_items=items,
-            handoffs=run_handoffs,
+            orbs=run_handoffs,
             functions=functions,
             computer_actions=computer_actions,
         )
@@ -426,9 +431,7 @@ class RunImpl:
     ) -> SingleStepResult:
         if len(run_handoffs) > 1:
             ignored_handoffs = run_handoffs[1:]
-            output_message = (
-                f"Multiple handoffs, ignoring {len(ignored_handoffs)} handoffs."
-            )
+            output_message = f"Multiple orbs, ignoring {len(ignored_handoffs)} orbs."
             new_step_items.append(
                 ToolCallOutputItem(
                     output=output_message,
@@ -440,8 +443,8 @@ class RunImpl:
             )
 
         actual_handoff = run_handoffs[0]
-        handoff = actual_handoff.handoff
-        new_agent: Agent[Any] = await handoff.on_invoke_handoff(
+        orb = actual_handoff.orb
+        new_agent: Agent[Any] = await orb.on_invoke_orb(
             context_wrapper, actual_handoff.tool_call.arguments
         )
 
@@ -450,7 +453,7 @@ class RunImpl:
                 agent=agent,
                 raw_item=ItemHelpers.tool_call_output_item(
                     actual_handoff.tool_call,
-                    handoff.get_transfer_message(new_agent),
+                    orb.get_transfer_message(new_agent),
                 ),
                 source_agent=agent,
                 target_agent=new_agent,
@@ -474,24 +477,24 @@ class RunImpl:
             ),
         )
 
-        input_filter = handoff.input_filter or (
-            run_config.handoff_input_filter if run_config else None
+        input_filter = orb.input_filter or (
+            run_config.orb_input_filter if run_config else None
         )
         if input_filter:
             logger.debug("Filtering inputs for handoff")
-            handoff_input_data = HandoffInputData(
+            orb_input_data = OrbInputData(
                 input_history=(
                     tuple(original_input)
                     if isinstance(original_input, list)
                     else original_input
                 ),
-                pre_handoff_items=tuple(pre_step_items),
+                pre_orb_items=tuple(pre_step_items),
                 new_items=tuple(new_step_items),
             )
             if not callable(input_filter):
                 raise UsageError(f"Invalid input filter: {input_filter}")
-            filtered = input_filter(handoff_input_data)
-            if not isinstance(filtered, HandoffInputData):
+            filtered = input_filter(orb_input_data)
+            if not isinstance(filtered, OrbInputData):
                 raise UsageError(f"Invalid input filter result: {filtered}")
 
             original_input = (
@@ -499,7 +502,7 @@ class RunImpl:
                 if isinstance(filtered.input_history, str)
                 else list(filtered.input_history)
             )
-            pre_step_items = list(filtered.pre_handoff_items)
+            pre_step_items = list(filtered.pre_orb_items)
             new_step_items = list(filtered.new_items)
 
         return SingleStepResult(
@@ -550,25 +553,27 @@ class RunImpl:
             await hooks.on_end(context_wrapper, agent, final_output)
 
     @classmethod
-    async def run_single_input_guardrail(
+    async def run_single_input_shield(
         cls,
         agent: Agent[Any],
-        guardrail: InputGuardrail[TContext],
+        shield: InputShield[TContext],
         input: str | list[TResponseInputItem],
         context: RunContextWrapper[TContext],
-    ) -> InputGuardrailResult:
-        return await guardrail.run(agent, input, context)
+    ) -> InputShieldResult:
+        return await shield.run(agent, input, context)
 
     @classmethod
-    async def run_single_output_guardrail(
+    async def run_single_output_shield(
         cls,
-        guardrail: OutputGuardrail[TContext],
+        shield: OutputShield[TContext],
         agent: Agent[Any],
         agent_output: Any,
         context: RunContextWrapper[TContext],
-    ) -> OutputGuardrailResult:
-        return await guardrail.run(
-            agent=agent, agent_output=agent_output, context=context
+    ) -> OutputShieldResult:
+        return await shield.run(
+            context=context,
+            agent=agent,
+            agent_output=agent_output,
         )
 
     @classmethod
@@ -630,12 +635,3 @@ class RunImpl:
 
         logger.error(f"Invalid tool_use_behavior: {agent.tool_use_behavior}")
         raise UsageError(f"Invalid tool_use_behavior: {agent.tool_use_behavior}")
-
-
-########################################################
-#               Main Class: Computer Action            #
-########################################################
-
-
-async def noop_coroutine() -> None:
-    """A coroutine that does nothing. Used as a fallback when no hooks are defined."""

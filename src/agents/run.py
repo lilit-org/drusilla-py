@@ -5,6 +5,13 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, cast
 
+from ..gear.orbs import Orb, OrbInputFilter, orb
+from ..gear.shields import (
+    InputShield,
+    InputShieldResult,
+    OutputShield,
+    OutputShieldResult,
+)
 from ..models.interface import Model
 from ..models.provider import ModelProvider
 from ..models.settings import ModelSettings
@@ -13,18 +20,11 @@ from ..util._env import get_env_var
 from ..util._exceptions import (
     AgentError,
     GenericError,
-    InputGuardrailError,
+    InputShieldError,
     MaxTurnsError,
     ModelError,
-    OutputGuardrailError,
+    OutputShieldError,
 )
-from ..util._guardrail import (
-    InputGuardrail,
-    InputGuardrailResult,
-    OutputGuardrail,
-    OutputGuardrailResult,
-)
-from ..util._handoffs import Handoff, HandoffInputFilter, handoff
 from ..util._items import ItemHelpers, ModelResponse, RunItem, TResponseInputItem
 from ..util._lifecycle import RunHooks
 from ..util._result import RunResult, RunResultStreaming
@@ -51,25 +51,24 @@ MAX_TURNS = get_env_var("MAX_TURNS", DEFAULT_MAX_TURNS)
 
 
 ########################################################
-#               Data classes                            #
+#               Data class for Run Config
 ########################################################
 
 
 @dataclass(frozen=True)
 class RunConfig:
-    """Settings for agent run."""
 
     model: str | Model | None = None
     model_provider: ModelProvider = field(default_factory=ModelProvider)
     model_settings: ModelSettings | None = None
-    handoff_input_filter: HandoffInputFilter | None = None
-    input_guardrails: list[InputGuardrail[TContext]] = field(default_factory=list)
-    output_guardrails: list[OutputGuardrail[TContext]] = field(default_factory=list)
+    orb_input_filter: OrbInputFilter | None = None
+    input_shields: list[InputShield[TContext]] = field(default_factory=list)
+    output_shields: list[OutputShield[TContext]] = field(default_factory=list)
     max_turns: int = MAX_TURNS
 
 
 ########################################################
-#               Main Class                            #
+#               Main Class: Runner
 ########################################################
 
 
@@ -90,16 +89,11 @@ class Runner:
         str | list[TResponseInputItem],
         AgentOutputSchema | None,
     ]:
-
         hooks = hooks or RunHooks[Any]()
         run_config = run_config or RunConfig()
+        config_dict = {k: v for k, v in run_config.__dict__.items() if k != "max_turns"}
         run_config = RunConfig(
-            model=run_config.model,
-            model_provider=run_config.model_provider,
-            model_settings=run_config.model_settings,
-            handoff_input_filter=run_config.handoff_input_filter,
-            input_guardrails=run_config.input_guardrails,
-            output_guardrails=run_config.output_guardrails,
+            **config_dict,
             max_turns=max_turns,
         )
         context_wrapper = RunContextWrapper(context=context)
@@ -117,7 +111,6 @@ class Runner:
         hooks: RunHooks[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> RunResult:
-
         hooks, run_config, context_wrapper, input, _ = await cls._initialize_run(
             starting_agent, input, context, max_turns, hooks, run_config
         )
@@ -126,7 +119,7 @@ class Runner:
         original_input = input if isinstance(input, str) else input.copy()
         generated_items: list[RunItem] = []
         model_responses: list[ModelResponse] = []
-        input_guardrail_results: list[InputGuardrailResult] = []
+        input_shield_results: list[InputShieldResult] = []
         current_agent = starting_agent
         should_run_agent_start_hooks = True
 
@@ -160,7 +153,7 @@ class Runner:
                         original_input,
                         generated_items,
                         model_responses,
-                        input_guardrail_results,
+                        input_shield_results,
                         context_wrapper,
                         run_config,
                     )
@@ -179,10 +172,6 @@ class Runner:
             raise GenericError(e) from e
 
     @classmethod
-    def _handle_max_turns_exceeded(cls, max_turns: int) -> None:
-        raise MaxTurnsError(f"Max turns ({max_turns}) exceeded")
-
-    @classmethod
     async def _run_turn(
         cls,
         current_turn: int,
@@ -195,14 +184,13 @@ class Runner:
         should_run_agent_start_hooks: bool,
         input: str | list[TResponseInputItem],
     ) -> SingleStepResult:
-
         if current_turn == 1:
             _, turn_result = await asyncio.gather(
-                cls._run_input_guardrails(
-                    current_agent,
-                    current_agent.input_guardrails + run_config.input_guardrails,
-                    deepcopy(input),
-                    context_wrapper,
+                cls._run_input_shields(
+                    agent=current_agent,
+                    input=input,
+                    context=context_wrapper,
+                    shields=current_agent.input_shields + run_config.input_shields,
                 ),
                 cls._run_single_turn(
                     agent=current_agent,
@@ -234,16 +222,15 @@ class Runner:
         original_input: str | list[TResponseInputItem],
         generated_items: list[RunItem],
         model_responses: list[ModelResponse],
-        input_guardrail_results: list[InputGuardrailResult],
+        input_shield_results: list[InputShieldResult],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> RunResult:
-
-        output_guardrail_results = await cls._run_output_guardrails(
-            current_agent.output_guardrails + run_config.output_guardrails,
+        output_shield_results = await cls._run_output_shields(
             current_agent,
             turn_result.next_step.output,
             context_wrapper,
+            current_agent.output_shields + run_config.output_shields,
         )
         return RunResult(
             input=original_input,
@@ -251,8 +238,8 @@ class Runner:
             raw_responses=model_responses,
             final_output=turn_result.next_step.output,
             _last_agent=current_agent,
-            input_guardrail_results=input_guardrail_results,
-            output_guardrail_results=output_guardrail_results,
+            input_shield_results=input_shield_results,
+            output_shield_results=output_shield_results,
         )
 
     @classmethod
@@ -339,8 +326,8 @@ class Runner:
             is_complete=False,
             current_turn=0,
             max_turns=max_turns,
-            input_guardrail_results=[],
-            output_guardrail_results=[],
+            input_shield_results=[],
+            output_shield_results=[],
             _current_agent_output_schema=output_schema,
         )
 
@@ -373,16 +360,14 @@ class Runner:
                     break
 
                 if current_turn == 1:
-                    streamed_result._input_guardrails_task = asyncio.create_task(
-                        cls._run_input_guardrails_with_queue(
-                            starting_agent,
-                            starting_agent.input_guardrails
-                            + run_config.input_guardrails,
-                            deepcopy(
-                                ItemHelpers.input_to_new_input_list(starting_input)
-                            ),
-                            context_wrapper,
-                            streamed_result,
+                    streamed_result._input_shields_task = asyncio.create_task(
+                        cls._run_input_shields_with_queue(
+                            agent=starting_agent,
+                            input=starting_input,
+                            context=context_wrapper,
+                            shields=starting_agent.input_shields
+                            + run_config.input_shields,
+                            streamed_result=streamed_result,
                         )
                     )
 
@@ -445,21 +430,21 @@ class Runner:
         run_config: RunConfig,
     ) -> None:
 
-        streamed_result._output_guardrails_task = asyncio.create_task(
-            cls._run_output_guardrails(
-                current_agent.output_guardrails + run_config.output_guardrails,
+        streamed_result._output_shields_task = asyncio.create_task(
+            cls._run_output_shields(
                 current_agent,
                 turn_result.next_step.output,
                 context_wrapper,
+                current_agent.output_shields + run_config.output_shields,
             )
         )
 
         try:
-            output_guardrail_results = await streamed_result._output_guardrails_task
+            output_shield_results = await streamed_result._output_shields_task
         except Exception:
-            output_guardrail_results = []
+            output_shield_results = []
 
-        streamed_result.output_guardrail_results = output_guardrail_results
+        streamed_result.output_shield_results = output_shield_results
         streamed_result.final_output = turn_result.next_step.output
 
     @classmethod
@@ -469,47 +454,39 @@ class Runner:
         streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
 
     @classmethod
-    async def _run_input_guardrails_with_queue(
+    async def _run_input_shields_with_queue(
         cls,
-        agent: Agent[Any],
-        guardrails: list[InputGuardrail[TContext]],
+        agent: Agent[TContext],
         input: str | list[TResponseInputItem],
         context: RunContextWrapper[TContext],
+        shields: list[InputShield[TContext]],
         streamed_result: RunResultStreaming,
     ):
-        queue = streamed_result._input_guardrail_queue
-
-        # Only deepcopy if we have guardrails to run
-        if not guardrails:
+        if not shields:
             return
-
-        # Convert input to list if it's a string
         input_list = ItemHelpers.input_to_new_input_list(input)
-        # Only deepcopy if we have multiple guardrails that might modify the input
-        input_to_use = deepcopy(input_list) if len(guardrails) > 1 else input_list
+        input_to_use = deepcopy(input_list) if len(shields) > 1 else input_list
 
-        guardrail_tasks = [
+        shield_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_input_guardrail(
-                    agent, guardrail, input_to_use, context
-                )
+                RunImpl.run_single_input_shield(agent, shield, input_to_use, context)
             )
-            for guardrail in guardrails
+            for shield in shields
         ]
-        guardrail_results = []
+        shield_results = []
         try:
-            for done in asyncio.as_completed(guardrail_tasks):
+            for done in asyncio.as_completed(shield_tasks):
                 result = await done
                 if result.output.tripwire_triggered:
-                    raise InputGuardrailError(result)
-                queue.put_nowait(result)
-                guardrail_results.append(result)
+                    raise InputShieldError(result)
+                streamed_result._input_shield_queue.put_nowait(result)
+                shield_results.append(result)
         except Exception:
-            for t in guardrail_tasks:
+            for t in shield_tasks:
                 t.cancel()
             raise
 
-        streamed_result.input_guardrail_results = guardrail_results
+        streamed_result.input_shield_results = shield_results
 
     @classmethod
     async def _run_single_turn_streamed(
@@ -531,19 +508,18 @@ class Runner:
         system_prompt = agent.system_prompt
         input = streamed_result.input
         output_schema = cls._get_output_schema(agent)
-        handoffs = cls._get_handoffs(agent)
+        orbs = cls._get_handoffs(agent)
         model = cls._get_model(agent, run_config)
         model_settings = agent.model_settings.resolve(run_config.model_settings)
 
         # Stream the output events and collect the final response
-        final_response = None
         async for event in model.stream_response(
             system_prompt,
             input,
             model_settings,
             agent.tools,
             output_schema,
-            handoffs,
+            orbs=orbs,
         ):
             if isinstance(event, ResponseEvent) and event.type == "completed":
                 usage = (
@@ -566,7 +542,7 @@ class Runner:
                     agent=agent,
                     response=final_response,
                     output_schema=output_schema,
-                    handoffs=handoffs,
+                    orbs=orbs,
                 )
 
                 single_step_result = await RunImpl.execute_tools_and_side_effects(
@@ -588,9 +564,7 @@ class Runner:
 
             streamed_result._event_queue.put_nowait(RawResponsesStreamEvent(data=event))
 
-        if not final_response:
-            raise ModelError("Model did not produce a final response!")
-        raise ModelError("No response was processed!")
+        raise ModelError("Model did not produce a final response!")
 
     @classmethod
     async def _run_single_turn(
@@ -617,7 +591,7 @@ class Runner:
 
         system_prompt = await agent.get_system_prompt(context_wrapper)
         output_schema = cls._get_output_schema(agent)
-        handoffs = cls._get_handoffs(agent)
+        orbs = cls._get_handoffs(agent)
         input = ItemHelpers.input_to_new_input_list(original_input)
         input.extend(
             [generated_item.to_input_item() for generated_item in generated_items]
@@ -627,7 +601,7 @@ class Runner:
             system_prompt,
             input,
             output_schema,
-            handoffs,
+            orbs,
             context_wrapper,
             run_config,
         )
@@ -638,7 +612,7 @@ class Runner:
             pre_step_items=generated_items,
             new_response=new_response,
             output_schema=output_schema,
-            handoffs=handoffs,
+            orbs=orbs,
             hooks=hooks,
             context_wrapper=context_wrapper,
             run_config=run_config,
@@ -653,7 +627,7 @@ class Runner:
         pre_step_items: list[RunItem],
         new_response: ModelResponse,
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
@@ -663,7 +637,7 @@ class Runner:
             agent=agent,
             response=new_response,
             output_schema=output_schema,
-            handoffs=handoffs,
+            orbs=orbs,
         )
         return await RunImpl.execute_tools_and_side_effects(
             agent=agent,
@@ -678,64 +652,62 @@ class Runner:
         )
 
     @classmethod
-    async def _run_input_guardrails(
+    async def _run_input_shields(
         cls,
-        agent: Agent[Any],
-        guardrails: list[InputGuardrail[TContext]],
+        agent: Agent[TContext],
         input: str | list[TResponseInputItem],
         context: RunContextWrapper[TContext],
-    ) -> list[InputGuardrailResult]:
-        if not guardrails:
+        shields: list[InputShield[TContext]],
+    ) -> list[InputShieldResult]:
+        if not shields:
             return []
 
-        guardrail_tasks = [
+        shield_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_input_guardrail(agent, guardrail, input, context)
+                RunImpl.run_single_input_shield(agent, shield, input, context)
             )
-            for guardrail in guardrails
+            for shield in shields
         ]
-        guardrail_results = []
-        for done in asyncio.as_completed(guardrail_tasks):
-            result = await done
-            if result.output.tripwire_triggered:
-                # Cancel all guardrail tasks if a tripwire is triggered.
-                for t in guardrail_tasks:
-                    t.cancel()
-                raise InputGuardrailError(result)
-            else:
-                guardrail_results.append(result)
 
-        return guardrail_results
+        shield_results = []
+        for done in asyncio.as_completed(shield_tasks):
+            result = await done
+            # Cancel all shield tasks if a tripwire is triggered.
+            for t in shield_tasks:
+                if not t.done():
+                    t.cancel()
+            shield_results.append(result)
+
+        return shield_results
 
     @classmethod
-    async def _run_output_guardrails(
+    async def _run_output_shields(
         cls,
-        guardrails: list[OutputGuardrail[TContext]],
         agent: Agent[TContext],
         agent_output: Any,
         context: RunContextWrapper[TContext],
-    ) -> list[OutputGuardrailResult]:
-
-        if not guardrails:
+        shields: list[OutputShield[TContext]],
+    ) -> list[OutputShieldResult]:
+        if not shields:
             return []
-        guardrail_tasks = [
+
+        shield_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_output_guardrail(
-                    guardrail, agent, agent_output, context
-                )
+                RunImpl.run_single_output_shield(shield, agent, agent_output, context)
             )
-            for guardrail in guardrails
+            for shield in shields
         ]
-        guardrail_results = []
-        for done in asyncio.as_completed(guardrail_tasks):
+
+        shield_results = []
+        for done in asyncio.as_completed(shield_tasks):
             result = await done
             if result.output.tripwire_triggered:
-                for t in guardrail_tasks:
+                raise OutputShieldError(result)
+            for t in shield_tasks:
+                if not t.done():
                     t.cancel()
-                raise OutputGuardrailError(result)
-            else:
-                guardrail_results.append(result)
-        return guardrail_results
+            shield_results.append(result)
+        return shield_results
 
     @classmethod
     async def _get_new_response(
@@ -744,7 +716,7 @@ class Runner:
         system_prompt: str | None,
         input: list[TResponseInputItem],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> ModelResponse:
@@ -757,7 +729,7 @@ class Runner:
             model_settings=model_settings,
             tools=agent.tools,
             output_schema=output_schema,
-            handoffs=handoffs,
+            orbs=orbs,
         )
         context_wrapper.usage.add(new_response.usage)
         return new_response
@@ -770,11 +742,11 @@ class Runner:
         return AgentOutputSchema(agent.output_type)
 
     @classmethod
-    def _get_handoffs(cls, agent: Agent[Any]) -> list[Handoff]:
-        """Get list of handoffs from agent, converting Agent instances to Handoff objects."""
+    def _get_handoffs(cls, agent: Agent[Any]) -> list[Orb]:
+        """Get list of handoffs from agent, converting Agent instances to Orb objects."""
         return [
-            handoff_item if isinstance(handoff_item, Handoff) else handoff(handoff_item)
-            for handoff_item in agent.handoffs
+            orb_item if isinstance(orb_item, Orb) else orb(orb_item)
+            for orb_item in agent.orbs
         ]
 
     @classmethod

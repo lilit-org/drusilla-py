@@ -25,7 +25,7 @@ from typing_extensions import Concatenate, ParamSpec
 
 from ._computer import AsyncComputer, Computer
 from ._constants import LRU_CACHE_SIZE
-from ._exceptions import ModelError, UsageError
+from ._exceptions import GenericError, ModelError, UsageError
 from ._items import RunItem
 from ._logger import logger
 from ._run_context import RunContextWrapper
@@ -33,7 +33,7 @@ from ._strict_schema import ensure_strict_json_schema
 from ._types import MaybeAwaitable
 
 ########################################################
-#               Private Types                           #
+#               Private Types
 ########################################################
 
 ToolParams = ParamSpec("ToolParams")
@@ -45,7 +45,7 @@ ToolFunction = Union[
 
 
 ########################################################
-#               Data classes                           #
+#       Data classe for Function Tool Schema
 ########################################################
 
 
@@ -184,7 +184,7 @@ class ComputerTool:
 
 
 ########################################################
-#               Private Functions                       #
+#               Private Methods
 ########################################################
 
 DocstringStyle = Literal["google", "numpy", "sphinx"]
@@ -193,40 +193,25 @@ DocstringStyle = Literal["google", "numpy", "sphinx"]
 @lru_cache(maxsize=LRU_CACHE_SIZE)
 def _detect_docstring_style(doc: str) -> DocstringStyle:
     """Detect docstring style using pattern matching."""
-    scores: dict[DocstringStyle, int] = {"sphinx": 0, "numpy": 0, "google": 0}
+    patterns = {
+        "sphinx": [r"^:param\s", r"^:type\s", r"^:return:", r"^:rtype:"],
+        "numpy": [
+            r"^Parameters\s*\n\s*-{3,}",
+            r"^Returns\s*\n\s*-{3,}",
+            r"^Yields\s*\n\s*-{3,}",
+        ],
+        "google": [r"^(Args|Arguments):", r"^(Returns):", r"^(Raises):"],
+    }
 
-    # Sphinx style: :param, :type, :return:, :rtype:
-    sphinx_patterns = [r"^:param\s", r"^:type\s", r"^:return:", r"^:rtype:"]
-    for pattern in sphinx_patterns:
-        if re.search(pattern, doc, re.MULTILINE):
-            scores["sphinx"] += 1
-
-    # Numpy style: Headers with dashed underlines
-    numpy_patterns = [
-        r"^Parameters\s*\n\s*-{3,}",
-        r"^Returns\s*\n\s*-{3,}",
-        r"^Yields\s*\n\s*-{3,}",
-    ]
-    for pattern in numpy_patterns:
-        if re.search(pattern, doc, re.MULTILINE):
-            scores["numpy"] += 1
-
-    # Google style: Section headers with colons
-    google_patterns = [r"^(Args|Arguments):", r"^(Returns):", r"^(Raises):"]
-    for pattern in google_patterns:
-        if re.search(pattern, doc, re.MULTILINE):
-            scores["google"] += 1
-
-    max_score = max(scores.values())
-    if max_score == 0:
-        return "google"
+    scores = {
+        style: sum(
+            1 for pattern in style_patterns if re.search(pattern, doc, re.MULTILINE)
+        )
+        for style, style_patterns in patterns.items()
+    }
 
     return next(
-        (
-            style
-            for style in ["sphinx", "numpy", "google"]
-            if scores[style] == max_score
-        ),
+        (style for style, score in scores.items() if score == max(scores.values())),
         "google",
     )
 
@@ -278,7 +263,7 @@ def _process_var_keyword(
 
 
 ########################################################
-#               Public Functions                        #
+#               Public Methods
 ########################################################
 
 
@@ -509,14 +494,14 @@ def function_tool(
                     if inspect.iscoroutine(error_msg):
                         error_msg = await error_msg
                     return error_msg
-                raise
+                raise GenericError(e) from e
 
         async def _on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> Any:
             try:
                 return await _on_invoke_tool_impl(ctx, input)
             except Exception as e:
                 logger.debug(f"Tool {schema.name} failed with error: {e}")
-                raise
+                raise GenericError(e) from e
 
         return FunctionTool(
             name=schema.name,

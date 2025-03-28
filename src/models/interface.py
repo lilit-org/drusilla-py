@@ -9,7 +9,7 @@ from ..util._tool import Tool
 from .settings import ModelSettings
 
 if TYPE_CHECKING:
-    from ..util._handoffs import Handoff
+    from ..gear.orbs import Orb
 
 
 ########################################################
@@ -32,7 +32,7 @@ class Model(Protocol):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        handoffs: list[Orb],
     ) -> ModelResponse:
         """Get a complete model response.
 
@@ -55,7 +55,7 @@ class Model(Protocol):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        handoffs: list[Orb],
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Stream model responses as they are generated.
 
@@ -87,4 +87,4 @@ class ModelProvider(Protocol):
     """
 
     def get_model(self, model_name: str | None) -> Model:
-        """Get a model instance by name."""
+        pass

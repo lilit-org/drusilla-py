@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import abc
-import copy
 from dataclasses import dataclass
 from functools import cached_property
 from typing import (
@@ -52,7 +51,6 @@ THINK_START = "<think>"
 THINK_END = "</think>"
 ECHOES_START = "Echoes of encrypted hearts"
 
-# Type aliases for tool calls
 ToolCallItemTypes: TypeAlias = Union[
     ResponseFunctionToolCall,
     ResponseComputerToolCall,
@@ -60,7 +58,6 @@ ToolCallItemTypes: TypeAlias = Union[
     ResponseFunctionWebSearch,
 ]
 
-# Type alias for all possible run items
 RunItem: TypeAlias = Union[
     "MessageOutputItem",
     "HandoffCallItem",
@@ -70,17 +67,18 @@ RunItem: TypeAlias = Union[
     "ReasoningItem",
 ]
 
+########################################################
+#                        Data Classes
+########################################################
+
 
 @dataclass(frozen=True)
 class RunItemBase(Generic[T], abc.ABC):
-    """Base class for agent run items."""
-
     agent: Agent[Any]
     raw_item: T
 
     @cached_property
     def input_item(self) -> TResponseInputItem:
-        """Convert and cache item to model input format."""
         if isinstance(self.raw_item, dict):
             return self.raw_item
         elif isinstance(self.raw_item, BaseModel):
@@ -88,20 +86,16 @@ class RunItemBase(Generic[T], abc.ABC):
         return self.raw_item
 
     def to_input_item(self) -> TResponseInputItem:
-        """Convert item to model input format."""
         return self.input_item
 
 
 @dataclass(frozen=True)
 class MessageOutputItem(RunItemBase[ResponseOutputItem]):
-    """LLM message output."""
-
     raw_item: ResponseOutputItem
     type: Literal["message_output_item"] = "message_output_item"
 
     @cached_property
     def text_content(self) -> str:
-        """Cache the text content of the message."""
         try:
             if not isinstance(self.raw_item, dict):
                 return ""
@@ -130,16 +124,12 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
 
 @dataclass(frozen=True)
 class HandoffCallItem(RunItemBase[ResponseFunctionToolCall]):
-    """Agent handoff tool call."""
-
     raw_item: ResponseFunctionToolCall
     type: Literal["handoff_call_item"] = "handoff_call_item"
 
 
 @dataclass(frozen=True)
 class HandoffOutputItem(RunItemBase[TResponseInputItem]):
-    """Agent handoff output."""
-
     raw_item: TResponseInputItem
     source_agent: Agent[Any]
     target_agent: Agent[Any]
@@ -148,16 +138,12 @@ class HandoffOutputItem(RunItemBase[TResponseInputItem]):
 
 @dataclass(frozen=True)
 class ToolCallItem(RunItemBase[ToolCallItemTypes]):
-    """Tool call for function or computer action."""
-
     raw_item: ToolCallItemTypes
     type: Literal["tool_call_item"] = "tool_call_item"
 
 
 @dataclass(frozen=True)
 class ToolCallOutputItem(RunItemBase[Union[FunctionCallOutput, ComputerCallOutput]]):
-    """Tool call execution output."""
-
     raw_item: FunctionCallOutput | ComputerCallOutput
     output: Any
     type: Literal["tool_call_output_item"] = "tool_call_output_item"
@@ -165,46 +151,32 @@ class ToolCallOutputItem(RunItemBase[Union[FunctionCallOutput, ComputerCallOutpu
 
 @dataclass(frozen=True)
 class ReasoningItem(RunItemBase[ResponseReasoningItem]):
-    """LLM reasoning step."""
-
     raw_item: ResponseReasoningItem
     type: Literal["reasoning_item"] = "reasoning_item"
 
 
 @dataclass(frozen=True)
 class ModelResponse:
-    """Model response containing outputs and usage information."""
-
     output: list[TResponseOutputItem]
     usage: Usage
     referenceable_id: str | None
 
     @cached_property
     def input_items(self) -> list[TResponseInputItem]:
-        """Convert and cache outputs to input format."""
         return [
             cast(TResponseInputItem, it.model_dump(exclude_unset=True))
             for it in self.output
         ]
 
     def to_input_items(self) -> list[TResponseInputItem]:
-        """Convert outputs to input format efficiently."""
         return self.input_items
 
 
-########################################################
-#                   Item Helpers                        #
-########################################################
-
-
 class ItemHelpers:
-    """Helper methods for processing and formatting various item types."""
-
     SPECIAL_LINES: ClassVar[tuple[str, str]] = (THINK_START, ECHOES_START)
 
     @staticmethod
     def extract_last_content(message: TResponseOutputItem) -> str:
-        """Extract the last content from a message."""
         try:
             if not hasattr(message, "type") or message.type != MESSAGE_TYPE:
                 return ""
@@ -223,7 +195,6 @@ class ItemHelpers:
 
     @staticmethod
     def extract_last_text(message: TResponseOutputItem) -> str | None:
-        """Extract the last text content from a message, ignoring refusals."""
         if hasattr(message, "type") and message.type == MESSAGE_TYPE:
             last_content = message.content[-1]
             if last_content.type == OUTPUT_TEXT_TYPE:
@@ -234,14 +205,12 @@ class ItemHelpers:
     def input_to_new_input_list(
         input: str | list[TResponseInputItem],
     ) -> list[TResponseInputItem]:
-        """Convert string or input items to input list."""
         if isinstance(input, str):
             return [{"content": input, "role": "user"}]
-        return copy.deepcopy(input)
+        return input.copy()
 
     @staticmethod
     def text_message_outputs(items: list[RunItem]) -> str:
-        """Concatenate text from all message outputs efficiently."""
         return "".join(
             item.text_content if isinstance(item, MessageOutputItem) else ""
             for item in items
@@ -249,20 +218,15 @@ class ItemHelpers:
 
     @staticmethod
     def text_message_output(message: MessageOutputItem) -> str:
-        """Extract and format text from a message output efficiently."""
         try:
             if not (text := message.text_content):
                 return ""
 
-            # Clean up the raw text
             text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
-            text = text.replace("'text': '", "")
-            text = text.replace("'", "")
-            text = text.strip()
+            text = text.replace("'text': '", "").replace("'", "").strip()
             if not text:
                 return ""
 
-            # Split into lines and process
             lines = []
             current_line = []
 
@@ -271,7 +235,6 @@ class ItemHelpers:
                 if not line:
                     continue
 
-                # Handle think tags
                 if line.startswith(THINK_START):
                     if current_line:
                         lines.append(" ".join(current_line))
@@ -285,7 +248,6 @@ class ItemHelpers:
                 else:
                     current_line.append(line)
 
-            # Add any remaining lines
             if current_line:
                 lines.append(" ".join(current_line))
 
@@ -298,7 +260,6 @@ class ItemHelpers:
     def tool_call_output_item(
         tool_call: ResponseFunctionToolCall, output: str
     ) -> FunctionCallOutput:
-        """Create a tool call output from a call and result."""
         return {
             "call_id": tool_call.call_id,
             "output": output,
@@ -307,7 +268,6 @@ class ItemHelpers:
 
     @staticmethod
     def format_content(content: str) -> str:
-        """Format content with proper indentation and borders efficiently."""
         if not content:
             return ""
         content = content.replace("', 'type': 'output_text', 'annotations': []}", "")

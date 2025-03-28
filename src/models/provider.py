@@ -4,11 +4,11 @@ import httpx
 
 from src.util._constants import DEFAULT_BASE_URL, DEFAULT_MODEL
 from src.util._env import get_env_var
+from src.util._http import DefaultAsyncHttpxClient
+from src.util._types import AsyncDeepSeek
 
-from ..util._http import DefaultAsyncHttpxClient
-from ..util._types import AsyncDeepSeek
 from . import shared
-from .chat_completions import ModelChatCompletionsModel
+from .chat import ModelChatCompletionsModel
 from .interface import Model
 from .interface import ModelProvider as BaseModelProvider
 from .responses import ModelResponsesModel
@@ -25,13 +25,15 @@ _http_client: httpx.AsyncClient | None = None
 ########################################################
 #               Private Methods                        #
 ########################################################
+
+
 def shared_http_client() -> httpx.AsyncClient:
     global _http_client
     return _http_client or DefaultAsyncHttpxClient()
 
 
 ########################################################
-#               Main Class                            #
+#               Main Class: Model Provider
 ########################################################
 
 
@@ -57,10 +59,11 @@ class ModelProvider(BaseModelProvider):
             use_responses: Whether to use responses API.
         """
         if model_client is not None:
-            assert (
-                api_key is None and base_url is None
-            ), "Don't provide api_key or base_url if you provide model_client"
-            self._client: AsyncDeepSeek | None = model_client
+            if api_key is not None or base_url is not None:
+                raise ValueError(
+                    "Don't provide api_key or base_url if you provide model_client"
+                )
+            self._client = model_client
         else:
             self._client = None
             self._stored_api_key = api_key
@@ -86,7 +89,7 @@ class ModelProvider(BaseModelProvider):
             )
         return self._client
 
-    def get_model(self, model_name: str | None) -> Model:
+    def get_model(self, model_name: str | None = None) -> Model:
         """Get a model instance based on name and response type."""
         model_name = model_name or MODEL
 
