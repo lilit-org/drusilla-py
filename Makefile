@@ -35,3 +35,7 @@ world-traveler:
 .PHONY: summer-chaser
 summer-chaser:
 	poetry run python agent_examples/summer_chaser.py
+
+.PHONY: dissociative-identity
+dissociative-identity:
+	poetry run python agent_examples/dissociative_identity.py
