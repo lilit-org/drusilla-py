@@ -4,19 +4,13 @@ This module implements the Agent class, which provides a flexible framework for 
 The Agent class allows you to create AI agents with:
 - Configurable instructions and model settings
 - Tools for performing specific actions
-- Input and output guardrails for safety and validation
-- Handoffs to other agents or handlers
+- Input and output shield for safety and validation
+- Give orbs to other agents or handlers
 - Custom tool use behavior and output processing
 - Hooks for monitoring and modifying agent behavior
 
 Agents can be used standalone or converted into tools for other agents, enabling
 composition of complex AI behaviors from simpler components.
-
-Tool handling behavior:
-- run_llm_again: Run tools, feed results to LLM
-- stop_on_first_tool: Use first tool result
-- tool names: Stop on listed tools
-- function: Custom processing
 """
 
 from __future__ import annotations
@@ -27,12 +21,12 @@ from collections.abc import Awaitable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, cast
 
-from typing_extensions import TypeAlias, TypedDict
+from typing_extensions import TypeAlias
 
+from ..gear.orbs import Orb
+from ..gear.shields import InputShield, OutputShield
 from ..models.settings import ModelSettings
 from ..util import _json
-from ..util._guardrail import InputGuardrail, OutputGuardrail
-from ..util._handoffs import Handoff
 from ..util._items import ItemHelpers
 from ..util._run_context import RunContextWrapper, TContext
 from ..util._tool import FunctionToolResult, Tool, function_tool
@@ -77,7 +71,7 @@ def _create_agent_tool(
 
 
 ########################################################
-#                    Aux Data Classes
+#            Data Classes for Tools
 ########################################################
 
 
@@ -93,19 +87,14 @@ ToolsToFinalOutputFunction: TypeAlias = Callable[
 ]
 
 
-@dataclass
-class StopAtTools(TypedDict):
-    stop_at_tool_names: list[str]
-
-
 ########################################################
-#                    Main Data Class
+#            Main Data Class for Agents
 ########################################################
 
 
 @dataclass
 class Agent(Generic[TContext]):
-    """AI agent with tools, guardrails, and handoffs."""
+    """AI agent with tools, shields, and handoffs."""
 
     name: str
     instructions: (
@@ -117,30 +106,30 @@ class Agent(Generic[TContext]):
         | None
     ) = None
 
-    handoff_description: str | None = None
-    handoffs: list[Agent[Any] | Handoff[TContext]] = field(default_factory=list)
+    orb_description: str | None = None
+    orbs: list[Agent[Any] | Orb[TContext]] = field(default_factory=list)
     model: str | Model = field(default="")
     model_settings: ModelSettings = field(default_factory=ModelSettings)
     tools: list[Tool] = field(default_factory=list)
-    input_guardrails: list[InputGuardrail[TContext]] = field(default_factory=list)
-    output_guardrails: list[OutputGuardrail[TContext]] = field(default_factory=list)
+    input_shields: list[InputShield[TContext]] = field(default_factory=list)
+    output_shields: list[OutputShield[TContext]] = field(default_factory=list)
     output_type: type[Any] | None = None
     hooks: AgentHooks[TContext] | None = None
     tool_use_behavior: (
         Literal["run_llm_again", "stop_on_first_tool"]
-        | StopAtTools
+        | dict[Literal["stop_at_tool_names"], list[str]]
         | ToolsToFinalOutputFunction
     ) = "run_llm_again"
 
     def clone(self, **kwargs: Any) -> Agent[TContext]:
         """Create a copy of the agent with optional field updates."""
         defaults = {
-            "handoffs": [],
+            "orbs": [],
             "model": "",
             "model_settings": ModelSettings(),
             "tools": [],
-            "input_guardrails": [],
-            "output_guardrails": [],
+            "input_shields": [],
+            "output_shields": [],
             "output_type": None,
             "hooks": None,
             "tool_use_behavior": "run_llm_again",

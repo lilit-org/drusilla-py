@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal, Union
-
-from typing_extensions import TypeAlias
+from typing import Any, Literal, TypeAlias, Union
 
 from ..agents.agent import Agent
 from ._items import RunItem, TResponseStreamEvent

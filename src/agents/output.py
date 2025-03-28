@@ -18,6 +18,7 @@ from ..util._strict_schema import ensure_strict_json_schema
 WRAPPER_DICT_KEY = get_env_var("WRAPPER_DICT_KEY", DEFAULT_WRAPPER_DICT_KEY)
 LRU_CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", "128"))
 
+
 ########################################################
 #               Private Methods                        #
 ########################################################
@@ -28,8 +29,7 @@ def _is_subclass_of_base_model_or_dict(t: Any) -> bool:
     if not isinstance(t, type):
         return False
     origin = get_origin(t)
-    allowed_types = (BaseModel, dict)
-    return issubclass(origin or t, allowed_types)
+    return issubclass(origin or t, (BaseModel, dict))
 
 
 @lru_cache(maxsize=LRU_CACHE_SIZE)
@@ -39,11 +39,8 @@ def _type_to_str(t: type[Any]) -> str:
 
     if origin is None:
         return t.__name__
-    elif args:
-        args_str = ", ".join(_type_to_str(arg) for arg in args)
-        return f"{origin.__name__}[{args_str}]"
-    else:
-        return str(t)
+    args_str = ", ".join(_type_to_str(arg) for arg in args)
+    return f"{origin.__name__}[{args_str}]" if args else str(t)
 
 
 @lru_cache(maxsize=LRU_CACHE_SIZE)
@@ -67,7 +64,7 @@ def _get_type_adapter(
 
 
 ########################################################
-#               Main Class                            #
+#             Main Class for Output Schema            #
 ########################################################
 
 
@@ -117,13 +114,19 @@ class AgentOutputSchema:
 
     def validate_json(self, json_str: str, partial: bool = False) -> Any:
         validated = _json.validate_json(json_str, self._type_adapter, partial)
-        if self._is_wrapped and isinstance(validated, dict):
-            if WRAPPER_DICT_KEY not in validated:
-                raise ModelError(
-                    f"Could not find key {WRAPPER_DICT_KEY} in JSON: {json_str}"
-                )
-            return validated[WRAPPER_DICT_KEY]
-        return validated
+        if (
+            self._is_wrapped
+            and isinstance(validated, dict)
+            and WRAPPER_DICT_KEY not in validated
+        ):
+            raise ModelError(
+                f"Could not find key {WRAPPER_DICT_KEY} in JSON: {json_str}"
+            )
+        return (
+            validated[WRAPPER_DICT_KEY]
+            if self._is_wrapped and isinstance(validated, dict)
+            else validated
+        )
 
     def output_type_name(self) -> str:
         return self._type_name

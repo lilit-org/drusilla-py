@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from src.agents import Agent, Runner
 from src.util._client import setup_client
-from src.util._exceptions import GenericError
+from src.util._exceptions import AgentExecutionError
 from src.util._pretty_print import pretty_print_result
 
 ########################################################
@@ -38,8 +38,7 @@ def run_agent() -> str | None:
         )
         print(pretty_print_result(result))
     except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        raise GenericError(e) from e
+        raise AgentExecutionError(e) from e
 
 
 if __name__ == "__main__":

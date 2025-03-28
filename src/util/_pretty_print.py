@@ -1,5 +1,4 @@
 import re
-from re import Pattern
 from typing import Any
 
 from ._exceptions import GenericError
@@ -7,31 +6,26 @@ from ._items import ModelResponse
 from ._result import RunResult
 
 ########################################################
-#               Compiled Regex Patterns                #
-########################################################
-
-THINK_PATTERN: Pattern[str] = re.compile(r"<think>(.*?)</think>(.*)", re.DOTALL)
-
-########################################################
-#               Final Output Section                  #
+#          Final Output private method
 ########################################################
 
 
-def _decode_unicode_escape(text: str) -> str:
-    return text.encode().decode("unicode-escape")
+def _indent(text: str, indent_level: int) -> str:
+    indent_string = "  " * indent_level
+    return "\n".join(f"{indent_string}{line}" for line in text.splitlines())
 
 
 def _format_final_output(raw_response: ModelResponse) -> str:
     try:
         output = raw_response.output[0]["text"]
-        match = THINK_PATTERN.search(output)
+        match = re.search(r"<think>(.*?)</think>(.*)", output, re.DOTALL)
 
         if match:
-            reasoning = _decode_unicode_escape(match.group(1).strip())
-            final_result = _decode_unicode_escape(match.group(2).strip())
+            reasoning = match.group(1).strip().encode().decode("unicode-escape")
+            final_result = match.group(2).strip().encode().decode("unicode-escape")
         else:
             reasoning = ""
-            final_result = _decode_unicode_escape(output.strip("'").strip())
+            final_result = output.strip("'").strip().encode().decode("unicode-escape")
 
         return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{final_result}\n"
 
@@ -41,33 +35,27 @@ def _format_final_output(raw_response: ModelResponse) -> str:
 
 
 ########################################################
-#               Agent Info Section                    #
+#               Agent Info private method
 ########################################################
 
 
-def _indent(text: str, indent_level: int) -> str:
-    indent_string = "  " * indent_level
-    return "\n".join(f"{indent_string}{line}" for line in text.splitlines())
-
-
 def _format_agent_info(result: RunResult) -> str:
+    info = ["\n👾 Agent Info:"]
     if hasattr(result, "is_complete"):
-        info = [
-            "\n👾 Agent Info:",
-            f"      Name   → {result.current_agent.name}",
-            f"      Turn   → {result.current_turn}/{result.max_turns}",
-            f"      Status → {'✔️ Complete' if result.is_complete else '🟡 Running'}",
-        ]
+        info.extend(
+            [
+                f"      Name   → {result.current_agent.name}",
+                f"      Turn   → {result.current_turn}/{result.max_turns}",
+                f"      Status → {'✔️ Complete' if result.is_complete else '🟡 Running'}",
+            ]
+        )
     else:
-        info = [
-            "\n👾 Agent Info:",
-            f"      Last Agent → {result.last_agent.name}",
-        ]
+        info.append(f"      Last Agent → {result.last_agent.name}")
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
 ########################################################
-#               Stats Section                         #
+#               Stats Section private method
 ########################################################
 
 
@@ -76,41 +64,39 @@ def _format_stats(result: RunResult) -> str:
         "\n📊 Statistics:",
         f"      Items     → {len(result.new_items)}",
         f"      Responses → {len(result.raw_responses)}",
-        f"      Input GR  → {len(result.input_guardrail_results)}",
-        f"      Output GR → {len(result.output_guardrail_results)}",
+        f"      Input GR  → {len(result.input_shield_results)}",
+        f"      Output GR → {len(result.output_shield_results)}",
     ]
     return "\n" + "\n".join(_indent(stat, 1) for stat in stats)
 
 
 ########################################################
-#               Stream Info Section                   #
+#               Stream Info private method
 ########################################################
 
 
-def _format_stream_object(obj: Any) -> str:
-    if obj is None or obj is object():
-        return "None"
-    elif isinstance(obj, bool):
-        return "✔️ Enabled" if obj else "❌ Disabled"
-    return str(obj)
-
-
 def _format_stream_info(stream: bool, tool_choice: Any) -> str:
+    def format_obj(x: Any) -> str:
+        if x is None or x is object():
+            return "None"
+        if isinstance(x, bool):
+            return "✔️ Enabled" if x else "❌ Disabled"
+        return str(x)
+
     info = [
         "\n🦾 Configuration:",
-        f"      Streaming → {_format_stream_object(stream)}",
-        f"      Tool Mode → {_format_stream_object(tool_choice)}",
+        f"      Streaming → {format_obj(stream)}",
+        f"      Tool Mode → {format_obj(tool_choice)}",
     ]
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
 ########################################################
-#               Public Main Function                  #
+#               Public Main method
 ########################################################
 
 
 def pretty_print_result(result: RunResult) -> str:
-
     parts = [
         f"✅ {result.__class__.__name__}:",
         _format_agent_info(result),

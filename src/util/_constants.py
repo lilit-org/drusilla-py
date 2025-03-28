@@ -9,7 +9,7 @@ Constants used throughout the deepseek agentic framework.
 This module contains API configurations, environment settings, and default values.
 """
 
-__all__ = [
+__all__ = (
     "FAKE_RESPONSES_ID",
     "HEADERS",
     "Environment",
@@ -30,7 +30,7 @@ __all__ = [
     "HTTP_MAX_KEEPALIVE_CONNECTIONS",
     "HTTP_MAX_CONNECTIONS",
     "LRU_CACHE_SIZE",
-]
+)
 
 # Type Definitions
 Environment = Literal["mac", "windows", "ubuntu", "browser"]

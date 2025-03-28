@@ -13,7 +13,7 @@ T = TypeVar("T")
 FUNCTION_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9]")
 
 ########################################################
-#              Validators
+#              Public Methods
 ########################################################
 
 
@@ -27,18 +27,6 @@ def validate_json(
         raise ModelError(f"Invalid JSON: {e}") from e
 
 
-########################################################
-#              String Transformers
-########################################################
-
-
 def transform_string_function_style(name: str) -> str:
-    """Converts a string into a valid Python function name.
-
-    Args:
-        name: Input string to transform
-
-    Returns:
-        Lowercase string with spaces and special chars replaced by underscores
-    """
+    """Converts a string into a valid Python function name."""
     return FUNCTION_NAME_PATTERN.sub("_", name.replace(" ", "_")).lower()

@@ -3,6 +3,5 @@ import os
 import sys
 
 logger = logging.getLogger("deepseek.agents")
-log_level = os.getenv("LOG_LEVEL", "DEBUG")
-logger.setLevel(getattr(logging, log_level.upper()))
+logger.setLevel(getattr(logging, os.getenv("LOG_LEVEL", "DEBUG").upper()))
 logger.addHandler(logging.StreamHandler(sys.stdout))

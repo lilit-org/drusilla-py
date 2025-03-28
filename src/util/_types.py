@@ -7,15 +7,15 @@ from typing import Any, Literal, NotRequired, TypeAlias, TypedDict, Union
 from typing_extensions import TypeVar
 
 ########################################################
-#              Type Variables                         #
+#              Type Variables
 ########################################################
 
 T = TypeVar("T")
 MaybeAwaitable = Union[Awaitable[T], T]
 
 ########################################################
-#            Data class for Usage                      #
-########################################################
+#            Data class for Usage
+# ######################################################
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ class Usage:
 
 
 ########################################################
-#            TypedDict for Computer Actions            #
+#            TypedDict for Computer Actions
 ########################################################
 
 
@@ -66,7 +66,7 @@ class ComputerCallOutput(TypedDict):
 
 
 ########################################################
-#            TypedDict for Response Outputs            #
+#            Main classes for Response Outputs
 ########################################################
 
 
@@ -200,7 +200,7 @@ class ResponseEvent:
 
 
 ########################################################
-#            TypedDict for Chat Completion            #
+#           Main classes for Chat Completion
 ########################################################
 
 
@@ -323,7 +323,7 @@ ChatCompletionToolChoiceOptionParam: TypeAlias = Union[
 
 
 ########################################################
-#            TypedDict for Response Input              #
+#            TypedDict for Response Input
 ########################################################
 
 
@@ -347,7 +347,7 @@ class ResponseFormat(TypedDict):
 
 
 ########################################################
-#            Async DeepSeek Client                    #
+#           Main class: AsyncStream
 ########################################################
 
 

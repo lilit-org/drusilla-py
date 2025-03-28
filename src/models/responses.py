@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, overload
+from typing import Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
+from ..gear.orbs import Orb
 from ..util._constants import HEADERS, UNSET, IncludeLiteral
 from ..util._exceptions import UsageError
-from ..util._handoffs import Handoff
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
 from ..util._logger import logger
 from ..util._tool import ComputerTool, FileSearchTool, FunctionTool, Tool, WebSearchTool
@@ -25,17 +25,23 @@ from ..util._usage import Usage
 from .interface import Model
 from .settings import ModelSettings
 
-if TYPE_CHECKING:
-    from .settings import ModelSettings
+########################################################
+#               Data Classes                          #
+########################################################
+
+
+@dataclass
+class ConvertedTools:
+    tools: list[ChatCompletionToolParam]
+    includes: list[IncludeLiteral]
+
 
 ########################################################
-#           Main Class: Responses Model                #
+#               Main Class: Responses Model            #
 ########################################################
 
 
 class ModelResponsesModel(Model):
-    """Model implementation using Model Responses API."""
-
     def __init__(
         self,
         model: str,
@@ -54,7 +60,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
     ) -> ModelResponse:
         try:
             response = await self._fetch_response(
@@ -63,7 +69,7 @@ class ModelResponsesModel(Model):
                 model_settings,
                 tools,
                 output_schema,
-                handoffs,
+                orbs,
                 stream=False,
             )
 
@@ -83,16 +89,16 @@ class ModelResponsesModel(Model):
                 else Usage()
             )
 
+            return ModelResponse(
+                output=response.output,
+                usage=usage,
+                referenceable_id=response.id,
+            )
+
         except Exception as e:
             request_id = getattr(e, "request_id", None)
             logger.error(f"Error getting response: {e}. (request_id: {request_id})")
             raise
-
-        return ModelResponse(
-            output=response.output,
-            usage=usage,
-            referenceable_id=response.id,
-        )
 
     async def stream_response(
         self,
@@ -101,9 +107,8 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
     ) -> AsyncIterator[ResponseOutput]:
-        """Yields a partial message as it is generated, as well as the usage information."""
         try:
             stream = await self._fetch_response(
                 system_instructions,
@@ -111,7 +116,7 @@ class ModelResponsesModel(Model):
                 model_settings,
                 tools,
                 output_schema,
-                handoffs,
+                orbs,
                 stream=True,
             )
 
@@ -130,7 +135,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
         stream: Literal[True],
     ) -> AsyncStream[ResponseOutput]: ...
 
@@ -142,7 +147,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
         stream: Literal[False],
     ) -> Response: ...
 
@@ -153,19 +158,13 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Handoff],
+        orbs: list[Orb],
         stream: Literal[True] | Literal[False] = False,
     ) -> Response | AsyncStream[ResponseOutput]:
         list_input = ItemHelpers.input_to_new_input_list(input)
-
-        parallel_tool_calls = (
-            True
-            if model_settings.parallel_tool_calls and tools and len(tools) > 0
-            else UNSET
-        )
-
+        parallel_tool_calls = bool(model_settings.parallel_tool_calls and tools)
         tool_choice = Converter.convert_tool_choice(model_settings.tool_choice)
-        converted_tools = Converter.convert_tools(tools, handoffs)
+        converted_tools = Converter.convert_tools(tools, orbs)
         response_format = Converter.get_response_format(output_schema)
 
         logger.debug(
@@ -188,22 +187,11 @@ class ModelResponsesModel(Model):
             truncation=self._non_null_or_not_given(model_settings.truncation),
             max_output_tokens=self._non_null_or_not_given(model_settings.max_tokens),
             tool_choice=tool_choice,
-            parallel_tool_calls=parallel_tool_calls,
+            parallel_tool_calls=parallel_tool_calls or UNSET,
             stream=stream,
             extra_headers=HEADERS,
             text=response_format,
         )
-
-
-########################################################
-#               Data Classes                          #
-########################################################
-
-
-@dataclass
-class ConvertedTools:
-    tools: list[ChatCompletionToolParam]
-    includes: list[IncludeLiteral]
 
 
 ########################################################
@@ -212,59 +200,38 @@ class ConvertedTools:
 
 
 class Converter:
-    """Tool conversion utilities."""
-
-    @classmethod
+    @staticmethod
     def convert_tool_choice(
-        cls, tool_choice: Literal["auto", "required", "none"] | str | None
+        tool_choice: Literal["auto", "required", "none"] | str | None
     ) -> ChatCompletionToolChoiceOptionParam:
         if tool_choice is None:
             return UNSET
-        elif tool_choice == "required":
-            return "required"
-        elif tool_choice == "auto":
-            return "auto"
-        elif tool_choice == "none":
-            return "none"
-        elif tool_choice == "file_search":
-            return {
-                "type": "file_search",
-            }
-        elif tool_choice == "web_search_preview":
-            return {
-                "type": "web_search_preview",
-            }
-        elif tool_choice == "computer_use_preview":
-            return {
-                "type": "computer_use_preview",
-            }
-        else:
-            return {
-                "type": "function",
-                "name": tool_choice,
-            }
+        if tool_choice in ("required", "auto", "none"):
+            return tool_choice
+        if tool_choice in ("file_search", "web_search_preview", "computer_use_preview"):
+            return {"type": tool_choice}
+        return {"type": "function", "name": tool_choice}
 
-    @classmethod
+    @staticmethod
     def get_response_format(
-        cls, output_schema: AgentOutputSchema | None
+        output_schema: AgentOutputSchema | None,
     ) -> ResponseFormat | None:
-        if output_schema is None or output_schema.is_plain_text():
+        if not output_schema or output_schema.is_plain_text():
             return UNSET
-        else:
-            return {
-                "format": {
-                    "type": "json_schema",
-                    "name": "final_output",
-                    "schema": output_schema.json_schema(),
-                    "strict": output_schema.strict_json_schema,
-                }
+        return {
+            "format": {
+                "type": "json_schema",
+                "name": "final_output",
+                "schema": output_schema.json_schema(),
+                "strict": output_schema.strict_json_schema,
             }
+        }
 
     @classmethod
     def convert_tools(
         cls,
         tools: list[Tool],
-        handoffs: list[Handoff[Any]],
+        orbs: list[Orb[Any]],
     ) -> ConvertedTools:
         converted_tools: list[ChatCompletionToolParam] = []
         includes: list[IncludeLiteral] = []
@@ -281,40 +248,30 @@ class Converter:
             if include:
                 includes.append(include)
 
-        for handoff in handoffs:
-            converted_tools.append(cls._convert_handoff_tool(handoff))
+        converted_tools.extend(cls._convert_orb_tool(orb) for orb in orbs)
 
         return ConvertedTools(tools=converted_tools, includes=includes)
 
-    @classmethod
+    @staticmethod
     def _convert_tool(
-        cls, tool: Tool
+        tool: Tool,
     ) -> tuple[ChatCompletionToolParam, IncludeLiteral | None]:
-        """Convert tool to API format"""
-        converted_tool: ChatCompletionToolParam = {"type": "function"}
-        includes: IncludeLiteral | None = None
-
         if isinstance(tool, FunctionTool):
-            converted_tool = {
+            return {
                 "name": tool.name,
                 "parameters": tool.params_json_schema,
                 "strict": tool.strict_json_schema,
                 "type": "function",
                 "description": tool.description,
-            }
-            includes = None
-            return converted_tool, includes
-        elif isinstance(tool, WebSearchTool):
-            ws = {
+            }, None
+        if isinstance(tool, WebSearchTool):
+            return {
                 "type": "web_search_preview",
                 "user_location": tool.user_location,
                 "search_context_size": tool.search_context_size,
-            }
-            converted_tool = ws
-            includes = None
-            return converted_tool, includes
-        elif isinstance(tool, FileSearchTool):
-            converted_tool = {
+            }, None
+        if isinstance(tool, FileSearchTool):
+            converted_tool: ChatCompletionToolParam = {
                 "type": "file_search",
                 "vector_store_ids": tool.vector_store_ids,
             }
@@ -324,27 +281,23 @@ class Converter:
                 converted_tool["ranking_options"] = tool.ranking_options
             if tool.filters:
                 converted_tool["filters"] = tool.filters
-
-            includes = (
+            return converted_tool, (
                 "file_search_call.results" if tool.include_search_results else None
             )
-            return converted_tool, includes
-        elif isinstance(tool, ComputerTool):
-            converted_tool = {
+        if isinstance(tool, ComputerTool):
+            return {
                 "type": "computer_use_preview",
                 "environment": tool.computer.environment,
                 "display_width": tool.computer.dimensions[0],
                 "display_height": tool.computer.dimensions[1],
-            }
-            includes = None
-            return converted_tool, includes
+            }, None
 
-    @classmethod
-    def _convert_handoff_tool(cls, handoff: Handoff) -> ChatCompletionToolParam:
+    @staticmethod
+    def _convert_orb_tool(orb: Orb) -> ChatCompletionToolParam:
         return {
-            "name": handoff.tool_name,
-            "parameters": handoff.input_json_schema,
-            "strict": handoff.strict_json_schema,
+            "name": orb.tool_name,
+            "parameters": orb.input_json_schema,
+            "strict": orb.strict_json_schema,
             "type": "function",
-            "description": handoff.tool_description,
+            "description": orb.tool_description,
         }

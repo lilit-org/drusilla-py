@@ -3,13 +3,35 @@
 <br>
 
 <p align="center">
-<img src="https://github.com/user-attachments/assets/f473ad0c-82e7-40b7-9aea-e4de45c8d360" width="70%" align="center" style="padding:1px;border:1px solid black;"/>
+<img src="https://github.com/user-attachments/assets/f473ad0c-82e7-40b7-9aea-e4de45c8d360" width="90%" align="center" style="padding:1px;border:1px solid black;"/>
 </p>
 
 
 <br>
 
 ---
+
+## overview
+
+<br>
+
+this project was inspired by many open-source frameworks and our own local workflows, and customized for deepseek and for the work we are doing at **[lilit](https://github.com/lilit-org)**.
+
+
+
+### primitives
+
+to design multi-agent systems, we utilize the following primitives:
+
+- [agents](src/agents/agent.py): our LLM robots that can be equipped with orbs and shields
+- [orbs](src/gear/orbs.py): part of the agent's gear, used to delegate tasks to other agents
+- [shields](src/gear/shields.py): part of the agent's gear, used to validate and protect the inputs from agents
+
+
+<br>
+
+---
+
 ## local development
 
 <br>
@@ -23,7 +45,7 @@ source venv/bin/activate
 
 <br>
 
-install dependencies
+install dependencies:
 
 ```shell
 make install
@@ -62,7 +84,12 @@ ollama serve
 
 ___
 
-## agent "cypherpunk love"
+## agents
+
+<br> 
+
+
+### agent "cypherpunk love": a hello world
 
 <br>
 
@@ -110,7 +137,7 @@ you should get something like this:
 ✅ Received Model Response...
   
   👾 Agent Info:
-        Last Agent → Agent Mulder
+        Last Agent → Agent Dr. Love
   
   📊 Statistics:
         Items     → 1
@@ -163,9 +190,8 @@ Secret love in code.
 
 <br>
 
-___
 
-## agent "world traveler"
+### agent "world traveler": using tools
 
 <br>
 
@@ -226,7 +252,7 @@ you can input a sentence in any major language and it will translate it for you:
 ✅ Successfully received model response...
 
   👾 Agent Info:
-        Last Agent → Translation Orchestrator
+        Last Agent → Agent World Traveler
 
   📊 Statistics:
         Items     → 1
@@ -270,7 +296,6 @@ This makes the response helpful and flexible.
 
 
 ✅ RESULT:
-
 
 I love you.
 ```

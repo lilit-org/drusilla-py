@@ -88,33 +88,18 @@ class DeepSeekClient(AsyncDeepSeek):
                 if client.api_key:
                     headers["Authorization"] = f"Bearer {client.api_key}"
 
-                ollama_messages = []
-                for msg in messages:
-                    if msg["role"] == "system":
-                        ollama_messages.append(
-                            {"role": "system", "content": msg["content"]}
-                        )
-                    elif msg["role"] == "user":
-                        ollama_messages.append(
-                            {"role": "user", "content": msg["content"]}
-                        )
-                    elif msg["role"] == "assistant":
-                        ollama_messages.append(
-                            {"role": "assistant", "content": msg["content"]}
-                        )
-
                 data: dict[str, Any] = {
                     "model": model,
-                    "messages": ollama_messages,
+                    "messages": messages,
                     "stream": stream,
                 }
 
-                optional_params = {
-                    "temperature": temperature,
-                    "top_p": top_p,
-                    "max_tokens": max_tokens,
-                }
-                data.update({k: v for k, v in optional_params.items() if v is not None})
+                if temperature is not None:
+                    data["temperature"] = temperature
+                if top_p is not None:
+                    data["top_p"] = top_p
+                if max_tokens is not None:
+                    data["max_tokens"] = max_tokens
 
                 endpoint = os.getenv(
                     "CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT
@@ -132,7 +117,7 @@ class DeepSeekClient(AsyncDeepSeek):
                 # Convert Ollama response to ChatCompletion format
                 ollama_response = response.json()
                 return ChatCompletion(
-                    id="ollama-" + str(hash(str(ollama_response))),
+                    id=f"ollama-{hash(str(ollama_response))}",
                     object="chat.completion",
                     created=int(ollama_response.get("created", 0)),
                     model=model,

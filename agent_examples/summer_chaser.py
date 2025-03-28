@@ -9,59 +9,43 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel
-
 sys.path.append(str(Path(__file__).parent.parent))
 
 from src.agents import Agent, Runner
 from src.util._client import setup_client
 from src.util._env import get_env_var
-from src.util._exceptions import GenericError
+from src.util._exceptions import AgentExecutionError, UsageError
 from src.util._pretty_print import pretty_print_result
 from src.util._tool import function_tool
 
 ########################################################
-#           Constants                                  #
+#           Tools                                      #
 ########################################################
-
-CACHE_SIZE = int(get_env_var("CACHE_SIZE", "128"))
-SUMMER_TEMP_THRESHOLD = 25
-
-########################################################
-#           Models and Tools                           #
-########################################################
-
-
-class Weather(BaseModel):
-    city: str
-    temperature_range: str
-    conditions: str
-    is_summer: bool
 
 
 @function_tool
-@lru_cache(maxsize=CACHE_SIZE)
-def get_weather(city: str) -> Weather:
+@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
+def get_weather(city: str) -> dict:
     print(f"Getting weather for {city}")
-    return Weather(
-        city=city, temperature_range="0-30C", conditions="Clear skies", is_summer=False
-    )
-
-
-def _parse_temperature_range(temp_range: str) -> tuple[int, int]:
-    try:
-        min_temp, max_temp = temp_range.split("-")
-        return int(min_temp), int(max_temp.rstrip("C"))
-    except (ValueError, AttributeError) as e:
-        raise ValueError(f"Invalid temperature range format: {temp_range}") from e
+    return {
+        "city": city,
+        "temperature_range": "0-30C",
+        "conditions": "Clear skies",
+        "is_summer": False,
+    }
 
 
 @function_tool
-@lru_cache(maxsize=CACHE_SIZE)
+@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
 def is_summer(city: str) -> bool:
     weather = get_weather(city)
-    _, max_temp = _parse_temperature_range(weather.temperature_range)
-    return max_temp >= SUMMER_TEMP_THRESHOLD
+    try:
+        _, max_temp = map(int, weather["temperature_range"].split("-")[1].rstrip("C"))
+        return max_temp >= 25
+    except (ValueError, AttributeError) as e:
+        raise UsageError(
+            f"Invalid temperature range format: {weather['temperature_range']}"
+        ) from e
 
 
 ########################################################
@@ -97,8 +81,7 @@ def run_agent() -> Optional[str]:
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
     except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
-        raise GenericError(e) from e
+        raise AgentExecutionError(e) from e
 
 
 if __name__ == "__main__":
