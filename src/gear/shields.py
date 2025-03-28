@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Generic, Union, overload
+from typing import TYPE_CHECKING, Any, Generic, overload
 
 from typing_extensions import TypeVar
 
@@ -128,7 +128,7 @@ _InputShieldFuncSync = Callable[
     [
         RunContextWrapper[TContext_co],
         "Agent[Any]",
-        Union[str, list[TResponseInputItem]],
+        str | list[TResponseInputItem],
     ],
     ShieldFunctionOutput,
 ]
@@ -136,7 +136,7 @@ _InputShieldFuncAsync = Callable[
     [
         RunContextWrapper[TContext_co],
         "Agent[Any]",
-        Union[str, list[TResponseInputItem]],
+        str | list[TResponseInputItem],
     ],
     Awaitable[ShieldFunctionOutput],
 ]

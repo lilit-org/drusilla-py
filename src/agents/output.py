@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, ClassVar
+from typing import Any, ClassVar, get_args, get_origin
 
 from pydantic import BaseModel, TypeAdapter
-from typing_extensions import TypedDict, get_args, get_origin
+from typing_extensions import TypedDict
 
 from ..util import _json
 from ..util._constants import DEFAULT_WRAPPER_DICT_KEY
@@ -29,7 +29,7 @@ def _is_subclass_of_base_model_or_dict(t: Any) -> bool:
     if not isinstance(t, type):
         return False
     origin = get_origin(t)
-    return issubclass(origin or t, (BaseModel, dict))
+    return issubclass(origin or t, BaseModel | dict)
 
 
 @lru_cache(maxsize=LRU_CACHE_SIZE)

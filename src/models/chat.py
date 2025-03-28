@@ -41,7 +41,7 @@ from .settings import ModelSettings
 ########################################################
 
 
-@dataclass(frozen=True)
+@dataclass
 class _StreamingState:
     """Maintains the current state of streaming responses."""
 
@@ -120,7 +120,8 @@ class ModelChatCompletionsModel(Model):
         output_schema: AgentOutputSchema | None,
         orbs: list[Orb],
     ) -> AsyncIterator[TResponseStreamEvent]:
-        _, stream = await self._fetch_response(
+        """Stream model responses as generated."""
+        response, stream = await self._fetch_response(
             system_instructions,
             input,
             model_settings,
@@ -130,122 +131,55 @@ class ModelChatCompletionsModel(Model):
             stream=True,
         )
 
+        if not isinstance(stream, AsyncStream):
+            raise TypeError(f"Expected AsyncStream, got {type(stream)}")
+
         state = _StreamingState()
         async for chunk in stream:
-            if chunk["choices"][0]["delta"]["content"]:
-                delta = chunk["choices"][0]["delta"]
-                if not state.text_content_index_and_output:
-                    state.text_content_index_and_output = (
-                        0,
-                        ResponseOutputText(
-                            text=delta["content"],
-                            type="output_text",
-                            annotations=[],
-                        ),
-                    )
-                    yield ResponseEvent(
-                        type="content_part.added",
-                        content_index=state.text_content_index_and_output[0],
-                        item_id=FAKE_RESPONSES_ID,
-                        output_index=0,
-                        part=ResponseOutputText(
-                            text=delta["content"],
-                            type="output_text",
-                            annotations=[],
-                        ),
-                    )
-                else:
-                    state.text_content_index_and_output[1].text += delta["content"]
-                    yield ResponseEvent(
-                        type="output_text.delta",
-                        content_index=state.text_content_index_and_output[0],
-                        item_id=FAKE_RESPONSES_ID,
-                        output_index=0,
-                        delta=delta["content"],
-                    )
-
-            if chunk["choices"][0]["delta"]["tool_calls"]:
-                for tc_delta in chunk["choices"][0]["delta"]["tool_calls"]:
-                    if tc_delta["index"] not in state.function_calls:
-                        state.function_calls[tc_delta["index"]] = (
-                            ResponseFunctionToolCall(
-                                id=FAKE_RESPONSES_ID,
-                                arguments="",
-                                name="",
-                                type="function_call",
-                                call_id="",
-                            )
+            try:
+                delta = chunk.get("choices", [{}])[0].get("delta", {})
+                if delta.get("content"):
+                    if not state.text_content_index_and_output:
+                        state.text_content_index_and_output = (
+                            0,
+                            ResponseOutputText(
+                                text=delta["content"],
+                                type="output_text",
+                                annotations=[],
+                            ),
                         )
-                    tc_function = tc_delta["function"]
-                    if tc_function:
-                        state.function_calls[tc_delta["index"]].arguments += (
-                            tc_function["arguments"] or ""
+                        yield ResponseEvent(
+                            type="content_part.added",
+                            content_index=state.text_content_index_and_output[0],
+                            item_id=FAKE_RESPONSES_ID,
+                            output_index=0,
+                            part=state.text_content_index_and_output[1],
                         )
-                        state.function_calls[tc_delta["index"]].name += (
-                            tc_function["name"] or ""
+                    else:
+                        state.text_content_index_and_output[1]["text"] += delta[
+                            "content"
+                        ]
+                        yield ResponseEvent(
+                            type="output_text.delta",
+                            content_index=state.text_content_index_and_output[0],
+                            item_id=FAKE_RESPONSES_ID,
+                            output_index=0,
+                            delta=delta["content"],
                         )
-                    state.function_calls[tc_delta["index"]].call_id += (
-                        tc_delta["id"] or ""
-                    )
+            except Exception as e:
+                logger.warning(f"Error processing chunk: {e}")
+                continue
 
-            if chunk["choices"][0]["finish_reason"] == "stop":
-                if state.text_content_index_and_output:
-                    yield ResponseEvent(
-                        type="content_part.done",
-                        content_index=state.text_content_index_and_output[0],
-                        item_id=FAKE_RESPONSES_ID,
-                        output_index=0,
-                        part=state.text_content_index_and_output[1],
-                    )
+        if state.text_content_index_and_output:
+            yield ResponseEvent(
+                type="content_part.done",
+                content_index=state.text_content_index_and_output[0],
+                item_id=FAKE_RESPONSES_ID,
+                output_index=0,
+                part=state.text_content_index_and_output[1],
+            )
 
-                for i, function_call in state.function_calls.items():
-                    yield ResponseEvent(
-                        type="content_part.added",
-                        content_index=i
-                        + (1 if state.text_content_index_and_output else 0),
-                        item_id=FAKE_RESPONSES_ID,
-                        output_index=0,
-                        part=function_call,
-                    )
-                    yield ResponseEvent(
-                        type="content_part.done",
-                        content_index=i
-                        + (1 if state.text_content_index_and_output else 0),
-                        item_id=FAKE_RESPONSES_ID,
-                        output_index=0,
-                        part=function_call,
-                    )
-
-                final_response = Response(
-                    id=FAKE_RESPONSES_ID,
-                    created_at=time.time(),
-                    model=self.model,
-                    object="response",
-                    output=[],
-                    tool_choice="auto",
-                    top_p=model_settings.top_p,
-                    temperature=model_settings.temperature,
-                    tools=[],
-                    parallel_tool_calls=False,
-                )
-
-                if state.text_content_index_and_output:
-                    final_response.output.append(
-                        {
-                            "id": FAKE_RESPONSES_ID,
-                            "content": [state.text_content_index_and_output[1]],
-                            "role": "assistant",
-                            "type": "message",
-                            "status": "completed",
-                        }
-                    )
-
-                final_response.output.extend(state.function_calls.values())
-
-                yield ResponseEvent(
-                    type="completed",
-                    response=final_response,
-                )
+        yield ResponseEvent(type="completed", response=response)
 
     async def _fetch_response(
         self,
@@ -324,6 +258,8 @@ class ModelChatCompletionsModel(Model):
                 tools=[],
                 parallel_tool_calls=parallel_tool_calls or False,
             )
+            if not isinstance(ret, AsyncStream):
+                raise TypeError(f"Expected AsyncStream, got {type(ret)}")
             return response, ret
 
         return ret

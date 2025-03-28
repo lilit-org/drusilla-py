@@ -8,7 +8,9 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
-from src.agents import Agent, Runner
+
+from src.agents.agent import Agent
+from src.agents.run import Runner
 from src.util._client import setup_client
 from src.util._exceptions import AgentExecutionError
 from src.util._pretty_print import pretty_print_result

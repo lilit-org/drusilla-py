@@ -391,7 +391,7 @@ class RunImpl:
                     agent=agent,
                 ),
             )
-            for tool_run, result in zip(tool_runs, results)
+            for tool_run, result in zip(tool_runs, results, strict=False)
         ]
 
     @classmethod
@@ -577,7 +577,7 @@ class RunImpl:
         )
 
     @classmethod
-    def stream_step_result_to_queue(
+    async def stream_step_result_to_queue(
         cls,
         step_result: SingleStepResult,
         queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel],
@@ -590,9 +590,12 @@ class RunImpl:
             else:
                 logger.warning(f"Unexpected item type: {type(item)}")
 
-        # Batch put all events at once
+        # Batch put all events at once with timeout
         for event in events:
-            queue.put_nowait(event)
+            try:
+                await asyncio.wait_for(queue.put(event), timeout=1.0)
+            except (asyncio.TimeoutError, asyncio.QueueFull):
+                logger.warning(f"Failed to queue event: {event}")
 
     @classmethod
     async def _check_for_final_output_from_tools(

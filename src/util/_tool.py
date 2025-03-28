@@ -5,14 +5,13 @@ import inspect
 import json
 import logging
 import re
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import (
     Any,
-    Callable,
+    Concatenate,
     Literal,
-    Union,
     get_args,
     get_origin,
     get_type_hints,
@@ -21,7 +20,7 @@ from typing import (
 
 from griffe import Docstring, DocstringSectionKind
 from pydantic import BaseModel, Field, ValidationError, create_model
-from typing_extensions import Concatenate, ParamSpec
+from typing_extensions import ParamSpec
 
 from ._computer import AsyncComputer, Computer
 from ._constants import LRU_CACHE_SIZE
@@ -39,19 +38,18 @@ from ._types import MaybeAwaitable
 ToolParams = ParamSpec("ToolParams")
 ToolFunctionWithoutContext = Callable[ToolParams, Any]
 ToolFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], ToolParams], Any]
-ToolFunction = Union[
-    ToolFunctionWithoutContext[ToolParams], ToolFunctionWithContext[ToolParams]
-]
+ToolFunction = (
+    ToolFunctionWithoutContext[ToolParams] | ToolFunctionWithContext[ToolParams]
+)
 
 
 ########################################################
-#       Data classe for Function Tool Schema
+#       Data classes for Function Tool Schema
 ########################################################
 
 
 @dataclass(frozen=True)
 class FuncSchema:
-    """Schema for Python functions used as LLM tools."""
 
     name: str
     description: str | None
@@ -156,7 +154,7 @@ class FileSearchTool:
     filters: Any | None = None
 
     @property
-    def name(self):
+    def name(self) -> str:
         return "file_search"
 
 
@@ -168,7 +166,7 @@ class WebSearchTool:
     search_context_size: Literal["low", "medium", "high"] = "medium"
 
     @property
-    def name(self):
+    def name(self) -> str:
         return "web_search_preview"
 
 
@@ -179,7 +177,7 @@ class ComputerTool:
     computer: Computer | AsyncComputer
 
     @property
-    def name(self):
+    def name(self) -> str:
         return "computer_use_preview"
 
 
@@ -390,7 +388,11 @@ def function_schema(
     )
 
 
-Tool = Union[FunctionTool, FileSearchTool, WebSearchTool, ComputerTool]
+########################################################
+#           Tool Types
+########################################################
+
+Tool = FunctionTool | FileSearchTool | WebSearchTool | ComputerTool
 """A tool that can be used in an agent."""
 
 
@@ -460,34 +462,27 @@ def function_tool(
         async def _on_invoke_tool_impl(ctx: RunContextWrapper[Any], input: str) -> Any:
             try:
                 json_data: dict[str, Any] = json.loads(input) if input else {}
-            except Exception as e:
-                logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
-                raise ModelError(
-                    f"Invalid JSON input for tool {schema.name}: {input}"
-                ) from e
-
-            logger.debug(f"Invoking tool {schema.name} with input {input}")
-
-            try:
                 parsed = (
                     schema.params_pydantic_model(**json_data)
                     if json_data
                     else schema.params_pydantic_model()
                 )
-            except ValidationError as e:
-                raise ModelError(
-                    f"Invalid JSON input for tool {schema.name}: {e}"
-                ) from e
+                args, kwargs_dict = schema.to_call_args(parsed)
+                logger.debug(f"Tool call args: {args}, kwargs: {kwargs_dict}")
 
-            args, kwargs_dict = schema.to_call_args(parsed)
-
-            logger.debug(f"Tool call args: {args}, kwargs: {kwargs_dict}")
-
-            try:
                 result = the_func(ctx, *args, **kwargs_dict)
                 if inspect.iscoroutine(result):
                     result = await result
                 return str(result)
+            except json.JSONDecodeError as e:
+                logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
+                raise ModelError(
+                    f"Invalid JSON input for tool {schema.name}: {input}"
+                ) from e
+            except ValidationError as e:
+                raise ModelError(
+                    f"Invalid JSON input for tool {schema.name}: {e}"
+                ) from e
             except Exception as e:
                 if failure_error_function:
                     error_msg = failure_error_function(ctx, e)
