@@ -8,13 +8,14 @@ translation agents to handle user messages.
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 from src.agents.agent import Agent
 from src.agents.run import Runner
 from src.util._client import setup_client
 from src.util._constants import SUPPORTED_LANGUAGES
 from src.util._exceptions import AgentExecutionError
-from src.util._pretty_print import pretty_print_result
+from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
 
 ########################################################
 #           Agent Creation                             #
@@ -32,7 +33,7 @@ def create_agents() -> Agent:
             Agent(
                 name=f"{lang_name} Translator",
                 instructions=f"Translate English text to {lang_name}",
-                orb_description=f"English to {lang_name} translator",
+                orbs_description=f"English to {lang_name} translator",
             ).as_tool(
                 tool_name=f"translate_to_{lang_key.lower()}",
                 tool_description=f"Translate text to {lang_name}",
@@ -54,6 +55,7 @@ def run_agent() -> str | None:
         msg = input("\n❓ Enter text to translate: ")
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
+        print(pretty_print_result_stats(result))
     except Exception as e:
         raise AgentExecutionError(e) from e
 

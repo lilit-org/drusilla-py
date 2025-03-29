@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import httpx
 
+from src.util._client import DeepSeekClient
 from src.util._constants import DEFAULT_BASE_URL, DEFAULT_MODEL
 from src.util._env import get_env_var
 from src.util._http import DefaultAsyncHttpxClient
@@ -76,7 +77,7 @@ class ModelProvider(BaseModelProvider):
     def _get_client(self) -> AsyncDeepSeek:
         """Lazy load the client to avoid API key errors if never used."""
         if self._client is None:
-            self._client = shared.get_default_model_client() or AsyncDeepSeek(
+            self._client = shared.get_default_model_client() or DeepSeekClient(
                 api_key=self._stored_api_key or shared.get_default_model_key(),
                 base_url=self._stored_base_url,
                 organization=self._stored_organization,

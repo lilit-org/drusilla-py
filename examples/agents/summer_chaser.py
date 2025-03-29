@@ -1,30 +1,41 @@
 #!/usr/bin/env python3
 
 """
-A weather information agent that demonstrates the usage of tools this framework.
+This script demonstrates the agents-as-tools pattern where a frontline agent selects
+translation agents to handle user messages.
 """
 
 import sys
-from functools import lru_cache
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+from functools import lru_cache
 
 from src.agents.agent import Agent
 from src.agents.run import Runner
 from src.util._client import setup_client
+from src.util._constants import LRU_CACHE_SIZE
 from src.util._env import get_env_var
 from src.util._exceptions import AgentExecutionError, UsageError
-from src.util._pretty_print import pretty_print_result
+from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
 from src.util._tool import function_tool
 
 ########################################################
-#           Tools                                      #
+#           Constants
+########################################################
+
+
+CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
+
+
+########################################################
+#           Tools
 ########################################################
 
 
 @function_tool
-@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
+@lru_cache(maxsize=CACHE_SIZE)
 def get_weather(city: str) -> dict:
     print(f"Getting weather for {city}")
     return {
@@ -36,7 +47,7 @@ def get_weather(city: str) -> dict:
 
 
 @function_tool
-@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
+@lru_cache(maxsize=CACHE_SIZE)
 def is_summer(city: str) -> bool:
     weather = get_weather(city)
     try:
@@ -47,11 +58,11 @@ def is_summer(city: str) -> bool:
 
 
 ########################################################
-#           Agent Creation                             #
+#           Agent Creation
 ########################################################
 
 
-@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
+@lru_cache(maxsize=CACHE_SIZE)
 def create_agent() -> Agent:
     return Agent(
         name="Agent Summer Chaser",
@@ -67,7 +78,7 @@ def create_agent() -> Agent:
 
 
 ########################################################
-#           Agent Runner                               #
+#           Agent Runne
 ########################################################
 
 
@@ -78,6 +89,7 @@ def run_agent() -> str | None:
         msg = input("\n❓ Enter a city to check the weather: ").strip()
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
+        print(pretty_print_result_stats(result))
     except Exception as e:
         raise AgentExecutionError(e) from e
 

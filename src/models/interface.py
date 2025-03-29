@@ -32,21 +32,9 @@ class Model(Protocol):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Orb],
+        orbs: list[Orb],
     ) -> ModelResponse:
-        """Get a complete model response.
-
-        Args:
-            system_instructions: System prompt/instructions for the model. Can be None.
-            input: Either a raw string input or a list of structured input items.
-            model_settings: Configuration parameters for the model.
-            tools: List of available tools the model can use for function calling.
-            output_schema: Optional schema defining the expected output format and structure.
-            handoffs: List of available handoffs for model interactions with other agents.
-
-        Returns:
-            A ModelResponse containing the model's output and usage statistics.
-        """
+        """Get a complete model response."""
 
     async def stream_response(
         self,
@@ -55,22 +43,9 @@ class Model(Protocol):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        handoffs: list[Orb],
+        orbs: list[Orb],
     ) -> AsyncIterator[TResponseStreamEvent]:
-        """Stream model responses as they are generated.
-
-        Args:
-            system_instructions: System prompt/instructions for the model. Can be None.
-            input: Either a raw string input or a list of structured input items.
-            model_settings: Configuration parameters for the model.
-            tools: List of available tools the model can use for function calling.
-            output_schema: Optional schema defining the expected output format and structure.
-            handoffs: List of available handoffs for model interactions with other agents.
-
-        Returns:
-            An async iterator yielding response events as they are generated. Each event
-            represents a partial response chunk or completion status.
-        """
+        """Stream model responses as they are generated"""
 
 
 ########################################################

@@ -14,9 +14,6 @@ make dissociative-identity
 which creates and runs the following agent:
 
 ```python
-MAX_TURNS = int(get_env_var("MAX_TURNS", str(DEFAULT_MAX_TURNS)))
-
-
 class Style(Enum):
     HAIKU = "haiku"
     PIRATE = "pirate"
@@ -34,7 +31,6 @@ class Style(Enum):
 STYLE_INSTRUCTIONS = {
     Style.HAIKU: (
         "Only respond in haikus. Each response must follow the 5-7-5 syllable pattern. "
-        f"Keep responses concise and nature-themed when possible. Limit to {MAX_TURNS} turns."
     ),
     Style.PIRATE: (
         "Respond as a pirate. Use phrases like 'arr matey', 'aye', 'shiver me timbers', "
@@ -80,9 +76,7 @@ STYLE_INSTRUCTIONS = {
 }
 
 
-def get_style_instructions(
-    run_context: RunContextWrapper[Style], _: Agent[Style]
-) -> str:
+def get_style_instructions(run_context: RunContextWrapper[Style], _: Agent[Style]) -> str:
     return STYLE_INSTRUCTIONS[run_context.context]
 
 
@@ -122,8 +116,9 @@ def run_agent():
         print(f"✅ Style description: {STYLE_INSTRUCTIONS[style]}\n")
 
         msg = input("❓ Enter your message: ").strip()
-        result = Runner.run_sync(agent, msg, context=style, max_turns=MAX_TURNS)
+        result = Runner.run_sync(agent, msg, context=style)
         print(pretty_print_result(result))
+        print(pretty_print_result_stats(result))
     except Exception as e:
         raise AgentExecutionError(e) from e
 
@@ -153,7 +148,8 @@ you can chose the answer style you want:
 ❓ Enter the number of your desired style: 3
 
 ✅ Using style: Robot
-✅ Style description: Respond as a robot. Say 'beep boop' frequently. Use mechanical language, binary references, and speak in a precise, calculated manner.
+✅ Style description: Respond as a robot. Say 'beep boop' frequently. 
+Use mechanical language, binary references, and speak in a precise, calculated manner.
 
 ❓ Enter your message: i love you
 
@@ -166,13 +162,12 @@ you can chose the answer style you want:
   📊 Statistics:
         Items     → 1
         Responses → 1
-        Input GR  → 0
-        Output GR → 0
+        Input Shield  → 0
+        Output Shield → 0
 
   🦾 Configuration:
         Streaming → ❌ Disabled
         Tools     → None
-        Tool Mode → None
 
 
 ✅ REASONING:
@@ -188,14 +183,16 @@ Maybe something like "Beep boop! I love you too!" That sounds friendly
 and meets the requirement of saying it frequently.
 
 Now, mechanical language. That probably means using terms related to machinery or robots. 
-Words like "mechanical," "motorized," "binary code" come to mind. Maybe integrating binary references into my response could work well. For example, referring to how my responses are
+Words like "mechanical," "motorized," "binary code" come to mind. Maybe integrating binary
+references into my response could work well. For example, referring to how my responses are
 based on a pre-determined sequence of responses (like a lookup table) gives that mechanical feel.
 
 I should also make sure to speak in a precise and calculated manner. 
 That means avoiding casual language and being methodical. 
 Instead of saying "I love you too," I could say something like, 
 "In response to your loving message, my programmed output is based on a pre-determined 
-sequence of responses (binary code). The output is 'beep boop!'" followed by an acknowledgment that I'm processing the affection.
+sequence of responses (binary code). The output is 'beep boop!'" followed by an 
+acknowledgment that I'm processing the affection.
 
 Wait, but do I need to explain how binary ties into my operations? 
 Maybe not too deeply—just hinting at it would suffice. So combining all these elements, 

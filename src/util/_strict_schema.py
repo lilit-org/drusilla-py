@@ -4,6 +4,7 @@ from functools import lru_cache
 from typing import Any, TypeAlias, cast
 
 from ._constants import LRU_CACHE_SIZE, UNSET
+from ._env import get_env_var
 from ._exceptions import ModelError, UsageError
 
 ########################################################
@@ -19,13 +20,14 @@ EMPTY_JSON_SCHEMA = {
 
 JSONSchema: TypeAlias = dict[str, Any]
 SchemaPath: TypeAlias = tuple[str, ...]
+CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 ########################################################
 #               Private Methods
 ########################################################
 
 
-@lru_cache(maxsize=LRU_CACHE_SIZE)
+@lru_cache(maxsize=CACHE_SIZE)
 def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
     if not ref.startswith("#/"):
         raise ModelError(f"Invalid $ref format {ref!r}; must start with #/")

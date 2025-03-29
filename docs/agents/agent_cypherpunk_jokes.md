@@ -13,8 +13,6 @@ make cypherpunk-joker
 which creates and runs the following agent:
 
 ```python
-MAX_TURNS = int(get_env_var("MAX_TURNS", str(DEFAULT_MAX_TURNS)))
-
 def create_agent() -> Agent:
     return Agent(
         name="Agent Cypherpunk Joker",
@@ -89,7 +87,6 @@ async def run_agent():
         result = await Runner.run_streamed(
             agent,
             f"Tell me exactly {num_jokes} cypherpunk jokes!",
-            max_turns=MAX_TURNS,
         )
 
         await _handle_stream_events(result, num_jokes)
@@ -119,13 +116,12 @@ you can ask for a certain number of jokes, and it will update and run the agent:
   📊 Statistics:
         Items     → 0
         Responses → 1
-        Input GR  → 0
-        Output GR → 0
+        Input Shield  → 0
+        Output Shield → 0
   
   🦾 Configuration:
         Streaming → ✔️ Enabled
         Tools     → None
-        Tool Mode → None
 
 
 ✅ REASONING:
@@ -134,7 +130,9 @@ Okay, so I need to come up with four cypherpunk-themed jokes based on the user's
 First, I'll recall what cypherpunk is—it combines cyberpunk (cyber technology and dystopian
 themes) with j科幻 elements like space, AI, and high-tech environments.
 
-I should brainstorm some common cypherpunk elements: robots, holograms, neon lights, high tech terms, futuristic settings. Now, thinking of joke structures—maybe something that plays on technology or phrases people might use in their daily lives but add a twist with the cyberpunk theme.
+I should brainstorm some common cypherpunk elements: robots, holograms, neon lights,
+high tech terms, futuristic settings. Now, thinking of joke structures—maybe something that plays
+on technology or phrases people might use in their daily lives but add a twist with the cyberpunk theme.
 
 Let me start with the first joke. Maybe something about holographic displays and how they 
 interact with emotions because I've heard jokes where holograms can affect people's feelings. 

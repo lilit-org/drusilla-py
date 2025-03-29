@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
-from ..gear.orbs import Orb
+from ..gear.orbs import Orbs
 from ..util._constants import HEADERS, UNSET, IncludeLiteral
 from ..util._exceptions import UsageError
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
@@ -60,7 +60,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
     ) -> ModelResponse:
         try:
             response = await self._fetch_response(
@@ -107,7 +107,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
     ) -> AsyncIterator[ResponseOutput]:
         try:
             stream = await self._fetch_response(
@@ -135,7 +135,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
         stream: Literal[True],
     ) -> AsyncStream[ResponseOutput]: ...
 
@@ -147,7 +147,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
         stream: Literal[False],
     ) -> Response: ...
 
@@ -158,7 +158,7 @@ class ModelResponsesModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
         stream: Literal[True] | Literal[False] = False,
     ) -> Response | AsyncStream[ResponseOutput]:
         list_input = ItemHelpers.input_to_new_input_list(input)
@@ -231,7 +231,7 @@ class Converter:
     def convert_tools(
         cls,
         tools: list[Tool],
-        orbs: list[Orb[Any]],
+        orbs: list[Orbs[Any]],
     ) -> ConvertedTools:
         converted_tools: list[ChatCompletionToolParam] = []
         includes: list[IncludeLiteral] = []
@@ -291,11 +291,11 @@ class Converter:
             }, None
 
     @staticmethod
-    def _convert_orb_tool(orb: Orb) -> ChatCompletionToolParam:
+    def _convert_orb_tool(orbs: Orbs) -> ChatCompletionToolParam:
         return {
-            "name": orb.tool_name,
-            "parameters": orb.input_json_schema,
-            "strict": orb.strict_json_schema,
+            "name": orbs.tool_name,
+            "parameters": orbs.input_json_schema,
+            "strict": orbs.strict_json_schema,
             "type": "function",
-            "description": orb.tool_description,
+            "description": orbs.tool_description,
         }

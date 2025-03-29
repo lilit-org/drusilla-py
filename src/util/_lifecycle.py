@@ -63,24 +63,24 @@ class BaseHooks(ABC, Generic[TContext], HookProtocol[TContext]):
 
 
 class RunHooks(BaseHooks[TContext]):
-    """Receives callbacks for agent run lifecycle events. Override methods as needed."""
+    """Receives callbacks for agent run lifecycle events."""
 
-    async def on_handoff(
+    async def on_orbs(
         self,
         context: RunContextWrapper[TContext],
         from_agent: Agent[TContext],
         to_agent: Agent[TContext],
     ) -> None:
-        """Called during agent handoff."""
+        """Called during agent orbs."""
 
 
 class AgentHooks(BaseHooks[TContext]):
-    """Receives callbacks for specific agent lifecycle events. Set on agent.hooks."""
+    """Receives callbacks for specific agent lifecycle events."""
 
-    async def on_handoff(
+    async def on_orbs(
         self,
         context: RunContextWrapper[TContext],
         agent: Agent[TContext],
         source: Agent[TContext],
     ) -> None:
-        """Called when agent receives handoff. Source is the handing-off agent."""
+        """Called when agent receives orbs."""

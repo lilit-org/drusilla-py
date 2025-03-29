@@ -60,8 +60,8 @@ ToolCallItemTypes: TypeAlias = (
 
 RunItem: TypeAlias = Union[
     "MessageOutputItem",
-    "HandoffCallItem",
-    "HandoffOutputItem",
+    "OrbsCallItem",
+    "OrbsOutputItem",
     "ToolCallItem",
     "ToolCallOutputItem",
     "ReasoningItem",
@@ -124,17 +124,17 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
 
 
 @dataclass(frozen=True)
-class HandoffCallItem(RunItemBase[ResponseFunctionToolCall]):
+class OrbsCallItem(RunItemBase[ResponseFunctionToolCall]):
     raw_item: ResponseFunctionToolCall
-    type: Literal["handoff_call_item"] = "handoff_call_item"
+    type: Literal["orbs_call_item"] = "orbs_call_item"
 
 
 @dataclass(frozen=True)
-class HandoffOutputItem(RunItemBase[TResponseInputItem]):
+class OrbsOutputItem(RunItemBase[TResponseInputItem]):
     raw_item: TResponseInputItem
     source_agent: Agent[Any]
     target_agent: Agent[Any]
-    type: Literal["handoff_output_item"] = "handoff_output_item"
+    type: Literal["orbs_output_item"] = "orbs_output_item"
 
 
 @dataclass(frozen=True)
