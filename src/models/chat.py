@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
-from ..gear.orbs import Orb
+from ..gear.orbs import Orbs
 from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET
 from ..util._exceptions import AgentError, UsageError
 from ..util._items import (
@@ -75,7 +75,7 @@ class ModelChatCompletionsModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
     ) -> ModelResponse:
         response = await self._fetch_response(
             system_instructions,
@@ -116,7 +116,7 @@ class ModelChatCompletionsModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
     ) -> AsyncIterator[TResponseStreamEvent]:
         """Stream model responses as generated."""
         response, stream = await self._fetch_response(
@@ -184,7 +184,7 @@ class ModelChatCompletionsModel(Model):
         model_settings: ModelSettings,
         tools: list[Tool],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
         stream: bool = False,
     ) -> ChatCompletion | tuple[Response, AsyncStream]:
         converted_messages = _Converter.items_to_messages(input)
@@ -597,12 +597,12 @@ class ToolConverter:
         raise AgentError(f"Received tool type: {type(tool)}, tool: {tool}")
 
     @classmethod
-    def convert_orb_tool(cls, orb: Orb[Any]) -> ChatCompletionToolParam:
+    def convert_orb_tool(cls, orbs: Orbs[Any]) -> ChatCompletionToolParam:
         return {
             "type": "function",
             "function": {
-                "name": orb.tool_name,
-                "description": orb.tool_description,
-                "parameters": orb.input_json_schema,
+                "name": orbs.tool_name,
+                "description": orbs.tool_description,
+                "parameters": orbs.input_json_schema,
             },
         }

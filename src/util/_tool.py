@@ -24,6 +24,7 @@ from typing_extensions import ParamSpec
 
 from ._computer import AsyncComputer, Computer
 from ._constants import LRU_CACHE_SIZE
+from ._env import get_env_var
 from ._exceptions import GenericError, ModelError, UsageError
 from ._items import RunItem
 from ._logger import logger
@@ -39,6 +40,7 @@ ToolParams = ParamSpec("ToolParams")
 ToolFunctionWithoutContext = Callable[ToolParams, Any]
 ToolFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], ToolParams], Any]
 ToolFunction = ToolFunctionWithoutContext[ToolParams] | ToolFunctionWithContext[ToolParams]
+CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 
 ########################################################
@@ -185,7 +187,7 @@ class ComputerTool:
 DocstringStyle = Literal["google", "numpy", "sphinx"]
 
 
-@lru_cache(maxsize=LRU_CACHE_SIZE)
+@lru_cache(maxsize=CACHE_SIZE)
 def _detect_docstring_style(doc: str) -> DocstringStyle:
     """Detect docstring style using pattern matching."""
     patterns = {
@@ -221,7 +223,7 @@ def _suppress_griffe_logging():
         logger.setLevel(previous_level)
 
 
-@lru_cache(maxsize=LRU_CACHE_SIZE)
+@lru_cache(maxsize=CACHE_SIZE)
 def _process_var_positional(
     param: inspect.Parameter, ann: Any, field_description: str | None
 ) -> tuple[Any, Field]:
@@ -238,7 +240,7 @@ def _process_var_positional(
     return ann, Field(default_factory=list, description=field_description)  # type: ignore
 
 
-@lru_cache(maxsize=LRU_CACHE_SIZE)
+@lru_cache(maxsize=CACHE_SIZE)
 def _process_var_keyword(
     param: inspect.Parameter, ann: Any, field_description: str | None
 ) -> tuple[Any, Field]:

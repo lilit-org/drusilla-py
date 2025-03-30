@@ -13,37 +13,24 @@ def _indent(text: str, indent_level: int) -> str:
     return "\n".join("  " * indent_level + line for line in text.splitlines())
 
 
-def _format_final_output(raw_response: ModelResponse) -> str:
+def _format_final_output(raw_response: ModelResponse) -> tuple[str, str]:
     if not raw_response.output:
-        return ""
+        return "", ""
 
-    # Get text from the first output item
     output_text = str(raw_response.output[0].get("text", raw_response.output[0]))
     output_text = output_text.strip("'").strip().encode().decode("unicode-escape")
 
-    # Extract everything between think tags for reasoning
     reasoning = ""
     result = output_text
 
     if "<think>" in output_text and "</think>" in output_text:
-        # Find the start and end positions
         start = output_text.find("<think>") + len("<think>")
         end = output_text.find("</think>")
-
-        # Extract the reasoning (everything between think tags)
         reasoning = output_text[start:end].strip()
-
-        # Extract the result (everything after </think>)
         result = output_text[end + len("</think>") :].strip()
-
-        # Clean up any leading/trailing whitespace or newlines
-        reasoning = reasoning.strip()
-        result = result.strip()
-
-        # Remove "Here are the jokes:" if present
         result = re.sub(r"^Here are the jokes?:", "", result, flags=re.IGNORECASE).strip()
 
-    return f"\n\n✅ REASONING:\n\n{reasoning}\n\n✅ RESULT:\n\n{result}\n"
+    return (f"\n\n✅ REASONING:\n\n{reasoning}", f"\n\n✅ RESULT:\n\n{result}\n")
 
 
 ########################################################
@@ -76,8 +63,8 @@ def _format_stats(result: Any) -> str:
         "\n📊 Statistics:",
         f"      Items     → {len(result.new_items)}",
         f"      Responses → {len(result.raw_responses)}",
-        f"      Input GR  → {len(result.input_shield_results)}",
-        f"      Output GR → {len(result.output_shield_results)}",
+        f"      Input Shield  → {len(result.input_shield_results)}",
+        f"      Output Shield → {len(result.output_shield_results)}",
     ]
     return "\n" + "\n".join(_indent(stat, 1) for stat in stats)
 
@@ -88,6 +75,7 @@ def _format_stats(result: Any) -> str:
 
 
 def _format_stream_info(stream: bool, tool_choice: Any, result: Any) -> str:
+
     def format_obj(x: Any) -> str:
         if x is None or x is object():
             return "None"
@@ -102,7 +90,6 @@ def _format_stream_info(stream: bool, tool_choice: Any, result: Any) -> str:
     info.append(f"      Streaming → {format_obj(stream)}")
     if tools and hasattr(tools, "tools"):
         info.append(f"      Tools     → {format_obj(tools.tools)}")
-    info.append(f"      Tool Mode → {format_obj(tool_choice)}")
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
@@ -125,11 +112,17 @@ def pretty_print_result_stats(result: RunResult) -> str:
     return "".join(parts)
 
 
-def pretty_print_result(result: RunResult) -> str:
-    return pretty_print_result_stats(result) + _format_final_output(result.raw_responses[0])
+def _format_result(result: Any, show_reasoning: bool = True) -> str:
+    res_reasoning, res_result = _format_final_output(result)
+    return (res_reasoning + res_result) if show_reasoning else res_result
 
 
-def pretty_print_result_stream(result: RunResultStreaming):
-    return _format_final_output(
-        ModelResponse(output=[{"text": result}], usage=Usage(), referenceable_id=None)
+def pretty_print_result(result: RunResult, show_reasoning: bool = True) -> str:
+    return _format_result(result.raw_responses[0], show_reasoning)
+
+
+def pretty_print_result_stream(result: RunResultStreaming, show_reasoning: bool = True) -> str:
+    return _format_result(
+        ModelResponse(output=[{"text": result}], usage=Usage(), referenceable_id=None),
+        show_reasoning,
     )

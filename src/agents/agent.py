@@ -21,7 +21,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, cast
 
-from ..gear.orbs import Orb
+from ..gear.orbs import Orbs
 from ..gear.shields import InputShield, OutputShield
 from ..models.settings import ModelSettings
 from ..util import _json
@@ -92,7 +92,7 @@ ToolsToFinalOutputFunction: TypeAlias = Callable[
 
 @dataclass
 class Agent(Generic[TContext]):
-    """AI agent with tools, shields, and handoffs."""
+    """AI agent with tools, shields, and orbs."""
 
     name: str
     instructions: (
@@ -104,8 +104,8 @@ class Agent(Generic[TContext]):
         | None
     ) = None
 
-    orb_description: str | None = None
-    orbs: list[Agent[Any] | Orb[TContext]] = field(default_factory=list)
+    orbs_description: str | None = None
+    orbs: list[Agent[Any] | Orbs[TContext]] = field(default_factory=list)
     model: str | Model = field(default="")
     model_settings: ModelSettings = field(default_factory=ModelSettings)
     tools: list[Tool] = field(default_factory=list)

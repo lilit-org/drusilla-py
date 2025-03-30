@@ -6,7 +6,7 @@ from pydantic import BaseModel, TypeAdapter
 from typing_extensions import TypedDict
 
 from ..util import _json
-from ..util._constants import DEFAULT_WRAPPER_DICT_KEY
+from ..util._constants import DEFAULT_WRAPPER_DICT_KEY, LRU_CACHE_SIZE
 from ..util._env import get_env_var
 from ..util._exceptions import ModelError, UsageError
 from ..util._strict_schema import ensure_strict_json_schema
@@ -16,7 +16,7 @@ from ..util._strict_schema import ensure_strict_json_schema
 ########################################################
 
 WRAPPER_DICT_KEY = get_env_var("WRAPPER_DICT_KEY", DEFAULT_WRAPPER_DICT_KEY)
-LRU_CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", "128"))
+LRU_CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 
 ########################################################

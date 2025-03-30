@@ -167,8 +167,3 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-
-venv
-env
-.env
-.ruff_cache/

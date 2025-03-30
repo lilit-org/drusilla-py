@@ -9,21 +9,13 @@ import asyncio
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 from src.agents.agent import Agent
 from src.agents.run import Runner
 from src.util._client import setup_client
-from src.util._constants import DEFAULT_MAX_TURNS
-from src.util._env import get_env_var
 from src.util._exceptions import AgentExecutionError
 from src.util._pretty_print import pretty_print_result_stats, pretty_print_result_stream
-
-########################################################
-#           Constants
-########################################################
-
-MAX_TURNS = int(get_env_var("MAX_TURNS", str(DEFAULT_MAX_TURNS)))
-
 
 ########################################################
 #           Agent Creation                             #
@@ -41,7 +33,6 @@ def create_agent() -> Agent:
             "4. Make the jokes cyberpunk-themed and entertaining\n"
             "5. Number each joke clearly"
         ),
-        tools=[],
     )
 
 
@@ -97,11 +88,8 @@ async def run_agent():
         result = await Runner.run_streamed(
             agent,
             f"Tell me exactly {num_jokes} cypherpunk jokes!",
-            max_turns=MAX_TURNS,
         )
-
         await _handle_stream_events(result, num_jokes)
-
     except Exception as e:
         raise AgentExecutionError(e) from e
 

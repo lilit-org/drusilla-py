@@ -5,7 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-from ..gear.orbs import Orb, OrbInputFilter, orb
+from ..gear.orbs import Orbs, OrbsInputFilter, orbs
 from ..gear.shields import (
     InputShield,
     InputShieldResult,
@@ -35,7 +35,7 @@ from .agent import Agent
 from .output import AgentOutputSchema
 from .run_impl import (
     NextStepFinalOutput,
-    NextStepHandoff,
+    NextStepOrbs,
     NextStepRunAgain,
     QueueCompleteSentinel,
     RunImpl,
@@ -61,7 +61,7 @@ class RunConfig:
     model: str | Model | None = None
     model_provider: ModelProvider = field(default_factory=ModelProvider)
     model_settings: ModelSettings | None = None
-    orb_input_filter: OrbInputFilter | None = None
+    orbs_input_filter: OrbsInputFilter | None = None
     input_shields: list[InputShield[TContext]] = field(default_factory=list)
     output_shields: list[OutputShield[TContext]] = field(default_factory=list)
     max_turns: int = MAX_TURNS
@@ -157,7 +157,7 @@ class Runner:
                         context_wrapper,
                         run_config,
                     )
-                elif isinstance(turn_result.next_step, NextStepHandoff):
+                elif isinstance(turn_result.next_step, NextStepOrbs):
                     current_agent = cast(Agent[TContext], turn_result.next_step.new_agent)
                     should_run_agent_start_hooks = True
                 elif isinstance(turn_result.next_step, NextStepRunAgain):
@@ -333,7 +333,6 @@ class Runner:
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> None:
-
         current_agent = starting_agent
         current_turn = 0
         should_run_agent_start_hooks = True
@@ -378,7 +377,7 @@ class Runner:
 
                     cls._update_streamed_result(streamed_result, turn_result)
 
-                    if isinstance(turn_result.next_step, NextStepHandoff):
+                    if isinstance(turn_result.next_step, NextStepOrbs):
                         current_agent = turn_result.next_step.new_agent
                         should_run_agent_start_hooks = True
                         try:
@@ -428,7 +427,6 @@ class Runner:
     def _update_streamed_result(
         cls, streamed_result: RunResultStreaming, turn_result: SingleStepResult
     ) -> None:
-
         streamed_result.raw_responses.append(turn_result.model_response)
         streamed_result.input = turn_result.original_input
         streamed_result.new_items = turn_result.generated_items
@@ -442,7 +440,6 @@ class Runner:
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> None:
-
         streamed_result._output_shields_task = asyncio.create_task(
             cls._run_output_shields(
                 current_agent,
@@ -520,7 +517,7 @@ class Runner:
         system_prompt = await agent.get_system_prompt(context_wrapper)
         input = streamed_result.input
         output_schema = cls._get_output_schema(agent)
-        orbs = cls._get_handoffs(agent)
+        orbs = cls._get_orbs(agent)
         model = cls._get_model(agent, run_config)
         model_settings = agent.model_settings.resolve(run_config.model_settings)
 
@@ -599,7 +596,6 @@ class Runner:
         run_config: RunConfig,
         should_run_agent_start_hooks: bool,
     ) -> SingleStepResult:
-
         if should_run_agent_start_hooks:
             await cls._run_agent_start_hooks(
                 agent,
@@ -609,7 +605,7 @@ class Runner:
 
         system_prompt = await agent.get_system_prompt(context_wrapper)
         output_schema = cls._get_output_schema(agent)
-        orbs = cls._get_handoffs(agent)
+        orbs = cls._get_orbs(agent)
         input = ItemHelpers.input_to_new_input_list(original_input)
         input.extend([generated_item.to_input_item() for generated_item in generated_items])
         new_response = await cls._get_new_response(
@@ -643,12 +639,11 @@ class Runner:
         pre_step_items: list[RunItem],
         new_response: ModelResponse,
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> SingleStepResult:
-
         processed_response = RunImpl.process_model_response(
             agent=agent,
             response=new_response,
@@ -730,11 +725,10 @@ class Runner:
         system_prompt: str | None,
         input: list[TResponseInputItem],
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> ModelResponse:
-
         model = cls._get_model(agent, run_config)
         model_settings = agent.model_settings.resolve(run_config.model_settings)
         new_response = await model.get_response(
@@ -756,9 +750,12 @@ class Runner:
         return AgentOutputSchema(agent.output_type)
 
     @classmethod
-    def _get_handoffs(cls, agent: Agent[Any]) -> list[Orb]:
-        """Get list of handoffs from agent, converting Agent instances to Orb objects."""
-        return [orb_item if isinstance(orb_item, Orb) else orb(orb_item) for orb_item in agent.orbs]
+    def _get_orbs(cls, agent: Agent[Any]) -> list[Orbs]:
+        """Get list of orbs from agent, converting Agent instances to Orb objects."""
+        return [
+            orbs_item if isinstance(orbs_item, Orbs) else orbs(orbs_item)
+            for orbs_item in agent.orbs
+        ]
 
     @classmethod
     def _get_model(cls, agent: Agent[Any], run_config: RunConfig) -> Model:

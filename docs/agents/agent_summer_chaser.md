@@ -13,8 +13,10 @@ make summer-chaser
 which creates and runs the following agent:
 
 ```python
+CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
+
 @function_tool
-@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
+@lru_cache(maxsize=CACHE_SIZE)
 def get_weather(city: str) -> dict:
     print(f"Getting weather for {city}")
     return {
@@ -26,19 +28,17 @@ def get_weather(city: str) -> dict:
 
 
 @function_tool
-@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
+@lru_cache(maxsize=CACHE_SIZE)
 def is_summer(city: str) -> bool:
     weather = get_weather(city)
     try:
         _, max_temp = map(int, weather["temperature_range"].split("-")[1].rstrip("C"))
         return max_temp >= 25
     except (ValueError, AttributeError) as e:
-        raise UsageError(
-            f"Invalid temperature range format: {weather['temperature_range']}"
-        ) from e
+        raise UsageError(f"Invalid temperature range format: {weather['temperature_range']}") from e
 
 
-@lru_cache(maxsize=int(get_env_var("CACHE_SIZE", "128")))
+@lru_cache(maxsize=CACHE_SIZE)
 def create_agent() -> Agent:
     return Agent(
         name="Agent Summer Chaser",
@@ -60,6 +60,7 @@ def run_agent() -> str | None:
         msg = input("\n❓ Enter a city to check the weather: ").strip()
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
+        print(pretty_print_result_stats(result))
     except Exception as e:
         raise AgentExecutionError(e) from e
 
@@ -84,13 +85,12 @@ you can find out the weather at any city and whether it feels like summer:
   📊 Statistics:
         Items     → 1
         Responses → 1
-        Input GR  → 0
-        Output GR → 0
+        Input Shield  → 0
+        Output Shield → 0
 
   🦾 Configuration:
         Streaming → ❌ Disabled
         Tools     → Available (2 tools)
-        Tool Mode → None
 
 
 ✅ REASONING:

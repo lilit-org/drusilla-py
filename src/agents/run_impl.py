@@ -6,7 +6,7 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from ..gear.orbs import Orb, OrbInputData
+from ..gear.orbs import Orbs, OrbsInputData
 from ..gear.shields import (
     InputShield,
     InputShieldResult,
@@ -15,11 +15,11 @@ from ..gear.shields import (
 )
 from ..util._exceptions import AgentError, ModelError, UsageError
 from ..util._items import (
-    HandoffCallItem,
-    HandoffOutputItem,
     ItemHelpers,
     MessageOutputItem,
     ModelResponse,
+    OrbsCallItem,
+    OrbsOutputItem,
     ReasoningItem,
     RunItem,
     ToolCallItem,
@@ -67,8 +67,8 @@ _NOT_FINAL_OUTPUT = ToolsToFinalOutputResult(is_final_output=False, final_output
 
 
 @dataclass(frozen=True)
-class ToolRunHandoff:
-    orb: Orb
+class ToolRunOrbs:
+    orbs: Orbs
     tool_call: ResponseFunctionToolCall
 
 
@@ -87,7 +87,7 @@ class ToolRunComputerAction:
 @dataclass
 class ProcessedResponse:
     new_items: list[RunItem]
-    orbs: list[ToolRunHandoff]
+    orbs: list[ToolRunOrbs]
     functions: list[ToolRunFunction]
     computer_actions: list[ToolRunComputerAction]
 
@@ -96,7 +96,7 @@ class ProcessedResponse:
 
 
 @dataclass(frozen=True)
-class NextStepHandoff:
+class NextStepOrbs:
     new_agent: Agent[Any]
 
 
@@ -116,7 +116,7 @@ class SingleStepResult:
     model_response: ModelResponse
     pre_step_items: list[RunItem]
     new_step_items: list[RunItem]
-    next_step: NextStepHandoff | NextStepFinalOutput | NextStepRunAgain
+    next_step: NextStepOrbs | NextStepFinalOutput | NextStepRunAgain
 
     @property
     def generated_items(self) -> list[RunItem]:
@@ -131,8 +131,8 @@ class SingleStepResult:
 class RunImpl:
     EVENT_MAP = {
         MessageOutputItem: "message_output_created",
-        HandoffCallItem: "handoff_requested",
-        HandoffOutputItem: "handoff_occured",
+        OrbsCallItem: "orbs_requested",
+        OrbsOutputItem: "orbs_occured",
         ToolCallItem: "tool_called",
         ToolCallOutputItem: "tool_output",
         ReasoningItem: "reasoning_item_created",
@@ -171,14 +171,14 @@ class RunImpl:
         new_step_items.extend([result.run_item for result in function_results])
         new_step_items.extend(computer_results)
 
-        if run_handoffs := processed_response.orbs:
-            return await cls.execute_handoffs(
+        if run_orbs := processed_response.orbs:
+            return await cls.execute_orbs(
                 agent=agent,
                 original_input=original_input,
                 pre_step_items=pre_step_items,
                 new_step_items=new_step_items,
                 new_response=new_response,
-                run_handoffs=run_handoffs,
+                run_orbs=run_orbs,
                 hooks=hooks,
                 context_wrapper=context_wrapper,
                 run_config=run_config,
@@ -254,13 +254,13 @@ class RunImpl:
         agent: Agent[Any],
         response: ModelResponse,
         output_schema: AgentOutputSchema | None,
-        orbs: list[Orb],
+        orbs: list[Orbs],
     ) -> ProcessedResponse:
         items: list[RunItem] = []
-        run_handoffs: list[ToolRunHandoff] = []
+        run_orbs: list[ToolRunOrbs] = []
         functions: list[ToolRunFunction] = []
         computer_actions: list[ToolRunComputerAction] = []
-        orb_map = {orb.tool_name: orb for orb in orbs}
+        orbs_map = {orb.tool_name: orb for orb in orbs}
         function_map = {}
         computer_tool = None
 
@@ -292,13 +292,13 @@ class RunImpl:
             elif output_type == "reasoning":
                 items.append(ReasoningItem(raw_item=output, agent=agent))
             elif output_type == "function":
-                if output["name"] in orb_map:
-                    items.append(HandoffCallItem(raw_item=output, agent=agent))
-                    handoff = ToolRunHandoff(
-                        orb=orb_map[output["name"]],
+                if output["name"] in orbs_map:
+                    items.append(OrbsCallItem(raw_item=output, agent=agent))
+                    orbs = ToolRunOrbs(
+                        orbs=orbs_map[output["name"]],
                         tool_call=output,
                     )
-                    run_handoffs.append(handoff)
+                    run_orbs.append(orbs)
                 else:
                     if output["name"] not in function_map:
                         raise ModelError(f"Tool {output['name']} not found in agent {agent.name}")
@@ -315,7 +315,7 @@ class RunImpl:
 
         return ProcessedResponse(
             new_items=items,
-            orbs=run_handoffs,
+            orbs=run_orbs,
             functions=functions,
             computer_actions=computer_actions,
         )
@@ -395,7 +395,7 @@ class RunImpl:
         )
 
     @classmethod
-    async def execute_handoffs(
+    async def execute_orbs(
         cls,
         *,
         agent: Agent[TContext],
@@ -403,36 +403,36 @@ class RunImpl:
         pre_step_items: list[RunItem],
         new_step_items: list[RunItem],
         new_response: ModelResponse,
-        run_handoffs: list[ToolRunHandoff],
+        run_orbs: list[ToolRunOrbs],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig | None,
     ) -> SingleStepResult:
-        if len(run_handoffs) > 1:
-            ignored_handoffs = run_handoffs[1:]
-            output_message = f"Multiple orbs, ignoring {len(ignored_handoffs)} orbs."
+        if len(run_orbs) > 1:
+            ignored_orbs = run_orbs[1:]
+            output_message = f"Multiple orbs, ignoring {len(ignored_orbs)} orbs."
             new_step_items.append(
                 ToolCallOutputItem(
                     output=output_message,
                     raw_item=ItemHelpers.tool_call_output_item(
-                        ignored_handoffs[0].tool_call, output_message
+                        ignored_orbs[0].tool_call, output_message
                     ),
                     agent=agent,
                 )
             )
 
-        actual_handoff = run_handoffs[0]
-        orb = actual_handoff.orb
-        new_agent: Agent[Any] = await orb.on_invoke_orb(
-            context_wrapper, actual_handoff.tool_call.arguments
+        actual_orbs = run_orbs[0]
+        orbs = actual_orbs.orbs
+        new_agent: Agent[Any] = await orbs.on_invoke_orbs(
+            context_wrapper, actual_orbs.tool_call.arguments
         )
 
         new_step_items.append(
-            HandoffOutputItem(
+            OrbsOutputItem(
                 agent=agent,
                 raw_item=ItemHelpers.tool_call_output_item(
-                    actual_handoff.tool_call,
-                    orb.get_transfer_message(new_agent),
+                    actual_orbs.tool_call,
+                    orbs.get_transfer_message(new_agent),
                 ),
                 source_agent=agent,
                 target_agent=new_agent,
@@ -440,13 +440,13 @@ class RunImpl:
         )
 
         await asyncio.gather(
-            hooks.on_handoff(
+            hooks.on_orbs(
                 context=context_wrapper,
                 from_agent=agent,
                 to_agent=new_agent,
             ),
             (
-                agent.hooks.on_handoff(
+                agent.hooks.on_orbs(
                     context_wrapper,
                     agent=new_agent,
                     source=agent,
@@ -456,20 +456,20 @@ class RunImpl:
             ),
         )
 
-        input_filter = orb.input_filter or (run_config.orb_input_filter if run_config else None)
+        input_filter = orbs.input_filter or (run_config.orbs_input_filter if run_config else None)
         if input_filter:
-            logger.debug("Filtering inputs for handoff")
-            orb_input_data = OrbInputData(
+            logger.debug("Filtering inputs for orbs")
+            orbs_input_data = OrbsInputData(
                 input_history=(
                     tuple(original_input) if isinstance(original_input, list) else original_input
                 ),
-                pre_orb_items=tuple(pre_step_items),
+                pre_orbs_items=tuple(pre_step_items),
                 new_items=tuple(new_step_items),
             )
             if not callable(input_filter):
                 raise UsageError(f"Invalid input filter: {input_filter}")
-            filtered = input_filter(orb_input_data)
-            if not isinstance(filtered, OrbInputData):
+            filtered = input_filter(orbs_input_data)
+            if not isinstance(filtered, OrbsInputData):
                 raise UsageError(f"Invalid input filter result: {filtered}")
 
             original_input = (
@@ -477,7 +477,7 @@ class RunImpl:
                 if isinstance(filtered.input_history, str)
                 else list(filtered.input_history)
             )
-            pre_step_items = list(filtered.pre_orb_items)
+            pre_step_items = list(filtered.pre_orbs_items)
             new_step_items = list(filtered.new_items)
 
         return SingleStepResult(
@@ -485,7 +485,7 @@ class RunImpl:
             model_response=new_response,
             pre_step_items=pre_step_items,
             new_step_items=new_step_items,
-            next_step=NextStepHandoff(new_agent),
+            next_step=NextStepOrbs(new_agent),
         )
 
     @classmethod

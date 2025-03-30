@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
 
 """
-A chameleon-like agent that changes its personality and response style based on context.
+This script demonstrates the agents-as-tools pattern where a frontline agent selects
+translation agents to handle user messages.
 """
+
 
 import sys
 from enum import Enum
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.agents.agent import Agent
 from src.agents.run import Runner
 from src.util._client import setup_client
-from src.util._constants import DEFAULT_MAX_TURNS
-from src.util._env import get_env_var
 from src.util._exceptions import AgentExecutionError
-from src.util._pretty_print import pretty_print_result
+from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
 from src.util._run_context import RunContextWrapper
-
-########################################################
-#           Constants
-########################################################
-
-MAX_TURNS = int(get_env_var("MAX_TURNS", str(DEFAULT_MAX_TURNS)))
 
 ########################################################
 #           Style instructions
@@ -45,10 +39,7 @@ class Style(Enum):
 
 
 STYLE_INSTRUCTIONS = {
-    Style.HAIKU: (
-        "Only respond in haikus. Each response must follow the 5-7-5 syllable pattern. "
-        f"Keep responses concise and nature-themed when possible. Limit to {MAX_TURNS} turns."
-    ),
+    Style.HAIKU: ("Only respond in haikus. Each response must follow the 5-7-5 syllable pattern. "),
     Style.PIRATE: (
         "Respond as a pirate. Use phrases like 'arr matey', 'aye', 'shiver me timbers', "
         "and 'yo ho ho'. Speak in a rough, adventurous tone."
@@ -143,8 +134,9 @@ def run_agent():
         print(f"✅ Style description: {STYLE_INSTRUCTIONS[style]}\n")
 
         msg = input("❓ Enter your message: ").strip()
-        result = Runner.run_sync(agent, msg, context=style, max_turns=MAX_TURNS)
+        result = Runner.run_sync(agent, msg, context=style)
         print(pretty_print_result(result))
+        print(pretty_print_result_stats(result))
     except Exception as e:
         raise AgentExecutionError(e) from e
 

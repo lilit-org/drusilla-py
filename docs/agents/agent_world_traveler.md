@@ -24,7 +24,7 @@ def create_agents() -> Agent:
             Agent(
                 name=f"{lang_name} Translator",
                 instructions=f"Translate English text to {lang_name}",
-                handoff_description=f"English to {lang_name} translator",
+                orbs_description=f"English to {lang_name} translator",
             ).as_tool(
                 tool_name=f"translate_to_{lang_key.lower()}",
                 tool_description=f"Translate text to {lang_name}",
@@ -42,6 +42,7 @@ def run_agent() -> str | None:
         msg = input("\n❓ Enter text to translate: ")
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
+        print(pretty_print_result_stats(result))
     except Exception as e:
         raise GenericError(e)
 
@@ -64,13 +65,12 @@ you can input a sentence in any major language and it will translate it for you:
   📊 Statistics:
         Items     → 1
         Responses → 1
-        Input GR  → 0
-        Output GR → 0
+        Input Shield  → 0
+        Output Shield → 0
 
   🦾 Configuration:
         Streaming → ❌ Disabled
         Tools     → Available (2 tools)
-        Tool Mode → None
 
 
 ✅ REASONING:

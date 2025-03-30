@@ -15,7 +15,7 @@
 
 <br>
 
-this project was inspired by many open-source frameworks and our own local workflows, and customized for deepseek and for the work we are doing at [lilit](https://github.com/lilit-org).
+this project is inspired by many open-source frameworks, our own local workflows, and the work we are doing at [lilit](https://github.com/lilit-org).
 
 <br>
 
@@ -24,9 +24,9 @@ this project was inspired by many open-source frameworks and our own local workf
 
 to design multi-agent systems, we utilize the following primitives:
 
-- [agents](src/agents/agent.py): our LLM robots that can be equipped with orbs and shields
-- [orbs](src/gear/orbs.py): part of the agent's gear, used to delegate tasks to other agents
-- [shields](src/gear/shields.py): part of the agent's gear, used to validate and protect the inputs from agents
+- [agents](docs/primitives/agents.md): our LLM robots that can be equipped with orbs and shields
+- [orbs](docs/primitives/orbs.md): part of the agent's gear, used to delegate tasks to other agents
+- [shields](docs/primitives/shields.md): part of the agent's gear, used to validate and protect the inputs from agents
 
 
 <br>
@@ -60,8 +60,7 @@ create a `.env` file in your project root with your deepseek api endpoint and an
 BASE_URL = "http://localhost:11434"
 MODEL = "deepseek-r1"
 MAX_TURNS = 10
-MAX_QUEUE_SIZE = 1000
-MAX_SHIELD_QUEUE_SIZE = 100
+MAX_SHIELD_QUEUE_SIZE = 1000
 LRU_CACHE_SIZE = 128
 LOG_LEVEL = "DEBUG"  
 HTTP_TIMEOUT_TOTAL = 120.0
@@ -105,8 +104,8 @@ which creates and runs the following agent:
 ```python
 def create_agent() -> Agent:
     return Agent(
-        name="Agent Dr. Love",
-        instructions="You are a cool special robot who loves"
+        name="Agent Dr. Love", i
+        nstructions="You are a cool special robot who loves"
     )
 
 
@@ -114,14 +113,14 @@ def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agent()
-        
         result = Runner.run_sync(
-            agent,
+            agent, 
             "Write a haiku about love in the cypherpunk world."
         )
         print(pretty_print_result(result))
+        print(pretty_print_result_stats(result))
     except Exception as e:
-        raise GenericError(e)
+        raise AgentExecutionError(e) from e
 
 
 if __name__ == "__main__":
@@ -141,13 +140,12 @@ you should get something like this:
   📊 Statistics:
         Items     → 1
         Responses → 1
-        Input GR  → 0
-        Output GR → 0
+        Input Shield  → 0
+        Output Shield → 0
   
   🦾 Configuration:
         Streaming → ❌ Disabled
         Tools     → None
-        Tool Mode → None
 
 
 ✅ REASONING:
@@ -206,12 +204,26 @@ Secret love in code.
 
 * [agent dissociative identity](docs/agents/agent_dissociative_identity.md)
 
-#### using tools:
+<br>
 
-* [agent world traveler](docs/agents/agent_world_traveler.md)
+#### with tools:
+
 * [agent summer chaser](docs/agents/agent_summer_chaser.md)
 
+<br>
 
-#### using streaming:
+#### with agents as tools:
+
+* [agent world traveler](docs/agents/agent_world_traveler.md)
+
+<br>
+
+#### with streaming:
 
 * [agent cyphepunk jokes](docs/agents/agent_cypherpunk_jokes.md)
+
+<br>
+
+#### with agents orbs and tools:
+
+* [agent friend with benefits](docs/agents/agent_friend_with_benefits.md)

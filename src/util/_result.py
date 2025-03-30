@@ -9,7 +9,7 @@ from typing import Any
 from ..agents.agent import Agent
 from ..agents.run_impl import QueueCompleteSentinel
 from ..gear.shields import InputShieldResult, OutputShieldResult
-from ._constants import MAX_QUEUE_SIZE, MAX_SHIELD_QUEUE_SIZE
+from ._constants import MAX_SHIELD_QUEUE_SIZE
 from ._env import get_env_var
 from ._items import ModelResponse, RunItem, TResponseInputItem
 from ._logger import logger
@@ -19,7 +19,6 @@ from ._stream_events import StreamEvent
 #               Constants
 ########################################################
 
-MAX_QUEUE_SIZE = get_env_var("MAX_QUEUE_SIZE", MAX_QUEUE_SIZE)
 MAX_SHIELD_QUEUE_SIZE = get_env_var("MAX_SHIELD_QUEUE_SIZE", MAX_SHIELD_QUEUE_SIZE)
 
 ########################################################
@@ -80,7 +79,7 @@ class RunResultStreaming:
     max_turns: int = 0
 
     _event_queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=MAX_QUEUE_SIZE), repr=False
+        default_factory=lambda: asyncio.Queue(maxsize=MAX_SHIELD_QUEUE_SIZE), repr=False
     )
     _input_shield_queue: asyncio.Queue[InputShieldResult] = field(
         default_factory=lambda: asyncio.Queue(maxsize=MAX_SHIELD_QUEUE_SIZE),
