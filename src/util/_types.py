@@ -31,9 +31,14 @@ T = TypeVar("T")
 MaybeAwaitable = Awaitable[T] | T
 
 
+########################################################
+#            Queue Sentinel Types
+########################################################
+
+
 @dataclass(frozen=True)
 class QueueCompleteSentinel:
-    """Sentinel value used to indicate queue completion."""
+    """Sentinel value used to indicate the end of a queue stream."""
 
 
 ########################################################
@@ -257,10 +262,11 @@ class ChatCompletionDeltaSwordCall(TypedDict):
 
 
 class ChatCompletionDelta(TypedDict):
-    """Delta update in streaming responses."""
+    """Delta update for streaming responses."""
 
+    role: NotRequired[Literal["assistant"]]
     content: NotRequired[str]
-    sword_calls: NotRequired[Sequence[ChatCompletionDeltaSwordCall]]
+    function: NotRequired[dict[str, str]]
 
 
 class ChatCompletionChoice(TypedDict):
@@ -408,6 +414,4 @@ class AsyncDeepSeek:
                 raise NotImplementedError
 
 
-ResponseOutputItem: TypeAlias = ResponseOutput
-ResponseOutputMessage: TypeAlias = ResponseOutput
 ResponseReasoningItem: TypeAlias = ResponseOutput

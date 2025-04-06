@@ -67,6 +67,7 @@ class RunResultBase(abc.ABC):
 @dataclass(frozen=True)
 class RunResult(RunResultBase):
     _last_agent: Agent[Any]
+    is_complete: bool = True
 
     @property
     def last_agent(self) -> Agent[Any]:
@@ -125,6 +126,7 @@ class RunResultStreaming:
                     break
                 if isinstance(item, QueueCompleteSentinel):
                     self._event_queue.task_done()
+                    self.is_complete = True
                     break
 
                 yield item
@@ -139,3 +141,13 @@ class RunResultStreaming:
         tasks = (self._run_impl_task, self._input_shields_task, self._output_shields_task)
         for task in filter(lambda t: t and not t.done(), tasks):
             task.cancel()
+
+    def __str__(self) -> str:
+        stream_status = "Complete" if self.is_complete else "In Progress"
+        return (
+            f"✅ {self.__class__.__name__}:\n"
+            f"Agent: {self.current_agent.name}\n"
+            f"Stats: {len(self.new_items)} items, {len(self.raw_responses)} responses\n"
+            f"Stream: {stream_status}\n"
+            f"Final Output: {self.final_output}"
+        )

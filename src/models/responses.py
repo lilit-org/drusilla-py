@@ -38,12 +38,9 @@ from ..util._types import (
 from .interface import Model
 from .settings import ModelSettings
 
-
 ########################################################
 #               Main Class: Responses Model            #
 ########################################################
-def _non_null_or_not_given(value: Any) -> Any:
-    return value or UNSET
 
 
 class ModelResponsesModel(Model):
@@ -179,15 +176,15 @@ class ModelResponsesModel(Model):
         )
 
         return await self._client.responses.create(
-            instructions=_non_null_or_not_given(system_instructions),
+            instructions=system_instructions,
             model=self.model,
             input=list_input,
             include=converted_swords.includes,
             swords=converted_swords.swords,
-            temperature=_non_null_or_not_given(model_settings.temperature),
-            top_p=_non_null_or_not_given(model_settings.top_p),
-            truncation=_non_null_or_not_given(model_settings.truncation),
-            max_output_tokens=_non_null_or_not_given(model_settings.max_tokens),
+            temperature=model_settings.temperature,
+            top_p=model_settings.top_p,
+            truncation=model_settings.truncation,
+            max_output_tokens=model_settings.max_tokens,
             sword_choice=sword_choice,
             parallel_sword_calls=parallel_sword_calls or UNSET,
             stream=stream,

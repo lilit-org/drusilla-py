@@ -50,7 +50,6 @@ OUTPUT_TEXT_TYPE = "output_text"
 REFUSAL_TYPE = "refusal"
 THINK_START = "<think>"
 THINK_END = "</think>"
-ECHOES_START = "Echoes of encrypted hearts"
 
 RunItem = Union[
     "MessageOutputItem",
@@ -155,29 +154,57 @@ class ModelResponse:
 
     @cached_property
     def input_items(self) -> list[TResponseInputItem]:
-        return [cast(TResponseInputItem, it.model_dump(exclude_unset=True)) for it in self.output]
+        return [
+            cast(
+                TResponseInputItem,
+                it.model_dump(exclude_unset=True) if hasattr(it, "model_dump") else it,
+            )
+            for it in self.output
+        ]
 
     def to_input_items(self) -> list[TResponseInputItem]:
         return self.input_items
 
 
 class ItemHelpers:
-    SPECIAL_LINES: ClassVar[tuple[str, str]] = (THINK_START, ECHOES_START)
+    SPECIAL_LINES: ClassVar[tuple[str]] = (THINK_START, THINK_END)
 
     @staticmethod
     def extract_last_content(message: TResponseOutputItem) -> str:
         try:
-            if not hasattr(message, "type") or message.type != MESSAGE_TYPE:
+            message_type = (
+                message.get("type") if isinstance(message, dict) else getattr(message, "type", None)
+            )
+            if message_type != MESSAGE_TYPE:
                 return ""
 
-            if not hasattr(message, "content") or not message.content:
+            content = (
+                message.get("content", [])
+                if isinstance(message, dict)
+                else getattr(message, "content", [])
+            )
+            if not content:
                 return ""
 
-            last_content = message.content[-1]
-            if last_content.type == OUTPUT_TEXT_TYPE:
-                return last_content.text
-            if last_content.type == REFUSAL_TYPE:
-                return last_content.refusal
+            last_content = content[-1]
+            content_type = (
+                last_content.get("type")
+                if isinstance(last_content, dict)
+                else getattr(last_content, "type", None)
+            )
+
+            if content_type == OUTPUT_TEXT_TYPE:
+                return (
+                    last_content.get("text", "")
+                    if isinstance(last_content, dict)
+                    else getattr(last_content, "text", "")
+                )
+            if content_type == REFUSAL_TYPE:
+                return (
+                    last_content.get("refusal", "")
+                    if isinstance(last_content, dict)
+                    else getattr(last_content, "refusal", "")
+                )
             return ""
         except (AttributeError, IndexError, KeyError):
             return ""
@@ -299,8 +326,6 @@ class ItemHelpers:
                 if current_section:
                     formatted_lines.extend(format_section(current_section))
                     current_section = []
-                if line.startswith(ECHOES_START):
-                    formatted_lines.append("")
                 formatted_lines.append(line)
             elif line.endswith(THINK_END):
                 formatted_lines.append(line)
