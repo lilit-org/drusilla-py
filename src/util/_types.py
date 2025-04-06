@@ -18,9 +18,9 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncIterator, Awaitable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Literal, NotRequired, TypeAlias, TypedDict
+from typing import Any, Generic, Literal, TypeAlias, TypedDict
 
-from typing_extensions import TypeVar
+from typing_extensions import NotRequired, TypeVar
 
 ########################################################
 #              Type Variables

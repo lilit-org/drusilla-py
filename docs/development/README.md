@@ -2,14 +2,16 @@
 
 <br>
 
-## prerequisites
+## pre-requisites
 
 - python 3.9+
 - [poetry](https://python-poetry.org/) for dependency management
 - [docker](https://www.docker.com/) for running github actions locally
 - [act](https://github.com/nektos/act) for testing github actions locally
 
-### installing docker
+<br>
+
+#### installing docker
 
 - **macos**:
   ```bash
@@ -29,7 +31,9 @@
 - **windows**:
   download and install [docker desktop](https://www.docker.com/products/docker-desktop)
 
-### installing act
+<br>
+
+#### installing act
 
 - **macos (intel)**:
   ```bash
@@ -52,7 +56,9 @@
   choco install act-cli
   ```
 
-### troubleshooting docker issues
+<br>
+
+#### troubleshooting docker issues
 
 if you encounter docker connectivity issues when running act:
 
