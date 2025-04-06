@@ -59,10 +59,10 @@ class ModelProvider(BaseModelProvider):
         """Lazy load the client to avoid API key errors if never used."""
         if self._client is None:
             self._client = DeepSeekClient(
-                api_key=self._stored_api_key or "test-api-key",
-                base_url=self._stored_base_url or "https://test-api.com",
-                organization=self._stored_organization or "test-org",
-                project=self._stored_project or "test-project",
+                api_key=self._stored_api_key,
+                base_url=self._stored_base_url,
+                organization=self._stored_organization,
+                project=self._stored_project,
                 http_client=DefaultAsyncHttpxClient(),
             )
         return self._client

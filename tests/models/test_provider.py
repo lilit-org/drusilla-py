@@ -14,7 +14,7 @@ def mock_client():
 
 
 @pytest.fixture
-def provider(mock_client):
+def provider():
     return ModelProvider(
         api_key="test-api-key",
         base_url="https://test-api.com",

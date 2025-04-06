@@ -42,7 +42,7 @@ FAKE_RESPONSES_ID = "fake_responses"
 # Initialize variables with default values
 LOG_LEVEL = "DEBUG"
 BASE_URL = "http://localhost:11434"
-API_KEY = "NONE"
+API_KEY = ""
 MODEL = "deepseek-r1"
 MAX_TURNS = 10
 MAX_QUEUE_SIZE = 1000
