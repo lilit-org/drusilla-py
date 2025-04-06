@@ -21,7 +21,7 @@ class MockAgent(Agent[Any]):
     """Mock agent for testing."""
 
     def __init__(self, name: str = "test_agent"):
-        self.name = name
+        super().__init__(name=name)
         self.orbs_description = "Test agent description"
 
 
