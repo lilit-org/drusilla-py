@@ -24,7 +24,6 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
-    TypeAlias,
     TypeVar,
     Union,
     cast,
@@ -38,13 +37,20 @@ from ._types import ResponseOutput as TResponseOutputItem
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
+    from ..gear.sword import FunctionCallOutput
+    from ..models.interface import (
+        ResponseFunctionSwordCall,
+        ResponseReasoningItem,
+        TResponseInputItem,
+        TResponseOutputItem,
+    )
 
 
 ########################################################
 #            Type Aliases and Constants                #
 ########################################################
 
-T = TypeVar("T", bound=TResponseOutputItem | TResponseInputItem)
+T = TypeVar("T")
 
 MESSAGE_TYPE = "message"
 OUTPUT_TEXT_TYPE = "output_text"
@@ -53,7 +59,7 @@ THINK_START = "<think>"
 THINK_END = "</think>"
 ECHOES_START = "Echoes of encrypted hearts"
 
-RunItem: TypeAlias = Union[
+RunItem = Union[
     "MessageOutputItem",
     "OrbsCallItem",
     "OrbsOutputItem",

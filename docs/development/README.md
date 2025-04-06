@@ -6,7 +6,28 @@
 
 - python 3.9+
 - [poetry](https://python-poetry.org/) for dependency management
+- [docker](https://www.docker.com/) for running github actions locally
 - [act](https://github.com/nektos/act) for testing github actions locally
+
+### installing docker
+
+- **macos**:
+  ```bash
+  brew install --cask docker
+  ```
+  after installation, open docker desktop and wait for it to start
+
+- **linux**:
+  ```bash
+  # ubuntu/debian
+  sudo apt-get update
+  sudo apt-get install docker.io
+  sudo systemctl start docker
+  sudo systemctl enable docker
+  ```
+
+- **windows**:
+  download and install [docker desktop](https://www.docker.com/products/docker-desktop)
 
 ### installing act
 
@@ -30,6 +51,39 @@
   ```bash
   choco install act-cli
   ```
+
+### troubleshooting docker issues
+
+if you encounter docker connectivity issues when running act:
+
+1. verify docker is running:
+   ```bash
+   docker info
+   ```
+
+2. check docker network connectivity:
+   ```bash
+   docker run hello-world
+   ```
+
+3. if you're behind a corporate proxy, configure docker to use it:
+   ```bash
+   # create or edit ~/.docker/config.json
+   {
+     "proxies": {
+       "default": {
+         "httpProxy": "http://proxy.example.com:8080",
+         "httpsProxy": "http://proxy.example.com:8080",
+         "noProxy": "localhost,127.0.0.1"
+       }
+     }
+   }
+   ```
+
+4. if you're still having issues, try pulling the image manually first:
+   ```bash
+   docker pull nektos/act-environments-ubuntu:18.04
+   ```
 
 <br>
 
