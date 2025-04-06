@@ -1,7 +1,7 @@
 # ⽊ noctira
 
 [![lint](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/lint.yml/badge.svg)](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/lint.yml)
-[![test](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/test.yml/badge.svg)](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/test.yml)
+[![tests](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/tests.yml/badge.svg)](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/tests.yml)
 
 
 <br>

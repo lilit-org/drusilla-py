@@ -84,8 +84,14 @@ class FuncSchema:
                 var_positional = name
             elif param.kind == param.VAR_KEYWORD:
                 var_keyword = name
-            elif param.kind in (param.POSITIONAL_ONLY, param.POSITIONAL_OR_KEYWORD):
+            elif param.kind == param.POSITIONAL_ONLY:
                 positional_params.append(name)
+            elif param.kind == param.POSITIONAL_OR_KEYWORD:
+                # Parameters with default values are treated as keyword arguments
+                if param.default == param.empty:
+                    positional_params.append(name)
+                else:
+                    keyword_params.append(name)
             else:
                 keyword_params.append(name)
 
@@ -103,11 +109,13 @@ class FuncSchema:
             if hasattr(data, name):
                 positional_args.append(getattr(data, name))
 
+        # Handle variable positional arguments (*args)
         if self._var_positional and hasattr(data, self._var_positional):
             var_args = getattr(data, self._var_positional)
             if var_args is not None:
                 positional_args.extend(var_args)
 
+        # Handle keyword arguments
         for name in self._keyword_params:
             if hasattr(data, name):
                 keyword_args[name] = getattr(data, name)
@@ -351,13 +359,31 @@ def function_schema(
     if strict_json_schema:
         json_schema = ensure_strict_json_schema(json_schema)
 
+    async def on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
+        data = dynamic_model.model_validate_json(input)
+        args, kwargs = FuncSchema(
+            name=func_name,
+            description=description_override or doc_info.description if doc_info else None,
+            params_pydantic_model=dynamic_model,
+            params_json_schema=json_schema,
+            signature=sig,
+            on_invoke_sword=lambda ctx, input: None,
+            takes_context=takes_context,
+            strict_json_schema=strict_json_schema,
+        ).to_call_args(data)
+        if takes_context:
+            args.insert(0, ctx)
+        if inspect.iscoroutinefunction(func):
+            return await func(*args, **kwargs)
+        return func(*args, **kwargs)
+
     return FuncSchema(
         name=func_name,
         description=description_override or doc_info.description if doc_info else None,
         params_pydantic_model=dynamic_model,
         params_json_schema=json_schema,
         signature=sig,
-        on_invoke_sword=lambda ctx, sword_name: func(ctx.value, **ctx.args),
+        on_invoke_sword=on_invoke_sword,
         takes_context=takes_context,
         strict_json_schema=strict_json_schema,
     )
