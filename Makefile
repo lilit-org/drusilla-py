@@ -12,7 +12,7 @@ clean:
 
 .PHONY: install
 install:
-	poetry install --no-root
+	poetry install --no-root --with dev
 
 .PHONY: test
 test:

@@ -303,24 +303,23 @@ class RunImpl:
                 # Run charms and sword in parallel
                 charms_tasks = [
                     charms.on_sword_start(context_wrapper, agent, func_sword),
-                    (
-                        agent.charms.on_sword_start(context_wrapper, agent, func_sword)
-                        if agent.charms
-                        else None
-                    ),
                     func_sword.on_invoke_sword(context_wrapper, sword_call.arguments),
                 ]
-                _, _, result = await asyncio.gather(*[t for t in charms_tasks if t is not None])
+                if agent.charms:
+                    charms_tasks.insert(
+                        1, agent.charms.on_sword_start(context_wrapper, agent, func_sword)
+                    )
+
+                results = await asyncio.gather(*[t for t in charms_tasks if t is not None])
+                result = results[-1]  # The last result is from on_invoke_sword
 
                 # Run end charms in parallel
-                end_charms_tasks = [
-                    charms.on_sword_end(context_wrapper, agent, func_sword, result),
-                    (
+                end_charms_tasks = [charms.on_sword_end(context_wrapper, agent, func_sword, result)]
+                if agent.charms:
+                    end_charms_tasks.append(
                         agent.charms.on_sword_end(context_wrapper, agent, func_sword, result)
-                        if agent.charms
-                        else None
-                    ),
-                ]
+                    )
+
                 await asyncio.gather(*[t for t in end_charms_tasks if t is not None])
                 return result
             except Exception as e:

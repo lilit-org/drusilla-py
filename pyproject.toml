@@ -16,7 +16,9 @@ dependencies = [
     "httpx[http2] (>=0.28.1,<0.29.0)",
     "autoflake (>=2.3.1,<3.0.0)",
     "black (>=25.1.0,<26.0.0)",
-    "pre-commit (>=4.2.0,<5.0.0)"
+    "pre-commit (>=4.2.0,<5.0.0)",
+    "pytest (>=8.0.0)",
+    "pytest-asyncio (>=0.23.0)"
 ]
 
 classifiers = [
@@ -143,6 +145,7 @@ exclude_also = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+pythonpath = ["."]
 filterwarnings = [
     # This is a warning that is expected to happen: we have an async filter that raises an exception
     "ignore:coroutine 'test_async_input_filter_fails.<locals>.invalid_input_filter' was never awaited:RuntimeWarning",

@@ -138,7 +138,7 @@ def pretty_print_result_stream(result: RunResultStreaming, show_reasoning: bool 
 def validate_json(json_str: str, type_adapter: TypeAdapter[T], partial: bool = False) -> T:
     """Validates a JSON string against a type adapter. Raises ModelError if invalid."""
     try:
-        return type_adapter.validate_json(json_str, strict=not partial)
+        return type_adapter.validate_json(json_str, experimental_allow_partial=partial)
     except ValidationError as e:
         raise ModelError(f"Invalid JSON: {e}") from e
 
