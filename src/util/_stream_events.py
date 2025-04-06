@@ -55,6 +55,15 @@ class RawResponsesStreamEvent:
 #               Data class RunItemStreamEvent          #
 ########################################################
 
+VALID_RUN_ITEM_EVENT_NAMES = {
+    "message_output_created",
+    "orbs_requested",
+    "orbs_occurred",
+    "sword_called",
+    "sword_output",
+    "reasoning_item_created",
+}
+
 
 @dataclass(frozen=True)
 class RunItemStreamEvent:
@@ -63,6 +72,10 @@ class RunItemStreamEvent:
     name: RunItemStreamEventName
     item: RunItem
     type: Literal["run_item_stream_event"] = "run_item_stream_event"
+
+    def __post_init__(self):
+        if self.name not in VALID_RUN_ITEM_EVENT_NAMES:
+            raise TypeError(f"Invalid RunItemStreamEventName: {self.name}")
 
 
 ########################################################

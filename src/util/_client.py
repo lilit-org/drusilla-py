@@ -141,26 +141,46 @@ class DeepSeekClient(AsyncDeepSeek):
                 if stream:
                     return AsyncStream(response.aiter_lines())
 
-                # Convert Ollama response to ChatCompletion format
-                ollama_response = response.json()
-                message = ollama_response.get("message", {}).get("content", "")
+                # Handle both Ollama and standard chat completion formats
+                response_data = response.json()
+
+                # Check if this is an Ollama response
+                if "message" in response_data:
+                    message = response_data.get("message", {}).get("content", "")
+                    return ChatCompletion(
+                        id=f"ollama-{hash(str(response_data))}",
+                        object="chat.completion",
+                        created=int(response_data.get("created", 0)),
+                        model=model,
+                        choices=[
+                            {
+                                "index": 0,
+                                "message": {"role": "assistant", "content": message},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                        usage={
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "total_tokens": 0,
+                        },
+                    )
+
+                # Handle standard chat completion format
                 return ChatCompletion(
-                    id=f"ollama-{hash(str(ollama_response))}",
-                    object="chat.completion",
-                    created=int(ollama_response.get("created", 0)),
+                    id=response_data.get("id", ""),
+                    object=response_data.get("object", "chat.completion"),
+                    created=response_data.get("created", 0),
                     model=model,
-                    choices=[
+                    choices=response_data.get("choices", []),
+                    usage=response_data.get(
+                        "usage",
                         {
-                            "index": 0,
-                            "message": {"role": "assistant", "content": message},
-                            "finish_reason": "stop",
-                        }
-                    ],
-                    usage={
-                        "prompt_tokens": 0,
-                        "completion_tokens": 0,
-                        "total_tokens": 0,
-                    },
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "total_tokens": 0,
+                        },
+                    ),
                 )
 
 

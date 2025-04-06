@@ -3,7 +3,6 @@
 
 # Python
 __pycache__/
-**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -21,6 +20,10 @@ MANIFEST
 venv/
 env/
 ENV/
+env.bak/
+venv.bak/
+.venv39
+.venv_res
 
 # Testing and Coverage
 .coverage
@@ -28,45 +31,27 @@ ENV/
 .cache
 .pytest_cache/
 htmlcov/
+.tox/
+.nox/
+.hypothesis/
+cover/
 
 # Type Checking
 .mypy_cache/
 .ruff_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
-
-# Misc
-.DS_Store
-
-# Byte-compiled / optimized / DLL files
-**/__pycache__/
-*.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
-build/
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+.spyderproject
+.spyproject
+.ropeproject
 
 # PyInstaller
 *.manifest
@@ -75,12 +60,6 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-.tox/
-.nox/
-.hypothesis/
-cover/
 
 # Translations
 *.mo
@@ -127,43 +106,6 @@ celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-.venv39
-.venv_res
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mypy
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# PyCharm
-.idea/
-
-# Ruff stuff:
-.ruff_cache/
 
 # PyPI configuration file
 .pypirc

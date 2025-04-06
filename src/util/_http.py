@@ -30,7 +30,7 @@ class DefaultAsyncHttpxClient(httpx.AsyncClient):
         max_connections: int = 10,
         max_retries: int = 3,
         verify: bool | str = True,
-        http2: bool = True,
+        http2: bool = False,
         **kwargs,
     ) -> None:
         timeout = (
@@ -39,17 +39,22 @@ class DefaultAsyncHttpxClient(httpx.AsyncClient):
             else timeout
         )
 
+        self.limits = Limits(
+            max_keepalive_connections=max_keepalive_connections,
+            max_connections=max_connections,
+        )
+
+        self.max_retries = max_retries
+        self.verify = verify
+        self.http2 = http2
+
         super().__init__(
             timeout=timeout,
             verify=verify,
             http2=http2,
-            limits=Limits(
-                max_keepalive_connections=max_keepalive_connections,
-                max_connections=max_connections,
-            ),
+            limits=self.limits,
             **kwargs,
         )
-        self.max_retries = max_retries
 
     async def request(self, *args, **kwargs) -> httpx.Response:
         for attempt in range(self.max_retries):

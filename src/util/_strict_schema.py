@@ -45,14 +45,20 @@ SCHEMA_DEFINITION_KEYS: Final[tuple[str, ...]] = ("definitions", "$defs")
 ########################################################
 
 
+def _make_hashable(d: dict) -> tuple:
+    """Convert a dictionary to a hashable tuple representation."""
+    return tuple(sorted((k, _make_hashable(v) if isinstance(v, dict) else v) for k, v in d.items()))
+
+
 @lru_cache(maxsize=CACHE_SIZE)
-def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
+def _resolve_schema_ref_cached(*, root_hash: tuple, ref: str) -> JSONSchema:
     """Resolve a JSON schema reference to its target schema with caching."""
     if not ref.startswith("#/"):
         raise ModelError(f"Invalid $ref format {ref!r}; must start with #/")
 
     try:
-        resolved = root
+        # Convert root_hash back to dict for resolution
+        resolved = dict(_make_dict(root_hash))
         for key in ref[2:].split("/"):
             resolved = resolved[key]
             if not isinstance(resolved, dict):
@@ -62,6 +68,11 @@ def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
         return cast(JSONSchema, resolved)
     except KeyError as e:
         raise ModelError(f"Invalid $ref path {ref}: {str(e)}") from e
+
+
+def _make_dict(t: tuple) -> dict:
+    """Convert a hashable tuple representation back to a dictionary."""
+    return {k: _make_dict(v) if isinstance(v, tuple) else v for k, v in t}
 
 
 def _enforce_strict_schema_rules(
@@ -134,7 +145,8 @@ def _enforce_strict_schema_rules(
             raise ModelError(f"$ref must be a string, got {ref}")
 
         if len(schema) > 1:
-            resolved = _resolve_schema_ref_cached(root=root, ref=ref)
+            root_hash = _make_hashable(root)
+            resolved = _resolve_schema_ref_cached(root_hash=root_hash, ref=ref)
             schema.update({**resolved, **schema})
             schema.pop("$ref")
             schema = _enforce_strict_schema_rules(schema, path=path, root=root)
@@ -156,4 +168,5 @@ def ensure_strict_json_schema(schema: JSONSchema) -> JSONSchema:
 
 def resolve_schema_ref(*, root: JSONSchema, ref: str) -> JSONSchema:
     """Resolves a JSON schema reference to its target schema."""
-    return _resolve_schema_ref_cached(root=root, ref=ref)
+    root_hash = _make_hashable(root)
+    return _resolve_schema_ref_cached(root_hash=root_hash, ref=ref)
