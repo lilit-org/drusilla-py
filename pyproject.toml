@@ -60,8 +60,8 @@ textual = "*"
 poetry = ">=1.7.1"
 
 [build-system]
-requires = ["hatchling>=1.0.0"]
-build-backend = "hatchling.build"
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 100
