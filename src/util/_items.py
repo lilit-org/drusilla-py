@@ -37,13 +37,6 @@ from ._types import ResponseOutput as TResponseOutputItem
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
-    from ..gear.sword import FunctionCallOutput
-    from ..models.interface import (
-        ResponseFunctionSwordCall,
-        ResponseReasoningItem,
-        TResponseInputItem,
-        TResponseOutputItem,
-    )
 
 
 ########################################################
