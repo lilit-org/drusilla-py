@@ -1,10 +1,21 @@
+"""
+This module defines the core interfaces for interacting with language models in the system.
+
+The Model interface provides a standardized way to interact with different language models,
+supporting both synchronous and streaming responses. It handles system instructions,
+input processing, and integration with various tools and orbs for enhanced functionality.
+
+The ModelProvider interface enables dynamic model instantiation and management,
+allowing the system to work with different model implementations through a unified interface.
+"""
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..agents.output import AgentOutputSchema
-from ..gear.swords import Sword
+from ..gear.sword import Sword
 from ..util._items import ModelResponse, TResponseInputItem, TResponseStreamEvent
 from .settings import ModelSettings
 

@@ -1,3 +1,17 @@
+"""
+The Runner class is the core orchestrator for executing agents in the Noctira system. It provides both synchronous
+and asynchronous interfaces for running agents with various configurations and capabilities.
+
+Key features:
+- Supports both synchronous (run_sync) and asynchronous (run) execution
+- Provides streaming capabilities (run_streamed) for real-time agent responses
+- Handles input and output shields for security and validation
+- Manages agent charms for custom behavior hooks
+- Supports multiple turns of agent execution with configurable limits
+- Integrates with various model providers and settings
+- Handles complex input/output processing with orbs and schemas
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -5,8 +19,9 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, cast
 
+from ..gear.charm import RunCharms
 from ..gear.orbs import Orbs, OrbsInputFilter, orbs
-from ..gear.shields import (
+from ..gear.shield import (
     InputShield,
     InputShieldResult,
     OutputShield,
@@ -15,8 +30,7 @@ from ..gear.shields import (
 from ..models.interface import Model
 from ..models.provider import ModelProvider
 from ..models.settings import ModelSettings
-from ..util._constants import DEFAULT_MAX_TURNS
-from ..util._env import get_env_var
+from ..util._constants import MAX_TURNS
 from ..util._exceptions import (
     AgentError,
     GenericError,
@@ -26,11 +40,9 @@ from ..util._exceptions import (
     OutputShieldError,
 )
 from ..util._items import ItemHelpers, ModelResponse, RunItem, TResponseInputItem
-from ..util._lifecycle import RunHooks
 from ..util._result import RunResult, RunResultStreaming
-from ..util._run_context import RunContextWrapper, TContext
 from ..util._stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
-from ..util._types import ResponseEvent, Usage
+from ..util._types import ResponseEvent, Usage, RunContextWrapper, TContext
 from .agent import Agent
 from .output import AgentOutputSchema
 from .run_impl import (
@@ -40,14 +52,8 @@ from .run_impl import (
     QueueCompleteSentinel,
     RunImpl,
     SingleStepResult,
-    noop_coroutine,
 )
 
-########################################################
-#             Constants                                #
-########################################################
-
-MAX_TURNS = get_env_var("MAX_TURNS", DEFAULT_MAX_TURNS)
 
 
 ########################################################
@@ -57,7 +63,6 @@ MAX_TURNS = get_env_var("MAX_TURNS", DEFAULT_MAX_TURNS)
 
 @dataclass(frozen=True)
 class RunConfig:
-
     model: str | Model | None = None
     model_provider: ModelProvider = field(default_factory=ModelProvider)
     model_settings: ModelSettings | None = None
@@ -80,25 +85,25 @@ class Runner:
         input: str | list[TResponseInputItem],
         context: TContext | None,
         max_turns: int,
-        hooks: RunHooks[TContext] | None,
+        charms: RunCharms[TContext] | None,
         run_config: RunConfig | None,
     ) -> tuple[
-        RunHooks[TContext],
+        RunCharms[TContext],
         RunConfig,
         RunContextWrapper[TContext],
         str | list[TResponseInputItem],
         AgentOutputSchema | None,
     ]:
-        hooks = hooks or RunHooks[Any]()
+        charms = charms or RunCharms[Any]()
         run_config = run_config or RunConfig()
         config_dict = {k: v for k, v in run_config.__dict__.items() if k != "max_turns"}
-        run_config = RunConfig(
-            **config_dict,
-            max_turns=max_turns,
+        return (
+            charms,
+            RunConfig(**config_dict, max_turns=max_turns),
+            RunContextWrapper(context=context),
+            input,
+            cls._get_output_schema(starting_agent),
         )
-        context_wrapper = RunContextWrapper(context=context)
-        output_schema = cls._get_output_schema(starting_agent)
-        return hooks, run_config, context_wrapper, input, output_schema
 
     @classmethod
     async def run(
@@ -108,20 +113,20 @@ class Runner:
         *,
         context: TContext | None = None,
         max_turns: int = MAX_TURNS,
-        hooks: RunHooks[TContext] | None = None,
+        charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> RunResult:
-        hooks, run_config, context_wrapper, input, _ = await cls._initialize_run(
-            starting_agent, input, context, max_turns, hooks, run_config
+        charms, run_config, context_wrapper, input, _ = await cls._initialize_run(
+            starting_agent, input, context, max_turns, charms, run_config
         )
 
         current_turn = 0
         original_input = input if isinstance(input, str) else input.copy()
-        generated_items: list[RunItem] = []
-        model_responses: list[ModelResponse] = []
-        input_shield_results: list[InputShieldResult] = []
+        generated_items = []
+        model_responses = []
+        input_shield_results = []
         current_agent = starting_agent
-        should_run_agent_start_hooks = True
+        should_run_agent_start_charms = True
 
         try:
             while True:
@@ -134,14 +139,14 @@ class Runner:
                     current_agent,
                     original_input,
                     generated_items,
-                    hooks,
+                    charms,
                     context_wrapper,
                     run_config,
-                    should_run_agent_start_hooks,
+                    should_run_agent_start_charms,
                     input,
                 )
 
-                should_run_agent_start_hooks = False
+                should_run_agent_start_charms = False
                 model_responses.append(turn_result.model_response)
                 original_input = turn_result.original_input
                 generated_items = turn_result.generated_items
@@ -159,7 +164,7 @@ class Runner:
                     )
                 elif isinstance(turn_result.next_step, NextStepOrbs):
                     current_agent = cast(Agent[TContext], turn_result.next_step.new_agent)
-                    should_run_agent_start_hooks = True
+                    should_run_agent_start_charms = True
                 elif isinstance(turn_result.next_step, NextStepRunAgain):
                     continue
                 else:
@@ -174,10 +179,10 @@ class Runner:
         current_agent: Agent[TContext],
         original_input: str | list[TResponseInputItem],
         generated_items: list[RunItem],
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
-        should_run_agent_start_hooks: bool,
+        should_run_agent_start_charms: bool,
         input: str | list[TResponseInputItem],
     ) -> SingleStepResult:
         if current_turn == 1:
@@ -192,10 +197,10 @@ class Runner:
                     agent=current_agent,
                     original_input=original_input,
                     generated_items=generated_items,
-                    hooks=hooks,
+                    charms=charms,
                     context_wrapper=context_wrapper,
                     run_config=run_config,
-                    should_run_agent_start_hooks=should_run_agent_start_hooks,
+                    should_run_agent_start_charms=should_run_agent_start_charms,
                 ),
             )
         else:
@@ -203,10 +208,10 @@ class Runner:
                 agent=current_agent,
                 original_input=original_input,
                 generated_items=generated_items,
-                hooks=hooks,
+                charms=charms,
                 context_wrapper=context_wrapper,
                 run_config=run_config,
-                should_run_agent_start_hooks=should_run_agent_start_hooks,
+                should_run_agent_start_charms=should_run_agent_start_charms,
             )
         return turn_result
 
@@ -246,7 +251,7 @@ class Runner:
         *,
         context: TContext | None = None,
         max_turns: int = MAX_TURNS,
-        hooks: RunHooks[TContext] | None = None,
+        charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> RunResult:
         """Synchronous wrapper for run()."""
@@ -256,7 +261,7 @@ class Runner:
                 input,
                 context=context,
                 max_turns=max_turns,
-                hooks=hooks,
+                charms=charms,
                 run_config=run_config,
             )
         )
@@ -268,17 +273,12 @@ class Runner:
         input: str | list[TResponseInputItem],
         context: TContext | None = None,
         max_turns: int = MAX_TURNS,
-        hooks: RunHooks[TContext] | None = None,
+        charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> RunResultStreaming:
-        """Run agent with streaming events."""
-        (
-            hooks,
-            run_config,
-            context_wrapper,
-            input,
-            output_schema,
-        ) = await cls._initialize_run(starting_agent, input, context, max_turns, hooks, run_config)
+        charms, run_config, context_wrapper, input, output_schema = await cls._initialize_run(
+            starting_agent, input, context, max_turns, charms, run_config
+        )
 
         streamed_result = cls._create_streamed_result(
             input=input,
@@ -293,7 +293,7 @@ class Runner:
                 streamed_result=streamed_result,
                 starting_agent=starting_agent,
                 max_turns=max_turns,
-                hooks=hooks,
+                charms=charms,
                 context_wrapper=context_wrapper,
                 run_config=run_config,
             )
@@ -308,7 +308,6 @@ class Runner:
         max_turns: int,
         output_schema: AgentOutputSchema | None,
     ) -> RunResultStreaming:
-        """Create a new streaming result with optimized initialization."""
         return RunResultStreaming(
             input=input if isinstance(input, str) else input.copy(),
             new_items=[],
@@ -329,13 +328,14 @@ class Runner:
         streamed_result: RunResultStreaming,
         starting_agent: Agent[TContext],
         max_turns: int,
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> None:
         current_agent = starting_agent
         current_turn = 0
-        should_run_agent_start_hooks = True
+        should_run_agent_start_charms = True
+
         try:
             await cls._queue_event(
                 streamed_result._event_queue,
@@ -368,18 +368,18 @@ class Runner:
                     turn_result = await cls._run_single_turn_streamed(
                         streamed_result,
                         current_agent,
-                        hooks,
+                        charms,
                         context_wrapper,
                         run_config,
-                        should_run_agent_start_hooks,
+                        should_run_agent_start_charms,
                     )
-                    should_run_agent_start_hooks = False
+                    should_run_agent_start_charms = False
 
                     cls._update_streamed_result(streamed_result, turn_result)
 
                     if isinstance(turn_result.next_step, NextStepOrbs):
                         current_agent = turn_result.next_step.new_agent
-                        should_run_agent_start_hooks = True
+                        should_run_agent_start_charms = True
                         try:
                             await asyncio.wait_for(
                                 streamed_result._event_queue.put(
@@ -502,15 +502,15 @@ class Runner:
         cls,
         streamed_result: RunResultStreaming,
         agent: Agent[TContext],
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
-        should_run_agent_start_hooks: bool,
+        should_run_agent_start_charms: bool,
     ) -> SingleStepResult:
-        if should_run_agent_start_hooks:
-            await cls._run_agent_start_hooks(
+        if should_run_agent_start_charms:
+            await cls._run_agent_start_charms(
+                charms,
                 agent,
-                hooks,
                 context_wrapper,
             )
 
@@ -566,7 +566,7 @@ class Runner:
                     new_response=final_response,
                     processed_response=processed_response,
                     output_schema=output_schema,
-                    hooks=hooks,
+                    charms=charms,
                     context_wrapper=context_wrapper,
                     run_config=run_config,
                 )
@@ -591,15 +591,15 @@ class Runner:
         agent: Agent[TContext],
         original_input: str | list[TResponseInputItem],
         generated_items: list[RunItem],
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
-        should_run_agent_start_hooks: bool,
+        should_run_agent_start_charms: bool,
     ) -> SingleStepResult:
-        if should_run_agent_start_hooks:
-            await cls._run_agent_start_hooks(
+        if should_run_agent_start_charms:
+            await cls._run_agent_start_charms(
+                charms,
                 agent,
-                hooks,
                 context_wrapper,
             )
 
@@ -625,7 +625,7 @@ class Runner:
             new_response=new_response,
             output_schema=output_schema,
             orbs=orbs,
-            hooks=hooks,
+            charms=charms,
             context_wrapper=context_wrapper,
             run_config=run_config,
         )
@@ -640,7 +640,7 @@ class Runner:
         new_response: ModelResponse,
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> SingleStepResult:
@@ -657,7 +657,7 @@ class Runner:
             new_response=new_response,
             processed_response=processed_response,
             output_schema=output_schema,
-            hooks=hooks,
+            charms=charms,
             context_wrapper=context_wrapper,
             run_config=run_config,
         )
@@ -744,14 +744,12 @@ class Runner:
 
     @classmethod
     def _get_output_schema(cls, agent: Agent[Any]) -> AgentOutputSchema | None:
-        """Get output schema for agent if specified."""
         if agent.output_type is None or agent.output_type is str:
             return None
         return AgentOutputSchema(agent.output_type)
 
     @classmethod
     def _get_orbs(cls, agent: Agent[Any]) -> list[Orbs]:
-        """Get list of orbs from agent, converting Agent instances to Orb objects."""
         return [
             orbs_item if isinstance(orbs_item, Orbs) else orbs(orbs_item)
             for orbs_item in agent.orbs
@@ -759,7 +757,6 @@ class Runner:
 
     @classmethod
     def _get_model(cls, agent: Agent[Any], run_config: RunConfig) -> Model:
-        """Get the model instance based on configuration and agent settings."""
         if isinstance(run_config.model, Model):
             return run_config.model
         if isinstance(run_config.model, str):
@@ -769,14 +766,14 @@ class Runner:
         return run_config.model_provider.get_model(agent.model)
 
     @classmethod
-    async def _run_agent_start_hooks(
+    async def _run_agent_start_charms(
         cls,
+        charms: RunCharms[TContext],
         agent: Agent[TContext],
-        hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
     ) -> None:
-        """Run the start hooks for an agent."""
-        await asyncio.gather(
-            hooks.on_start(context_wrapper, agent),
-            (agent.hooks.on_start(context_wrapper, agent) if agent.hooks else noop_coroutine()),
-        )
+        charm_tasks = [
+            charms.on_start(context_wrapper, agent),
+            agent.charms.on_start(context_wrapper, agent) if agent.charms else None
+        ]
+        await asyncio.gather(*[t for t in charm_tasks if t is not None])

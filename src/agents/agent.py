@@ -1,6 +1,12 @@
 """
-This module implements the Agent class, which provides a
-flexible framework for creating decentralized AI agents.
+The Agent module provides a powerful framework for creating and managing AI agents with advanced capabilities.
+
+This module implements the core Agent class that enables the creation of sophisticated AI agents with:
+- Function calling capabilities through swords
+- Input/output validation through shields
+- Context management through orbs
+- Custom behavior modification through charms
+- Flexible model integration and configuration
 """
 
 from __future__ import annotations
@@ -11,17 +17,16 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, cast
 
-from ..gear.orbs import Orbs
-from ..gear.shields import InputShield, OutputShield
-from ..gear.swords import FunctionSword, FunctionSwordResult, Sword, function_sword
-from ..models.settings import ModelSettings
-from ..util import _json
-from ..util._run_context import RunContextWrapper, TContext
-from ..util._types import MaybeAwaitable
-
 if TYPE_CHECKING:
+    from ..gear.orbs import Orbs
+    from ..gear.charm import AgentCharms
     from ..models.interface import Model
-    from ..util._lifecycle import AgentHooks
+
+from ..gear.shield import InputShield, OutputShield
+from ..gear.sword import Sword, SwordResult, function_sword
+from ..models.settings import ModelSettings
+from ..util._print import transform_string_function_style
+from ..util._types import MaybeAwaitable, RunContextWrapper, TContext
 
 
 ########################################################
@@ -34,9 +39,9 @@ def _create_agent_sword(
     sword_name: str | None,
     sword_description: str | None,
     custom_output_extractor: Callable[[Any], str] | None = None,
-) -> FunctionSword:
+) -> Sword:
     @function_sword(
-        name_override=sword_name or _json.transform_string_function_style(agent.name),
+        name_override=sword_name or transform_string_function_style(agent.name),
         description_override=sword_description or "",
     )
     async def _agent_sword(ctx: RunContextWrapper[TContext], input: str) -> Any:
@@ -57,7 +62,7 @@ class SwordsToFinalOutputResult:
 
 
 SwordsToFinalOutputFunction: TypeAlias = Callable[
-    [RunContextWrapper[TContext], list[FunctionSwordResult]],
+    [RunContextWrapper[TContext], list[SwordResult]],
     MaybeAwaitable[SwordsToFinalOutputResult],
 ]
 
@@ -89,7 +94,7 @@ class Agent(Generic[TContext]):
     input_shields: list[InputShield[TContext]] = field(default_factory=list)
     output_shields: list[OutputShield[TContext]] = field(default_factory=list)
     output_type: type[Any] | None = None
-    hooks: AgentHooks[TContext] | None = None
+    charms: AgentCharms[TContext] | None = None
     sword_use_behavior: (
         Literal["run_llm_again", "stop_on_first_sword"]
         | dict[Literal["stop_at_sword_names"], list[str]]
@@ -97,26 +102,14 @@ class Agent(Generic[TContext]):
 
     def clone(self, **kwargs: Any) -> Agent[TContext]:
         """Create a copy of the agent with optional field updates."""
-        defaults = {
-            "orbs": [],
-            "model": "",
-            "model_settings": ModelSettings(),
-            "swords": [],
-            "input_shields": [],
-            "output_shields": [],
-            "output_type": None,
-            "hooks": None,
-            "sword_use_behavior": "run_llm_again",
-        }
-        defaults.update(kwargs)
-        return dataclasses.replace(self, **defaults)
+        return dataclasses.replace(self, **kwargs)
 
     def as_sword(
         self,
-        sword_name: str | None,
-        sword_description: str | None,
+        sword_name: str | None = None,
+        sword_description: str | None = None,
         custom_output_extractor: Callable[[Any], str] | None = None,
-    ) -> FunctionSword:
+    ) -> Sword:
         """Converts agent to sword for other agents."""
         return _create_agent_sword(self, sword_name, sword_description, custom_output_extractor)
 
@@ -124,10 +117,14 @@ class Agent(Generic[TContext]):
         """Get the system prompt for the agent."""
         if self.instructions is None:
             return None
+            
         if isinstance(self.instructions, str):
             return self.instructions
-        if callable(self.instructions):
-            if inspect.iscoroutinefunction(self.instructions):
-                return await cast(Awaitable[str], self.instructions(run_context, self))
-            return cast(str, self.instructions(run_context, self))
-        raise TypeError(f"Invalid instructions type: {type(self.instructions)}")
+            
+        if not callable(self.instructions):
+            raise TypeError(f"Invalid instructions type: {type(self.instructions)}")
+            
+        result = self.instructions(run_context, self)
+        if inspect.iscoroutinefunction(self.instructions):
+            return await cast(Awaitable[str], result)
+        return cast(str, result)

@@ -1,3 +1,22 @@
+"""
+Shields Module - Input and Output Validation Framework
+
+This module provides a robust validation framework for agent input and output processing.
+Shields act as protective layers that ensure data integrity and type safety throughout
+the agent execution pipeline.
+
+Key Components:
+    - InputShield: Validates and sanitizes agent input before execution
+    - OutputShield: Validates and formats agent output after execution
+
+Features:
+    - Type checking and validation
+    - Data sanitization and normalization
+    - Error handling and reporting
+    - Custom validation rules support
+    - Integration with agent execution pipeline
+"""
+
 from __future__ import annotations
 
 import inspect
@@ -9,8 +28,7 @@ from typing_extensions import TypeVar
 
 from ..util._exceptions import UsageError
 from ..util._items import TResponseInputItem
-from ..util._run_context import RunContextWrapper, TContext
-from ..util._types import MaybeAwaitable
+from ..util._types import MaybeAwaitable, RunContextWrapper, TContext
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
@@ -227,8 +245,6 @@ def output_shield(
         OutputShield[TContext_co],
     ]
 ):
-    """Decorator for creating OutputShields."""
-
     def decorator(
         f: _OutputShieldFuncSync[TContext_co] | _OutputShieldFuncAsync[TContext_co],
     ) -> OutputShield[TContext_co]:

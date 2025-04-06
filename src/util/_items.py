@@ -1,3 +1,17 @@
+"""
+This module provides core data structures and utilities for handling different types of items and responses
+in an AI agent system. It defines various item types including messages, function calls (sword/orbs calls),
+reasoning items, and their corresponding outputs.
+
+Key Components:
+- RunItemBase: Abstract base class for all run items with common functionality
+- MessageOutputItem: Handles text message outputs and content extraction
+- SwordCallItem/OrbsCallItem: Manage function call requests
+- SwordCallOutputItem/OrbsOutputItem: Handle function call responses
+- ReasoningItem: Processes reasoning steps and thought processes
+- ItemHelpers: Utility class with helper methods for item manipulation
+"""
+
 from __future__ import annotations
 
 import abc
@@ -18,18 +32,14 @@ from typing import (
 from pydantic import BaseModel
 
 from ._types import (
-    ComputerCallOutput,
-    ComputerSwordCall,
     FunctionCallOutput,
-    ResponseFileSearchSwordCall,
     ResponseFunctionSwordCall,
-    ResponseFunctionWebSearch,
-    ResponseInputItemParam,
-    ResponseOutputItem,
+    ResponseInputItemParam as TResponseInputItem,
+    ResponseOutput as TResponseOutputItem,
     ResponseReasoningItem,
-    ResponseStreamEvent,
+    ResponseStreamEvent as TResponseStreamEvent
 )
-from ._usage import Usage
+from ._types import Usage
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
@@ -39,9 +49,6 @@ if TYPE_CHECKING:
 #            Type Aliases and Constants                #
 ########################################################
 
-TResponseInputItem = ResponseInputItemParam
-TResponseOutputItem = ResponseOutputItem
-TResponseStreamEvent = ResponseStreamEvent
 T = TypeVar("T", bound=TResponseOutputItem | TResponseInputItem)
 
 MESSAGE_TYPE = "message"
@@ -50,13 +57,6 @@ REFUSAL_TYPE = "refusal"
 THINK_START = "<think>"
 THINK_END = "</think>"
 ECHOES_START = "Echoes of encrypted hearts"
-
-SwordCallItemTypes: TypeAlias = (
-    ResponseFunctionSwordCall
-    | ComputerSwordCall
-    | ResponseFileSearchSwordCall
-    | ResponseFunctionWebSearch
-)
 
 RunItem: TypeAlias = Union[
     "MessageOutputItem",
@@ -85,13 +85,10 @@ class RunItemBase(Generic[T], abc.ABC):
             return self.raw_item.model_dump(exclude_unset=True)
         return self.raw_item
 
-    def to_input_item(self) -> TResponseInputItem:
-        return self.input_item
-
 
 @dataclass(frozen=True)
-class MessageOutputItem(RunItemBase[ResponseOutputItem]):
-    raw_item: ResponseOutputItem
+class MessageOutputItem(RunItemBase[TResponseOutputItem]):
+    raw_item: TResponseOutputItem
     type: Literal["message_output_item"] = "message_output_item"
 
     @cached_property
@@ -144,8 +141,8 @@ class SwordCallItem(RunItemBase[ResponseFunctionSwordCall]):
 
 
 @dataclass(frozen=True)
-class SwordCallOutputItem(RunItemBase[FunctionCallOutput | ComputerCallOutput]):
-    raw_item: FunctionCallOutput | ComputerCallOutput
+class SwordCallOutputItem(RunItemBase[FunctionCallOutput]):
+    raw_item: FunctionCallOutput
     output: Any
     type: Literal["sword_call_output_item"] = "sword_call_output_item"
 
@@ -219,55 +216,57 @@ class ItemHelpers:
             if not hasattr(message, "raw_item"):
                 return ""
 
-            if isinstance(message.raw_item, dict):
-                content = message.raw_item.get("content", [])
-                if not content:
-                    return ""
+            raw_item = message.raw_item
+            if not isinstance(raw_item, dict):
+                return ""
 
-                text_parts = []
-                for item in content:
-                    if isinstance(item, dict) and item.get("type") == OUTPUT_TEXT_TYPE:
-                        text = item.get("text", "").strip()
-                        if text:
-                            text_parts.append(text)
+            content = raw_item.get("content", [])
+            if not content:
+                return ""
 
-                if not text_parts:
-                    return ""
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == OUTPUT_TEXT_TYPE:
+                    text = item.get("text", "").strip()
+                    if text:
+                        text_parts.append(text)
 
-                text = " ".join(text_parts)
-                text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
-                text = text.replace("'text': '", "").replace("'", "").strip()
+            if not text_parts:
+                return ""
 
-                if not text:
-                    return ""
+            text = " ".join(text_parts)
+            text = text.replace("', 'type': 'output_text', 'annotations': []}", "")
+            text = text.replace("'text': '", "").replace("'", "").strip()
 
-                lines = []
-                current_section = []
+            if not text:
+                return ""
 
-                for line in text.split("\n"):
-                    line = line.strip()
-                    if not line:
-                        continue
+            lines = []
+            current_section = []
 
-                    if line.startswith(THINK_START):
-                        if current_section:
-                            lines.append(" ".join(current_section))
-                            current_section = []
-                        lines.append(line)
-                    elif line.endswith(THINK_END):
-                        if current_section:
-                            lines.append(" ".join(current_section))
-                            current_section = []
-                        lines.append(line)
-                    else:
-                        current_section.append(line)
+            for line in text.split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
 
-                if current_section:
-                    lines.append(" ".join(current_section))
+                if line.startswith(THINK_START):
+                    if current_section:
+                        lines.append(" ".join(current_section))
+                        current_section = []
+                    lines.append(line)
+                elif line.endswith(THINK_END):
+                    if current_section:
+                        lines.append(" ".join(current_section))
+                        current_section = []
+                    lines.append(line)
+                else:
+                    current_section.append(line)
 
-                return "\n".join(lines)
+            if current_section:
+                lines.append(" ".join(current_section))
 
-            return ""
+            return "\n".join(lines)
+
         except Exception as e:
             print(f"Error processing message output: {e}")
             return ""

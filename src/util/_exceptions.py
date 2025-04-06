@@ -1,7 +1,29 @@
+"""
+This module defines custom exceptions used throughout the Agents SDK.
+It includes:
+
+1. Base exception classes for:
+   - Agent-related errors
+   - Model-related errors
+   - Usage-related errors
+   - Input shield errors
+   - Output shield errors
+
+2. Specific exception types for:    
+   - Agent execution errors
+   - Generic errors
+   - Message errors
+   - Model errors
+   - Max turns errors
+   - Usage errors
+   - Input shield errors
+   - Output shield errors
+"""
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..gear.shields import InputShieldResult, OutputShieldResult
+    from ..gear.shield import InputShieldResult, OutputShieldResult
 
 
 class AgentError(Exception):

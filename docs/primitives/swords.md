@@ -21,7 +21,7 @@ the name of the sword is the same name of the python function (python's inspect 
 
 ```python
 @dataclass(frozen=True)
-class FunctionSword:
+class Sword:
     name: str
     description: str
     params_json_schema: dict[str, Any]
@@ -38,7 +38,7 @@ def function_sword(
     use_docstring_info: bool = True,
     failure_error_function: SwordErrorFunction | None = None,
     strict_mode: bool = True,
-) -> FunctionSword:
+) -> Sword:
     ...
 
 
@@ -51,7 +51,7 @@ def function_sword(
     use_docstring_info: bool = True,
     failure_error_function: SwordErrorFunction | None = None,
     strict_mode: bool = True,
-) -> Callable[[SwordFunction[...]], FunctionSword]:
+) -> Callable[[SwordFunction[...]], Sword]:
     ...
 
 
@@ -64,8 +64,8 @@ def function_sword(
     use_docstring_info: bool = True,
     failure_error_function: SwordErrorFunction | None = default_sword_error_function,
     strict_mode: bool = True,
-) -> FunctionSword | Callable[[SwordFunction[...]], FunctionSword]:
-    def _create_function_sword(the_func: SwordFunction[...]) -> FunctionSword:
+) -> Sword | Callable[[SwordFunction[...]], Sword]:
+    def _create_function_sword(the_func: SwordFunction[...]) -> Sword:
         schema = function_schema(
             func=the_func,
             name_override=name_override,
@@ -110,7 +110,7 @@ def function_sword(
                 logger.debug(f"Sword {schema.name} failed with error: {e}")
                 raise GenericError(e) from e
 
-        return FunctionSword(
+        return Sword(
             name=schema.name,
             description=schema.description or "",
             params_json_schema=schema.params_json_schema,
@@ -118,7 +118,7 @@ def function_sword(
             strict_json_schema=strict_mode,
         )
 
-    def decorator(real_func: SwordFunction[...]) -> FunctionSword:
+    def decorator(real_func: SwordFunction[...]) -> Sword:
         return _create_function_sword(real_func)
 
     if func is None:

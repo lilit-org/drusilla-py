@@ -1,3 +1,24 @@
+"""
+Client Implementation
+
+This module provides a Python client implementation for interacting with the DeepSeek API.
+It offers an asynchronous interface using httpx for making HTTP requests to the DeepSeek service.
+
+The client supports:
+- Chat completions with customizable parameters
+- Streaming responses
+- Sword-based completions
+- Custom HTTP client configuration
+- Environment-based configuration
+
+Key Features:
+- Async-first design using httpx
+- Configurable timeouts and connection limits
+- Support for organization and project headers
+- Flexible message formatting
+- Stream handling capabilities
+"""
+
 from __future__ import annotations
 
 import os
@@ -7,8 +28,8 @@ import httpx
 
 from ..models.shared import set_default_model_client
 from ._constants import (
+    BASE_URL,
     CHAT_COMPLETIONS_ENDPOINT,
-    DEFAULT_BASE_URL,
     HEADERS,
     HTTP_MAX_CONNECTIONS,
     HTTP_MAX_KEEPALIVE_CONNECTIONS,
@@ -43,8 +64,8 @@ class DeepSeekClient(AsyncDeepSeek):
         project: str | None = None,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
-        self.api_key = api_key
-        self.base_url = (base_url or os.getenv("BASE_URL", DEFAULT_BASE_URL)).rstrip("/")
+        self.api_key = api_key or "API_KEY"
+        self.base_url = base_url or BASE_URL
         self.organization = organization
         self.project = project
         self.http_client = http_client or httpx.AsyncClient()
@@ -63,18 +84,16 @@ class DeepSeekClient(AsyncDeepSeek):
                 self,
                 model: str,
                 messages: list[ChatCompletionMessageParam],
-                swords: list[ChatCompletionSwordParam] | None = None,
                 temperature: float | None = None,
                 top_p: float | None = None,
-                frequency_penalty: float | None = None,
-                presence_penalty: float | None = None,
                 max_tokens: int | None = None,
+                stream: bool = False,
+                extra_headers: dict[str, str] | None = None,
+                swords: list[ChatCompletionSwordParam] | None = None,
                 sword_choice: ChatCompletionSwordChoiceOptionParam | None = None,
                 response_format: ResponseFormat | None = None,
                 parallel_sword_calls: bool | None = None,
-                stream: bool = False,
                 stream_options: dict[str, bool] | None = None,
-                extra_headers: dict[str, str] | None = None,
             ) -> ChatCompletion | AsyncStream:
                 """Create a chat completion with the given parameters."""
                 client = self._chat._client
@@ -98,6 +117,16 @@ class DeepSeekClient(AsyncDeepSeek):
                     data["top_p"] = top_p
                 if max_tokens is not None:
                     data["max_tokens"] = max_tokens
+                if swords is not None:
+                    data["swords"] = swords
+                if sword_choice is not None:
+                    data["sword_choice"] = sword_choice
+                if response_format is not None:
+                    data["response_format"] = response_format
+                if parallel_sword_calls is not None:
+                    data["parallel_sword_calls"] = parallel_sword_calls
+                if stream_options is not None:
+                    data["stream_options"] = stream_options
 
                 endpoint = os.getenv("CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT)
                 url = f"{client.base_url}{endpoint}"
@@ -128,7 +157,7 @@ class DeepSeekClient(AsyncDeepSeek):
                         }
                     ],
                     usage={
-                        "prompt_tokens": 0,  # Ollama doesn't provide token counts
+                        "prompt_tokens": 0,
                         "completion_tokens": 0,
                         "total_tokens": 0,
                     },

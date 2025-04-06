@@ -1,3 +1,16 @@
+"""
+This module implements a singleton pattern to manage global configuration settings
+for the DeepSeek framework. It provides centralized access to:
+
+- Model API key: Authentication key for the DeepSeek API
+- Model client: Async client instance for making API requests
+- Response handling: Global flag for response formatting preferences
+
+The configuration is accessible through a singleton instance of SharedConfig,
+ensuring consistent settings across the application. Helper functions are provided
+for convenient access to these settings.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

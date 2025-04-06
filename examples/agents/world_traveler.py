@@ -15,7 +15,7 @@ from src.agents.run import Runner
 from src.util._client import setup_client
 from src.util._constants import SUPPORTED_LANGUAGES
 from src.util._exceptions import AgentExecutionError
-from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
+from src.util._print import pretty_print_result, pretty_print_result_stats
 
 ########################################################
 #           Agent Creation                             #
@@ -31,14 +31,14 @@ def create_agents() -> Agent:
         ),
         swords=[
             Agent(
-                name=f"{lang_name} Translator",
-                instructions=f"Translate English text to {lang_name}",
-                orbs_description=f"English to {lang_name} translator",
+                name=f"{lang_code.upper()} Translator",
+                instructions=f"Translate English text to {lang_code.upper()}",
+                orbs_description=f"English to {lang_code.upper()} translator",
             ).as_sword(
-                sword_name=f"translate_to_{lang_key.lower()}",
-                sword_description=f"Translate text to {lang_name}",
+                sword_name=f"translate_to_{lang_code.lower()}",
+                sword_description=f"Translate text to {lang_code.upper()}",
             )
-            for lang_key, lang_name in SUPPORTED_LANGUAGES.items()
+            for lang_code in SUPPORTED_LANGUAGES
         ],
     )
 

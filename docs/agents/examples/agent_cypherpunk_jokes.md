@@ -65,9 +65,9 @@ async def _handle_stream_events(result, num_jokes):
                         print(f"\n💬 Message:\n{message}")
                 elif event.name in ("sword_called", "sword_output"):
                     msg = (
-                        "🛠️  Sword called"
+                        "⚔️ Sword called"
                         if event.name == "sword_called"
-                        else f"📊 Sword output: {event.item.output}"
+                        else f"⚔️ Sword output: {event.item.output}"
                     )
                     print(f"\n{msg}")
 

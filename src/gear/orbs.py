@@ -1,17 +1,29 @@
+"""
+Orbs Module - Agent Task Delegation Framework
+
+This module implements a sophisticated task delegation system that enables seamless collaboration
+between agents through Orbs. Orbs serve as intelligent intermediaries that:
+
+- Facilitate dynamic task transfer between agents
+- Maintain context and state during delegation
+- Enable flexible agent-to-agent communication
+- Support complex multi-agent workflows
+"""
+
 from __future__ import annotations
 
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypeAlias, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeAlias, overload
 
 from pydantic import TypeAdapter
 from typing_extensions import TypeVar
 
 from ..util._exceptions import UsageError
 from ..util._items import RunItem, TResponseInputItem
-from ..util._json import transform_string_function_style, validate_json
-from ..util._run_context import RunContextWrapper, TContext
+from ..util._print import transform_string_function_style, validate_json
+from ..util._types import RunContextWrapper, TContext
 from ..util._strict_schema import ensure_strict_json_schema
 
 if TYPE_CHECKING:
@@ -142,17 +154,15 @@ def orbs(
                 type_adapter=type_adapter,
                 partial=False,
             )
-            input_func = cast(OnOrbsWithInput[TOrbsInput], on_orbs)
-            if inspect.iscoroutinefunction(input_func):
-                await input_func(ctx, validated_input)
+            if inspect.iscoroutinefunction(on_orbs):
+                await on_orbs(ctx, validated_input)
             else:
-                input_func(ctx, validated_input)
+                on_orbs(ctx, validated_input)
         elif on_orbs is not None:
-            no_input_func = cast(OnOrbsWithoutInput, on_orbs)
-            if inspect.iscoroutinefunction(no_input_func):
-                await no_input_func(ctx)
+            if inspect.iscoroutinefunction(on_orbs):
+                await on_orbs(ctx)
             else:
-                no_input_func(ctx)
+                on_orbs(ctx)
 
         return agent
 

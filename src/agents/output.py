@@ -1,3 +1,14 @@
+"""Output schema validation and parsing for LLM responses.
+
+This module provides functionality to validate and parse LLM (Large Language Model) outputs
+into specified Python types. It supports:
+- Type validation using Pydantic models
+- JSON schema generation and validation
+- Plain text output handling
+- Strict JSON schema enforcement
+- Caching of type adapters for performance
+"""
+
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, ClassVar, get_args, get_origin
@@ -5,18 +16,10 @@ from typing import Any, ClassVar, get_args, get_origin
 from pydantic import BaseModel, TypeAdapter
 from typing_extensions import TypedDict
 
-from ..util import _json
-from ..util._constants import DEFAULT_WRAPPER_DICT_KEY, LRU_CACHE_SIZE
-from ..util._env import get_env_var
+from ..util._constants import LRU_CACHE_SIZE
 from ..util._exceptions import ModelError, UsageError
+from ..util._print import validate_json
 from ..util._strict_schema import ensure_strict_json_schema
-
-########################################################
-#             Constants                                #
-########################################################
-
-WRAPPER_DICT_KEY = get_env_var("WRAPPER_DICT_KEY", DEFAULT_WRAPPER_DICT_KEY)
-LRU_CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 
 ########################################################
@@ -111,11 +114,11 @@ class AgentOutputSchema:
         return self._output_schema
 
     def validate_json(self, json_str: str, partial: bool = False) -> Any:
-        validated = _json.validate_json(json_str, self._type_adapter, partial)
-        if self._is_wrapped and isinstance(validated, dict) and WRAPPER_DICT_KEY not in validated:
-            raise ModelError(f"Could not find key {WRAPPER_DICT_KEY} in JSON: {json_str}")
+        validated = validate_json(json_str, self._type_adapter, partial)
+        if self._is_wrapped and isinstance(validated, dict) and 'response' not in validated:
+            raise ModelError(f"Could not find key 'response' in JSON: {json_str}")
         return (
-            validated[WRAPPER_DICT_KEY]
+            validated["response"]
             if self._is_wrapped and isinstance(validated, dict)
             else validated
         )
