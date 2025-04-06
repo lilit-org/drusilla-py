@@ -42,13 +42,13 @@ class RunResultBase(abc.ABC):
 
     def __str__(self) -> str:
         stream_status = "Complete" if getattr(self, "is_complete", False) else "In Progress"
-        tool_choice = getattr(self, "tool_choice", "N/A")
+        sword_choice = getattr(self, "sword_choice", "N/A")
         return (
             f"✅ {self.__class__.__name__}:\n"
             f"Agent: {self.last_agent.name}\n"
             f"Stats: {len(self.new_items)} items, {len(self.raw_responses)} responses\n"
             f"Stream: {stream_status}\n"
-            f"Tool Choice: {tool_choice}\n"
+            f"Sword Choice: {sword_choice}\n"
             f"Final Output: {self.final_output}"
         )
 

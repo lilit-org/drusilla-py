@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-This script demonstrates the agents-as-tools pattern where a frontline agent selects
+This script demonstrates the agents-as-swords pattern where a frontline agent selects
 translation agents to handle user messages.
 """
 
@@ -27,16 +27,16 @@ def create_agents() -> Agent:
         name="Agent World Traveler",
         instructions=(
             "You are a cool special robot who coordinates translation requests."
-            "Use appropriate translation tools based on requested languages."
+            "Use appropriate translation swords based on requested languages."
         ),
-        tools=[
+        swords=[
             Agent(
                 name=f"{lang_name} Translator",
                 instructions=f"Translate English text to {lang_name}",
                 orbs_description=f"English to {lang_name} translator",
-            ).as_tool(
-                tool_name=f"translate_to_{lang_key.lower()}",
-                tool_description=f"Translate text to {lang_name}",
+            ).as_sword(
+                sword_name=f"translate_to_{lang_key.lower()}",
+                sword_description=f"Translate text to {lang_name}",
             )
             for lang_key, lang_name in SUPPORTED_LANGUAGES.items()
         ],

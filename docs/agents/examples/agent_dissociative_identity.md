@@ -1,9 +1,8 @@
-## agent "dissociative identity": another simple style example
-
+# agent "dissociative identity": another simple reasoning agent
 
 <br>
 
-run our first example of an agent using tools with:
+run with:
 
 ```shell
 make dissociative-identity
@@ -167,7 +166,7 @@ Use mechanical language, binary references, and speak in a precise, calculated m
 
   🦾 Configuration:
         Streaming → ❌ Disabled
-        Tools     → None
+        Swords     → None
 
 
 ✅ REASONING:

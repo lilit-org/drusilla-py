@@ -22,29 +22,29 @@ from griffe import Docstring, DocstringSectionKind
 from pydantic import BaseModel, Field, ValidationError, create_model
 from typing_extensions import ParamSpec
 
-from ._computer import AsyncComputer, Computer
-from ._constants import LRU_CACHE_SIZE
-from ._env import get_env_var
-from ._exceptions import GenericError, ModelError, UsageError
-from ._items import RunItem
-from ._logger import logger
-from ._run_context import RunContextWrapper
-from ._strict_schema import ensure_strict_json_schema
-from ._types import MaybeAwaitable
+from ..util._computer import AsyncComputer, Computer
+from ..util._constants import LRU_CACHE_SIZE
+from ..util._env import get_env_var
+from ..util._exceptions import GenericError, ModelError, UsageError
+from ..util._items import RunItem
+from ..util._logger import logger
+from ..util._run_context import RunContextWrapper
+from ..util._strict_schema import ensure_strict_json_schema
+from ..util._types import MaybeAwaitable
 
 ########################################################
 #               Private Types
 ########################################################
 
-ToolParams = ParamSpec("ToolParams")
-ToolFunctionWithoutContext = Callable[ToolParams, Any]
-ToolFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], ToolParams], Any]
-ToolFunction = ToolFunctionWithoutContext[ToolParams] | ToolFunctionWithContext[ToolParams]
+SwordParams = ParamSpec("SwordParams")
+SwordFunctionWithoutContext = Callable[SwordParams, Any]
+SwordFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], SwordParams], Any]
+SwordFunction = SwordFunctionWithoutContext[SwordParams] | SwordFunctionWithContext[SwordParams]
 CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 
 ########################################################
-#       Data classes for Function Tool Schema
+#       Data classes for Function Sword Schema
 ########################################################
 
 
@@ -63,7 +63,6 @@ class FuncSchema:
     _var_keyword: str | None = field(init=False)
 
     def __post_init__(self) -> None:
-        """Set up parameter order and types."""
         positional_params: list[str] = []
         keyword_params: list[str] = []
         var_positional: str | None = None
@@ -72,7 +71,6 @@ class FuncSchema:
         for name, param in self.signature.parameters.items():
             if self.takes_context and name == list(self.signature.parameters.keys())[0]:
                 continue
-
             if param.kind == param.VAR_POSITIONAL:
                 var_positional = name
             elif param.kind == param.VAR_KEYWORD:
@@ -123,28 +121,28 @@ class FuncDocumentation:
 
 
 @dataclass(frozen=True)
-class FunctionToolResult:
-    """Result of running a function tool."""
+class FunctionSwordResult:
+    """Result of running a function sword."""
 
-    tool: FunctionTool
+    sword: FunctionSword
     output: Any
     run_item: RunItem
 
 
 @dataclass(frozen=True)
-class FunctionTool:
-    """Tool that wraps a Python function."""
+class FunctionSword:
+    """Sword that wraps a Python function."""
 
     name: str
     description: str
     params_json_schema: dict[str, Any]
-    on_invoke_tool: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
+    on_invoke_sword: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
     strict_json_schema: bool = True
 
 
 @dataclass(frozen=True)
-class FileSearchTool:
-    """Tool for searching vector stores."""
+class FileSearchSword:
+    """Sword for searching vector stores."""
 
     vector_store_ids: list[str]
     max_num_results: int | None = None
@@ -158,8 +156,8 @@ class FileSearchTool:
 
 
 @dataclass(frozen=True)
-class WebSearchTool:
-    """Tool for web searching."""
+class WebSearchSword:
+    """Sword for web searching."""
 
     user_location: Any | None = None
     search_context_size: Literal["low", "medium", "high"] = "medium"
@@ -170,8 +168,8 @@ class WebSearchTool:
 
 
 @dataclass(frozen=True)
-class ComputerTool:
-    """Tool for computer control."""
+class ComputerSword:
+    """Sword for computer control."""
 
     computer: Computer | AsyncComputer
 
@@ -301,7 +299,7 @@ def function_schema(
     use_docstring_info: bool = True,
     strict_json_schema: bool = True,
 ) -> FuncSchema:
-    """Extract function schema for tool use."""
+    """Extract function schema for sword use."""
 
     doc_info = generate_func_documentation(func, docstring_style) if use_docstring_info else None
     param_descs = doc_info.param_descriptions or {} if doc_info else {}
@@ -374,63 +372,56 @@ def function_schema(
 
 
 ########################################################
-#           Tool Types
+#           Sword Types
 ########################################################
 
-Tool = FunctionTool | FileSearchTool | WebSearchTool | ComputerTool
-"""A tool that can be used in an agent."""
+Sword = FunctionSword | FileSearchSword | WebSearchSword | ComputerSword
 
 
-def default_tool_error_function(ctx: RunContextWrapper[Any], error: Exception) -> str:
-    """Default error handler for tool failures."""
-    return f"An error occurred while running the tool. Please try again. Error: {str(error)}"
+def default_sword_error_function(ctx: RunContextWrapper[Any], error: Exception) -> str:
+    """Default error handler for sword failures."""
+    return f"An error occurred while running the sword. Error: {str(error)}"
 
 
-ToolErrorFunction = Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]]
-
-
-@overload
-def function_tool(
-    func: ToolFunction[...],
-    *,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    docstring_style: DocstringStyle | None = None,
-    use_docstring_info: bool = True,
-    failure_error_function: ToolErrorFunction | None = None,
-    strict_mode: bool = True,
-) -> FunctionTool:
-    """Overload for usage as @function_tool (no parentheses)."""
-    ...
+SwordErrorFunction = Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]]
 
 
 @overload
-def function_tool(
+def function_sword(
+    func: SwordFunction[...],
     *,
     name_override: str | None = None,
     description_override: str | None = None,
     docstring_style: DocstringStyle | None = None,
     use_docstring_info: bool = True,
-    failure_error_function: ToolErrorFunction | None = None,
+    failure_error_function: SwordErrorFunction | None = None,
     strict_mode: bool = True,
-) -> Callable[[ToolFunction[...]], FunctionTool]:
-    """Overload for usage as @function_tool(...)."""
-    ...
+) -> FunctionSword: ...
 
 
-def function_tool(
-    func: ToolFunction[...] | None = None,
+@overload
+def function_sword(
     *,
     name_override: str | None = None,
     description_override: str | None = None,
     docstring_style: DocstringStyle | None = None,
     use_docstring_info: bool = True,
-    failure_error_function: ToolErrorFunction | None = default_tool_error_function,
+    failure_error_function: SwordErrorFunction | None = None,
     strict_mode: bool = True,
-) -> FunctionTool | Callable[[ToolFunction[...]], FunctionTool]:
-    """Create FunctionTool from function with JSON schema and docstring."""
+) -> Callable[[SwordFunction[...]], FunctionSword]: ...
 
-    def _create_function_tool(the_func: ToolFunction[...]) -> FunctionTool:
+
+def function_sword(
+    func: SwordFunction[...] | None = None,
+    *,
+    name_override: str | None = None,
+    description_override: str | None = None,
+    docstring_style: DocstringStyle | None = None,
+    use_docstring_info: bool = True,
+    failure_error_function: SwordErrorFunction | None = default_sword_error_function,
+    strict_mode: bool = True,
+) -> FunctionSword | Callable[[SwordFunction[...]], FunctionSword]:
+    def _create_function_sword(the_func: SwordFunction[...]) -> FunctionSword:
         schema = function_schema(
             func=the_func,
             name_override=name_override,
@@ -440,7 +431,7 @@ def function_tool(
             strict_json_schema=strict_mode,
         )
 
-        async def _on_invoke_tool_impl(ctx: RunContextWrapper[Any], input: str) -> Any:
+        async def _on_invoke_sword_impl(ctx: RunContextWrapper[Any], input: str) -> Any:
             try:
                 json_data: dict[str, Any] = json.loads(input) if input else {}
                 parsed = (
@@ -449,17 +440,17 @@ def function_tool(
                     else schema.params_pydantic_model()
                 )
                 args, kwargs_dict = schema.to_call_args(parsed)
-                logger.debug(f"Tool call args: {args}, kwargs: {kwargs_dict}")
+                logger.debug(f"Sword call args: {args}, kwargs: {kwargs_dict}")
 
                 result = the_func(ctx, *args, **kwargs_dict)
                 if inspect.iscoroutine(result):
                     result = await result
                 return str(result)
             except json.JSONDecodeError as e:
-                logger.debug(f"Invalid JSON input for tool {schema.name}: {input}")
-                raise ModelError(f"Invalid JSON input for tool {schema.name}: {input}") from e
+                logger.debug(f"Invalid JSON input for sword {schema.name}: {input}")
+                raise ModelError(f"Invalid JSON input for sword {schema.name}: {input}") from e
             except ValidationError as e:
-                raise ModelError(f"Invalid JSON input for tool {schema.name}: {e}") from e
+                raise ModelError(f"Invalid JSON input for sword {schema.name}: {e}") from e
             except Exception as e:
                 if failure_error_function:
                     error_msg = failure_error_function(ctx, e)
@@ -468,23 +459,23 @@ def function_tool(
                     return error_msg
                 raise GenericError(e) from e
 
-        async def _on_invoke_tool(ctx: RunContextWrapper[Any], input: str) -> Any:
+        async def _on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
             try:
-                return await _on_invoke_tool_impl(ctx, input)
+                return await _on_invoke_sword_impl(ctx, input)
             except Exception as e:
-                logger.debug(f"Tool {schema.name} failed with error: {e}")
+                logger.debug(f"Sword {schema.name} failed with error: {e}")
                 raise GenericError(e) from e
 
-        return FunctionTool(
+        return FunctionSword(
             name=schema.name,
             description=schema.description or "",
             params_json_schema=schema.params_json_schema,
-            on_invoke_tool=_on_invoke_tool,
+            on_invoke_sword=_on_invoke_sword,
             strict_json_schema=strict_mode,
         )
 
-    def decorator(real_func: ToolFunction[...]) -> FunctionTool:
-        return _create_function_tool(real_func)
+    def decorator(real_func: SwordFunction[...]) -> FunctionSword:
+        return _create_function_sword(real_func)
 
     if func is None:
         return decorator

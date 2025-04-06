@@ -18,24 +18,24 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.agents.agent import Agent
 from src.agents.run import Runner
 from src.gear.orbs import OrbsInputData, OrbsInputFilter, orbs
+from src.gear.swords import function_sword
 from src.util._client import setup_client
 from src.util._exceptions import AgentExecutionError
 from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
-from src.util._tool import function_tool
 
 ########################################################
-#              Tools and Filters
+#              Swords and Filters
 ########################################################
 
 
-@function_tool
+@function_sword
 def random_number() -> int:
     return random.randint(3, 15)
 
 
 def orbs_message_filter(orbs_message_data: OrbsInputData) -> OrbsInputData:
-    """Filter the message history to remove tools and keep only relevant history."""
-    orbs_message_data = OrbsInputFilter.remove_all_tools(orbs_message_data)
+    """Filter the message history to remove swords and keep only relevant history."""
+    orbs_message_data = OrbsInputFilter.remove_all_swords(orbs_message_data)
     history = (
         tuple(orbs_message_data.input_history[2:])
         if isinstance(orbs_message_data.input_history, tuple)
@@ -68,7 +68,7 @@ second_agent = Agent(
 first_agent = Agent(
     name="Agent One",
     instructions="Generate a random between 3 and 15.",
-    tools=[random_number],
+    swords=[random_number],
 )
 
 ########################################################

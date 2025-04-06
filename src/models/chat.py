@@ -8,6 +8,7 @@ from typing import Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
 from ..gear.orbs import Orbs
+from ..gear.swords import ComputerSword, FileSearchSword, FunctionSword, WebSearchSword
 from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET
 from ..util._exceptions import AgentError, UsageError
 from ..util._items import (
@@ -17,19 +18,18 @@ from ..util._items import (
     TResponseStreamEvent,
 )
 from ..util._logger import logger
-from ..util._tool import FunctionTool, Tool
 from ..util._types import (
     AsyncDeepSeek,
     AsyncStream,
     ChatCompletion,
     ChatCompletionMessage,
     ChatCompletionMessageParam,
-    ChatCompletionToolChoiceOptionParam,
-    ChatCompletionToolParam,
+    ChatCompletionSwordChoiceOptionParam,
+    ChatCompletionSwordParam,
     Response,
     ResponseEvent,
     ResponseFormat,
-    ResponseFunctionToolCall,
+    ResponseFunctionSwordCall,
     ResponseOutputText,
 )
 from ..util._usage import Usage
@@ -46,7 +46,7 @@ class _StreamingState:
     """Maintains the current state of streaming responses."""
 
     text_content_index_and_output: tuple[int, ResponseOutputText] | None = None
-    function_calls: dict[int, ResponseFunctionToolCall] = field(default_factory=dict)
+    function_calls: dict[int, ResponseFunctionSwordCall] = field(default_factory=dict)
 
 
 ########################################################
@@ -73,7 +73,7 @@ class ModelChatCompletionsModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[FileSearchSword | WebSearchSword | ComputerSword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
     ) -> ModelResponse:
@@ -81,7 +81,7 @@ class ModelChatCompletionsModel(Model):
             system_instructions,
             input,
             model_settings,
-            tools,
+            swords,
             output_schema,
             orbs,
             stream=False,
@@ -114,7 +114,7 @@ class ModelChatCompletionsModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[FileSearchSword | WebSearchSword | ComputerSword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
     ) -> AsyncIterator[TResponseStreamEvent]:
@@ -123,7 +123,7 @@ class ModelChatCompletionsModel(Model):
             system_instructions,
             input,
             model_settings,
-            tools,
+            swords,
             output_schema,
             orbs,
             stream=True,
@@ -182,7 +182,7 @@ class ModelChatCompletionsModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[FileSearchSword | WebSearchSword | ComputerSword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
         stream: bool = False,
@@ -198,11 +198,13 @@ class ModelChatCompletionsModel(Model):
                 },
             )
 
-        parallel_tool_calls = True if model_settings.parallel_tool_calls and tools else UNSET
-        tool_choice = _Converter.convert_tool_choice(model_settings.tool_choice)
+        parallel_sword_calls = True if model_settings.parallel_sword_calls and swords else UNSET
+        sword_choice = _Converter.convert_sword_choice(model_settings.sword_choice)
         response_format = _Converter.convert_response_format(output_schema)
-        converted_tools = [ToolConverter.to_api_format(tool) for tool in tools] if tools else []
-        converted_tools.extend(ToolConverter.convert_orb_tool(orb) for orb in orbs)
+        converted_swords = (
+            [SwordConverter.to_api_format(sword) for sword in swords] if swords else []
+        )
+        converted_swords.extend(SwordConverter.convert_orb_sword(orb) for orb in orbs)
 
         request_params = {
             "model": self.model,
@@ -216,14 +218,14 @@ class ModelChatCompletionsModel(Model):
             "extra_headers": HEADERS,
         }
 
-        if converted_tools:
-            request_params["tools"] = converted_tools
-        if tool_choice != UNSET:
-            request_params["tool_choice"] = tool_choice
+        if converted_swords:
+            request_params["swords"] = converted_swords
+        if sword_choice != UNSET:
+            request_params["sword_choice"] = sword_choice
         if response_format != UNSET:
             request_params["response_format"] = response_format
-        if parallel_tool_calls != UNSET:
-            request_params["parallel_tool_calls"] = parallel_tool_calls
+        if parallel_sword_calls != UNSET:
+            request_params["parallel_sword_calls"] = parallel_sword_calls
         if stream:
             request_params["stream_options"] = {"include_usage": True}
 
@@ -236,15 +238,15 @@ class ModelChatCompletionsModel(Model):
                 model=self.model,
                 object="response",
                 output=[],
-                tool_choice=(
-                    cast(Literal["auto", "required", "none"], tool_choice)
-                    if tool_choice != UNSET
+                sword_choice=(
+                    cast(Literal["auto", "required", "none"], sword_choice)
+                    if sword_choice != UNSET
                     else "auto"
                 ),
                 top_p=model_settings.top_p,
                 temperature=model_settings.temperature,
-                tools=[],
-                parallel_tool_calls=parallel_tool_calls or False,
+                swords=[],
+                parallel_sword_calls=parallel_sword_calls or False,
             )
             if not isinstance(ret, AsyncStream):
                 raise TypeError(f"Expected AsyncStream, got {type(ret)}")
@@ -263,16 +265,16 @@ class ModelChatCompletionsModel(Model):
 
 class _Converter:
     @classmethod
-    def convert_tool_choice(
-        cls, tool_choice: Literal["auto", "required", "none"] | str | None
-    ) -> ChatCompletionToolChoiceOptionParam | Any:
-        if tool_choice is None:
+    def convert_sword_choice(
+        cls, sword_choice: Literal["auto", "required", "none"] | str | None
+    ) -> ChatCompletionSwordChoiceOptionParam | Any:
+        if sword_choice is None:
             return UNSET
-        if tool_choice in ("auto", "required", "none"):
-            return tool_choice
+        if sword_choice in ("auto", "required", "none"):
+            return sword_choice
         return {
             "type": "function",
-            "function": {"name": tool_choice},
+            "function": {"name": sword_choice},
         }
 
     @classmethod
@@ -305,14 +307,14 @@ class _Converter:
                     annotations=[],
                 )
             )
-        if message_dict.get("tool_calls"):
-            for tool_call in message_dict["tool_calls"]:
+        if message_dict.get("sword_calls"):
+            for sword_call in message_dict["sword_calls"]:
                 items.append(
-                    ResponseFunctionToolCall(
-                        name=tool_call["function"]["name"],
-                        arguments=tool_call["function"]["arguments"],
+                    ResponseFunctionSwordCall(
+                        name=sword_call["function"]["name"],
+                        arguments=sword_call["function"]["arguments"],
                         type="function_call",
-                        call_id=tool_call.get("id", ""),
+                        call_id=sword_call.get("id", ""),
                         referenceable_id=None,
                     )
                 )
@@ -343,12 +345,12 @@ class _Converter:
             return cast(dict[str, Any], item)
 
     @classmethod
-    def maybe_function_tool_call(cls, item: Any) -> dict[str, Any] | None:
+    def maybe_function_sword_call(cls, item: Any) -> dict[str, Any] | None:
         if isinstance(item, dict) and item.get("type") == "function_call":
             return cast(dict[str, Any], item)
 
     @classmethod
-    def maybe_function_tool_call_output(cls, item: Any) -> dict[str, Any] | None:
+    def maybe_function_sword_call_output(cls, item: Any) -> dict[str, Any] | None:
         if isinstance(item, dict) and item.get("type") == "function_call_output":
             return cast(dict[str, Any], item)
 
@@ -421,15 +423,15 @@ class _Converter:
         def flush_assistant_message() -> None:
             nonlocal current_assistant_msg
             if current_assistant_msg is not None:
-                if not current_assistant_msg.get("tool_calls"):
-                    del current_assistant_msg["tool_calls"]
+                if not current_assistant_msg.get("sword_calls"):
+                    del current_assistant_msg["sword_calls"]
                 result.append(cast(ChatCompletionMessageParam, current_assistant_msg))
                 current_assistant_msg = None
 
         def ensure_assistant_message() -> dict[str, Any]:
             nonlocal current_assistant_msg
             if current_assistant_msg is None:
-                current_assistant_msg = {"role": "assistant", "tool_calls": []}
+                current_assistant_msg = {"role": "assistant", "sword_calls": []}
             return current_assistant_msg
 
         for item in items:
@@ -500,7 +502,7 @@ class _Converter:
 
             elif resp_msg := cls.maybe_response_output_message(item):
                 flush_assistant_message()
-                new_asst = {"role": "assistant", "tool_calls": []}
+                new_asst = {"role": "assistant", "sword_calls": []}
                 contents = resp_msg["content"]
 
                 text_segments = []
@@ -523,8 +525,8 @@ class _Converter:
 
             elif file_search := cls.maybe_file_search_call(item):
                 asst = ensure_assistant_message()
-                tool_calls = list(asst.get("tool_calls", []))
-                tool_calls.append(
+                sword_calls = list(asst.get("sword_calls", []))
+                sword_calls.append(
                     {
                         "id": file_search["id"],
                         "type": "function",
@@ -540,12 +542,12 @@ class _Converter:
                         },
                     }
                 )
-                asst["tool_calls"] = tool_calls
+                asst["sword_calls"] = sword_calls
 
-            elif func_call := cls.maybe_function_tool_call(item):
+            elif func_call := cls.maybe_function_sword_call(item):
                 asst = ensure_assistant_message()
-                tool_calls = list(asst.get("tool_calls", []))
-                tool_calls.append(
+                sword_calls = list(asst.get("sword_calls", []))
+                sword_calls.append(
                     {
                         "id": func_call["call_id"],
                         "type": "function",
@@ -555,14 +557,14 @@ class _Converter:
                         },
                     }
                 )
-                asst["tool_calls"] = tool_calls
+                asst["sword_calls"] = sword_calls
 
-            elif func_output := cls.maybe_function_tool_call_output(item):
+            elif func_output := cls.maybe_function_sword_call_output(item):
                 flush_assistant_message()
                 result.append(
                     {
-                        "role": "tool",
-                        "tool_call_id": func_output["call_id"],
+                        "role": "sword",
+                        "sword_call_id": func_output["call_id"],
                         "content": func_output["output"],
                     }
                 )
@@ -578,31 +580,33 @@ class _Converter:
 
 
 ########################################################
-#           Main Class: Tool Converter
+#           Main Class: Sword Converter
 ########################################################
 
 
-class ToolConverter:
+class SwordConverter:
     @classmethod
-    def to_api_format(cls, tool: Tool) -> ChatCompletionToolParam:
-        if isinstance(tool, FunctionTool):
+    def to_api_format(
+        cls, sword: FileSearchSword | WebSearchSword | ComputerSword
+    ) -> ChatCompletionSwordParam:
+        if isinstance(sword, FunctionSword):
             return {
                 "type": "function",
                 "function": {
-                    "name": tool.name,
-                    "description": tool.description or "",
-                    "parameters": tool.params_json_schema,
+                    "name": sword.name,
+                    "description": sword.description or "",
+                    "parameters": sword.params_json_schema,
                 },
             }
-        raise AgentError(f"Received tool type: {type(tool)}, tool: {tool}")
+        raise AgentError(f"Received sword type: {type(sword)}, sword: {sword}")
 
     @classmethod
-    def convert_orb_tool(cls, orbs: Orbs[Any]) -> ChatCompletionToolParam:
+    def convert_orb_sword(cls, orbs: Orbs[Any]) -> ChatCompletionSwordParam:
         return {
             "type": "function",
             "function": {
-                "name": orbs.tool_name,
-                "description": orbs.tool_description,
+                "name": orbs.sword_name,
+                "description": orbs.sword_description,
                 "parameters": orbs.input_json_schema,
             },
         }

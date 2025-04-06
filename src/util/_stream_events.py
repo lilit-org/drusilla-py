@@ -32,8 +32,8 @@ class RunItemStreamEvent:
         "message_output_created",
         "orbs_requested",
         "orbs_occurred",
-        "tool_called",
-        "tool_output",
+        "sword_called",
+        "sword_output",
         "reasoning_item_created",
     ]
     item: RunItem

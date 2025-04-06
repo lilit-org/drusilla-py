@@ -7,16 +7,16 @@ from typing import Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
 from ..gear.orbs import Orbs
+from ..gear.swords import ComputerSword, FileSearchSword, FunctionSword, Sword, WebSearchSword
 from ..util._constants import HEADERS, UNSET, IncludeLiteral
 from ..util._exceptions import UsageError
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
 from ..util._logger import logger
-from ..util._tool import ComputerTool, FileSearchTool, FunctionTool, Tool, WebSearchTool
 from ..util._types import (
     AsyncDeepSeek,
     AsyncStream,
-    ChatCompletionToolChoiceOptionParam,
-    ChatCompletionToolParam,
+    ChatCompletionSwordChoiceOptionParam,
+    ChatCompletionSwordParam,
     Response,
     ResponseFormat,
     ResponseOutput,
@@ -31,8 +31,8 @@ from .settings import ModelSettings
 
 
 @dataclass
-class ConvertedTools:
-    tools: list[ChatCompletionToolParam]
+class ConvertedSwords:
+    swords: list[ChatCompletionSwordParam]
     includes: list[IncludeLiteral]
 
 
@@ -58,7 +58,7 @@ class ModelResponsesModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
     ) -> ModelResponse:
@@ -67,7 +67,7 @@ class ModelResponsesModel(Model):
                 system_instructions,
                 input,
                 model_settings,
-                tools,
+                swords,
                 output_schema,
                 orbs,
                 stream=False,
@@ -105,7 +105,7 @@ class ModelResponsesModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
     ) -> AsyncIterator[ResponseOutput]:
@@ -114,7 +114,7 @@ class ModelResponsesModel(Model):
                 system_instructions,
                 input,
                 model_settings,
-                tools,
+                swords,
                 output_schema,
                 orbs,
                 stream=True,
@@ -133,7 +133,7 @@ class ModelResponsesModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
         stream: Literal[True],
@@ -145,7 +145,7 @@ class ModelResponsesModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
         stream: Literal[False],
@@ -156,23 +156,23 @@ class ModelResponsesModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
         stream: Literal[True] | Literal[False] = False,
     ) -> Response | AsyncStream[ResponseOutput]:
         list_input = ItemHelpers.input_to_new_input_list(input)
-        parallel_tool_calls = bool(model_settings.parallel_tool_calls and tools)
-        tool_choice = Converter.convert_tool_choice(model_settings.tool_choice)
-        converted_tools = Converter.convert_tools(tools, orbs)
+        parallel_sword_calls = bool(model_settings.parallel_sword_calls and swords)
+        sword_choice = Converter.convert_sword_choice(model_settings.sword_choice)
+        converted_swords = Converter.convert_swords(swords, orbs)
         response_format = Converter.get_response_format(output_schema)
 
         logger.debug(
             f"Calling LLM {self.model} with input:\n"
             f"{json.dumps(list_input, indent=2)}\n"
-            f"Tools:\n{json.dumps(converted_tools.tools, indent=2)}\n"
+            f"Swords:\n{json.dumps(converted_swords.swords, indent=2)}\n"
             f"Stream: {stream}\n"
-            f"Tool choice: {tool_choice}\n"
+            f"Sword choice: {sword_choice}\n"
             f"Response format: {response_format}\n"
         )
 
@@ -180,14 +180,14 @@ class ModelResponsesModel(Model):
             instructions=self._non_null_or_not_given(system_instructions),
             model=self.model,
             input=list_input,
-            include=converted_tools.includes,
-            tools=converted_tools.tools,
+            include=converted_swords.includes,
+            swords=converted_swords.swords,
             temperature=self._non_null_or_not_given(model_settings.temperature),
             top_p=self._non_null_or_not_given(model_settings.top_p),
             truncation=self._non_null_or_not_given(model_settings.truncation),
             max_output_tokens=self._non_null_or_not_given(model_settings.max_tokens),
-            tool_choice=tool_choice,
-            parallel_tool_calls=parallel_tool_calls or UNSET,
+            sword_choice=sword_choice,
+            parallel_sword_calls=parallel_sword_calls or UNSET,
             stream=stream,
             extra_headers=HEADERS,
             text=response_format,
@@ -201,16 +201,16 @@ class ModelResponsesModel(Model):
 
 class Converter:
     @staticmethod
-    def convert_tool_choice(
-        tool_choice: Literal["auto", "required", "none"] | str | None,
-    ) -> ChatCompletionToolChoiceOptionParam:
-        if tool_choice is None:
+    def convert_sword_choice(
+        sword_choice: Literal["auto", "required", "none"] | str | None,
+    ) -> ChatCompletionSwordChoiceOptionParam:
+        if sword_choice is None:
             return UNSET
-        if tool_choice in ("required", "auto", "none"):
-            return tool_choice
-        if tool_choice in ("file_search", "web_search_preview", "computer_use_preview"):
-            return {"type": tool_choice}
-        return {"type": "function", "name": tool_choice}
+        if sword_choice in ("required", "auto", "none"):
+            return sword_choice
+        if sword_choice in ("file_search", "web_search_preview", "computer_use_preview"):
+            return {"type": sword_choice}
+        return {"type": "function", "name": sword_choice}
 
     @staticmethod
     def get_response_format(
@@ -228,74 +228,74 @@ class Converter:
         }
 
     @classmethod
-    def convert_tools(
+    def convert_swords(
         cls,
-        tools: list[Tool],
+        swords: list[Sword],
         orbs: list[Orbs[Any]],
-    ) -> ConvertedTools:
-        converted_tools: list[ChatCompletionToolParam] = []
+    ) -> ConvertedSwords:
+        converted_swords: list[ChatCompletionSwordParam] = []
         includes: list[IncludeLiteral] = []
 
-        computer_tools = [tool for tool in tools if isinstance(tool, ComputerTool)]
-        if len(computer_tools) > 1:
-            raise UsageError(f"You can only provide one computer tool. Got {len(computer_tools)}")
+        computer_swords = [sword for sword in swords if isinstance(sword, ComputerSword)]
+        if len(computer_swords) > 1:
+            raise UsageError(f"You can only provide one computer sword. Got {len(computer_swords)}")
 
-        for tool in tools:
-            converted_tool, include = cls._convert_tool(tool)
-            converted_tools.append(converted_tool)
+        for sword in swords:
+            converted_sword, include = cls._convert_sword(sword)
+            converted_swords.append(converted_sword)
             if include:
                 includes.append(include)
 
-        converted_tools.extend(cls._convert_orb_tool(orb) for orb in orbs)
+        converted_swords.extend(cls._convert_orb_sword(orb) for orb in orbs)
 
-        return ConvertedTools(tools=converted_tools, includes=includes)
+        return ConvertedSwords(swords=converted_swords, includes=includes)
 
     @staticmethod
-    def _convert_tool(
-        tool: Tool,
-    ) -> tuple[ChatCompletionToolParam, IncludeLiteral | None]:
-        if isinstance(tool, FunctionTool):
+    def _convert_sword(
+        sword: Sword,
+    ) -> tuple[ChatCompletionSwordParam, IncludeLiteral | None]:
+        if isinstance(sword, FunctionSword):
             return {
-                "name": tool.name,
-                "parameters": tool.params_json_schema,
-                "strict": tool.strict_json_schema,
+                "name": sword.name,
+                "parameters": sword.params_json_schema,
+                "strict": sword.strict_json_schema,
                 "type": "function",
-                "description": tool.description,
+                "description": sword.description,
             }, None
-        if isinstance(tool, WebSearchTool):
+        if isinstance(sword, WebSearchSword):
             return {
                 "type": "web_search_preview",
-                "user_location": tool.user_location,
-                "search_context_size": tool.search_context_size,
+                "user_location": sword.user_location,
+                "search_context_size": sword.search_context_size,
             }, None
-        if isinstance(tool, FileSearchTool):
-            converted_tool: ChatCompletionToolParam = {
+        if isinstance(sword, FileSearchSword):
+            converted_sword: ChatCompletionSwordParam = {
                 "type": "file_search",
-                "vector_store_ids": tool.vector_store_ids,
+                "vector_store_ids": sword.vector_store_ids,
             }
-            if tool.max_num_results:
-                converted_tool["max_num_results"] = tool.max_num_results
-            if tool.ranking_options:
-                converted_tool["ranking_options"] = tool.ranking_options
-            if tool.filters:
-                converted_tool["filters"] = tool.filters
-            return converted_tool, (
-                "file_search_call.results" if tool.include_search_results else None
+            if sword.max_num_results:
+                converted_sword["max_num_results"] = sword.max_num_results
+            if sword.ranking_options:
+                converted_sword["ranking_options"] = sword.ranking_options
+            if sword.filters:
+                converted_sword["filters"] = sword.filters
+            return converted_sword, (
+                "file_search_call.results" if sword.include_search_results else None
             )
-        if isinstance(tool, ComputerTool):
+        if isinstance(sword, ComputerSword):
             return {
                 "type": "computer_use_preview",
-                "environment": tool.computer.environment,
-                "display_width": tool.computer.dimensions[0],
-                "display_height": tool.computer.dimensions[1],
+                "environment": sword.computer.environment,
+                "display_width": sword.computer.dimensions[0],
+                "display_height": sword.computer.dimensions[1],
             }, None
 
     @staticmethod
-    def _convert_orb_tool(orbs: Orbs) -> ChatCompletionToolParam:
+    def _convert_orb_sword(orbs: Orbs) -> ChatCompletionSwordParam:
         return {
-            "name": orbs.tool_name,
+            "name": orbs.sword_name,
+            "description": orbs.sword_description,
             "parameters": orbs.input_json_schema,
             "strict": orbs.strict_json_schema,
             "type": "function",
-            "description": orbs.tool_description,
         }

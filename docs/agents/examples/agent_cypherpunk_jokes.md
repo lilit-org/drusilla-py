@@ -1,8 +1,7 @@
-## agent "cypherpunk joker": using streaming
-
+# agent "cypherpunk joker": an example of an agent with streaming
 <br>
 
-run our first example of an agent using streaming:
+run with:
 
 ```shell
 make cypherpunk-joker
@@ -24,7 +23,7 @@ def create_agent() -> Agent:
             "4. Make the jokes cyberpunk-themed and entertaining\n"
             "5. Number each joke clearly"
         ),
-        tools=[],
+        swords=[],
     )
 
 
@@ -64,11 +63,11 @@ async def _handle_stream_events(result, num_jokes):
                 if event.name == "message_output_created":
                     if message := ItemHelpers.text_message_output(event.item):
                         print(f"\n💬 Message:\n{message}")
-                elif event.name in ("tool_called", "tool_output"):
+                elif event.name in ("sword_called", "sword_output"):
                     msg = (
-                        "🛠️  Tool called"
-                        if event.name == "tool_called"
-                        else f"📊 Tool output: {event.item.output}"
+                        "🛠️  Sword called"
+                        if event.name == "sword_called"
+                        else f"📊 Sword output: {event.item.output}"
                     )
                     print(f"\n{msg}")
 
@@ -121,7 +120,7 @@ you can ask for a certain number of jokes, and it will update and run the agent:
   
   🦾 Configuration:
         Streaming → ✔️ Enabled
-        Tools     → None
+        Swords     → None
 
 
 ✅ REASONING:

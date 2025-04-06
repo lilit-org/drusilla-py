@@ -4,8 +4,8 @@ from abc import ABC
 from typing import Any, Generic, Protocol
 
 from ..agents.agent import Agent
+from ..gear.swords import Sword
 from ._run_context import RunContextWrapper, TContext
-from ._tool import Tool
 
 ########################################################
 #             Main Classes for Lifecycle Hooks
@@ -23,16 +23,16 @@ class HookProtocol(Protocol[TContext]):
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], output: Any
     ) -> None: ...
 
-    async def on_tool_start(
-        self, context: RunContextWrapper[TContext], agent: Agent[TContext], tool: Tool
+    async def on_sword_start(
+        self, context: RunContextWrapper[TContext], agent: Agent[TContext], sword: Sword
     ) -> None: ...
 
-    async def on_tool_end(
+    async def on_sword_end(
         self,
         context: RunContextWrapper[TContext],
         agent: Agent[TContext],
-        tool: Tool,
-        result: str,
+        sword: Sword,
+        result: Any,
     ) -> None: ...
 
 
@@ -47,19 +47,19 @@ class BaseHooks(ABC, Generic[TContext], HookProtocol[TContext]):
     ) -> None:
         """Called when agent produces final output."""
 
-    async def on_tool_start(
-        self, context: RunContextWrapper[TContext], agent: Agent[TContext], tool: Tool
+    async def on_sword_start(
+        self, context: RunContextWrapper[TContext], agent: Agent[TContext], sword: Sword
     ) -> None:
-        """Called before tool invocation."""
+        """Called before sword invocation."""
 
-    async def on_tool_end(
+    async def on_sword_end(
         self,
         context: RunContextWrapper[TContext],
         agent: Agent[TContext],
-        tool: Tool,
-        result: str,
+        sword: Sword,
+        result: Any,
     ) -> None:
-        """Called after tool invocation."""
+        """Called after sword invocation."""
 
 
 class RunHooks(BaseHooks[TContext]):

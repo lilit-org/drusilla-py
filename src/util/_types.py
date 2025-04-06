@@ -59,7 +59,7 @@ class ComputerAction(TypedDict):
 
 
 class ComputerCallOutput(TypedDict):
-    """Output from a computer tool call."""
+    """Output from a computer sword call."""
 
     type: Literal["computer_call_output"]
     call_id: str
@@ -110,10 +110,10 @@ class Response:
     created_at: float | None = None
     model: str | None = None
     object: Literal["response"] | None = None
-    tool_choice: Literal["auto", "required", "none"] | None = None
+    sword_choice: Literal["auto", "required", "none"] | None = None
     temperature: float | None = None
-    tools: Sequence[ChatCompletionToolParam] | None = None
-    parallel_tool_calls: bool | None = None
+    swords: Sequence[ChatCompletionSwordParam] | None = None
+    parallel_sword_calls: bool | None = None
     top_p: float | None = None
 
 
@@ -145,8 +145,8 @@ class ResponseOutputRefusal(TypedDict):
     refusal: str
 
 
-class ResponseFunctionToolCall(TypedDict):
-    """Function tool call in a response output."""
+class ResponseFunctionSwordCall(TypedDict):
+    """Function sword call in a response output."""
 
     type: Literal["function_call"]
     id: str
@@ -178,7 +178,7 @@ class ResponseTextDeltaEvent(TypedDict):
 
 
 class FunctionCallOutput(TypedDict):
-    """Output from a function tool call."""
+    """Output from a function sword call."""
 
     type: Literal["function_call_output"]
     call_id: str
@@ -203,27 +203,20 @@ class ResponseEvent:
 ########################################################
 
 
-class ChatCompletionFunctionParam(TypedDict):
-    """Function call params for chat completion."""
+class ChatCompletionSwordParam(TypedDict):
+    """Sword params for chat completion."""
 
     name: str
     description: str
     parameters: Mapping[str, Any]
 
 
-class ChatCompletionToolParam(TypedDict):
-    """Tool params for chat completion."""
-
-    type: Literal["function"]
-    function: ChatCompletionFunctionParam
-
-
-class ChatCompletionMessageToolCallParam(TypedDict):
-    """Tool call parameters in a chat message."""
+class ChatCompletionMessageSwordCallParam(TypedDict):
+    """Sword call parameters in a chat message."""
 
     id: str
     type: Literal["function"]
-    function: ChatCompletionFunctionParam
+    function: ChatCompletionSwordParam
 
 
 class ChatCompletionContentPartParam(TypedDict):
@@ -237,9 +230,9 @@ class ChatCompletionContentPartParam(TypedDict):
 class ChatCompletionMessage(TypedDict):
     """Message in a chat completion."""
 
-    role: Literal["user", "assistant", "system", "developer", "tool"]
+    role: Literal["user", "assistant", "system", "developer", "sword"]
     content: NotRequired[str]
-    tool_calls: NotRequired[Sequence[ChatCompletionMessageToolCallParam]]
+    sword_calls: NotRequired[Sequence[ChatCompletionMessageSwordCallParam]]
     refusal: NotRequired[str]
     audio: NotRequired[Mapping[str, str]]
 
@@ -247,10 +240,10 @@ class ChatCompletionMessage(TypedDict):
 class ChatCompletionMessageParam(TypedDict):
     """Parameters for a chat completion message."""
 
-    role: Literal["user", "assistant", "system", "developer", "tool"]
+    role: Literal["user", "assistant", "system", "developer", "sword"]
     content: str | Sequence[ChatCompletionContentPartParam]
-    tool_call_id: NotRequired[str]
-    tool_calls: NotRequired[Sequence[ChatCompletionMessageToolCallParam]]
+    sword_call_id: NotRequired[str]
+    sword_calls: NotRequired[Sequence[ChatCompletionMessageSwordCallParam]]
     refusal: NotRequired[str]
 
 
@@ -269,8 +262,8 @@ class ChatCompletionDeltaFunction(TypedDict):
     arguments: NotRequired[str]
 
 
-class ChatCompletionDeltaToolCall(TypedDict):
-    """Delta update for a tool call in streaming responses."""
+class ChatCompletionDeltaSwordCall(TypedDict):
+    """Delta update for a sword call in streaming responses."""
 
     index: int
     id: NotRequired[str]
@@ -282,7 +275,7 @@ class ChatCompletionDelta(TypedDict):
     """Delta update in streaming responses."""
 
     content: NotRequired[str]
-    tool_calls: NotRequired[Sequence[ChatCompletionDeltaToolCall]]
+    sword_calls: NotRequired[Sequence[ChatCompletionDeltaSwordCall]]
 
 
 class ChatCompletionChoice(TypedDict):
@@ -316,7 +309,7 @@ class ChatCompletionChunk(TypedDict):
     usage: NotRequired[ChatCompletionUsage]
 
 
-ChatCompletionToolChoiceOptionParam: TypeAlias = (
+ChatCompletionSwordChoiceOptionParam: TypeAlias = (
     Literal["auto", "required", "none"] | Mapping[str, Any]
 )
 
@@ -416,15 +409,15 @@ class AsyncDeepSeek:
                 cls,
                 model: str,
                 messages: Sequence[ChatCompletionMessageParam],
-                tools: Sequence[ChatCompletionToolParam] | None = None,
+                swords: Sequence[ChatCompletionSwordParam] | None = None,
                 temperature: float | None = None,
                 top_p: float | None = None,
                 frequency_penalty: float | None = None,
                 presence_penalty: float | None = None,
                 max_tokens: int | None = None,
-                tool_choice: ChatCompletionToolChoiceOptionParam | None = None,
+                sword_choice: ChatCompletionSwordChoiceOptionParam | None = None,
                 response_format: ResponseFormat | None = None,
-                parallel_tool_calls: bool | None = None,
+                parallel_sword_calls: bool | None = None,
                 stream: bool = False,
                 stream_options: Mapping[str, bool] | None = None,
                 extra_headers: Mapping[str, str] | None = None,
@@ -435,7 +428,8 @@ class AsyncDeepSeek:
 
 ResponseOutputItem: TypeAlias = ResponseOutput
 ResponseOutputMessage: TypeAlias = ResponseOutput
-ResponseFileSearchToolCall: TypeAlias = ResponseOutput
+ResponseFileSearchSwordCall: TypeAlias = ResponseOutput
 ResponseFunctionWebSearch: TypeAlias = ResponseOutput
-ResponseComputerToolCall: TypeAlias = ResponseOutput
+ResponseComputerSwordCall: TypeAlias = ResponseOutput
+ComputerSwordCall: TypeAlias = ResponseOutput
 ResponseReasoningItem: TypeAlias = ResponseOutput
