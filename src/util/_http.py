@@ -1,3 +1,11 @@
+"""
+This module provides a default async HTTP client for making requests.
+It extends the httpx.AsyncClient with additional features:
+
+1. Automatic retry mechanism for failed requests
+2. Configurable timeouts for different phases of the request
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -11,7 +19,6 @@ from httpx import Limits, Timeout
 
 
 class DefaultAsyncHttpxClient(httpx.AsyncClient):
-    """A default async HTTP client for making requests."""
 
     def __init__(
         self,

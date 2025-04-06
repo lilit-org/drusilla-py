@@ -1,19 +1,34 @@
+"""
+Charms Module - Sophisticated Agent Lifecycle Management
+
+This module implements a powerful event-driven system for managing agent lifecycles through Charms.
+Charms act as intelligent observers that can:
+
+- Intercept and modify agent behavior at key lifecycle points
+- Implement cross-cutting concerns like logging, monitoring, and validation
+- Enable sophisticated agent orchestration and coordination
+- Provide hooks for custom behavior injection before and after agent operations
+
+Charms follow the Observer pattern, allowing for clean separation of core agent logic
+from auxiliary functionality while maintaining flexibility and extensibility.
+"""
+
 from __future__ import annotations
 
 from abc import ABC
 from typing import Any, Generic, Protocol
 
 from ..agents.agent import Agent
-from ..gear.swords import Sword
-from ._run_context import RunContextWrapper, TContext
+from ..util._types import RunContextWrapper, TContext
+from .sword import Sword
 
 ########################################################
-#             Main Classes for Lifecycle Hooks
+#             Main Classes for Lifecycle Charms
 ########################################################
 
 
-class HookProtocol(Protocol[TContext]):
-    """Protocol defining the interface for lifecycle hooks."""
+class CharmProtocol(Protocol[TContext]):
+    """Protocol defining the interface for lifecycle charms."""
 
     async def on_start(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext]
@@ -36,21 +51,24 @@ class HookProtocol(Protocol[TContext]):
     ) -> None: ...
 
 
-class BaseHooks(ABC, Generic[TContext], HookProtocol[TContext]):
-    """Base class for lifecycle hooks with common method signatures."""
+class BaseCharms(ABC, Generic[TContext]):
+    """Base class for lifecycle charms with common method signatures."""
 
     async def on_start(self, context: RunContextWrapper[TContext], agent: Agent[TContext]) -> None:
         """Called before agent invocation."""
+        pass
 
     async def on_end(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], output: Any
     ) -> None:
         """Called when agent produces final output."""
+        pass
 
     async def on_sword_start(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], sword: Sword
     ) -> None:
         """Called before sword invocation."""
+        pass
 
     async def on_sword_end(
         self,
@@ -60,9 +78,10 @@ class BaseHooks(ABC, Generic[TContext], HookProtocol[TContext]):
         result: Any,
     ) -> None:
         """Called after sword invocation."""
+        pass
 
 
-class RunHooks(BaseHooks[TContext]):
+class RunCharms(BaseCharms[TContext]):
     """Receives callbacks for agent run lifecycle events."""
 
     async def on_orbs(
@@ -72,9 +91,10 @@ class RunHooks(BaseHooks[TContext]):
         to_agent: Agent[TContext],
     ) -> None:
         """Called during agent orbs."""
+        pass
 
 
-class AgentHooks(BaseHooks[TContext]):
+class AgentCharms(BaseCharms[TContext]):
     """Receives callbacks for specific agent lifecycle events."""
 
     async def on_orbs(
@@ -84,3 +104,4 @@ class AgentHooks(BaseHooks[TContext]):
         source: Agent[TContext],
     ) -> None:
         """Called when agent receives orbs."""
+        pass

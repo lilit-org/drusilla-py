@@ -1,15 +1,25 @@
+"""
+This module implements the ModelChatCompletionsModel class, which provides a concrete implementation
+of the Model interface specifically designed for chat-based language model interactions.
+
+The implementation supports both synchronous completions and streaming responses,
+with robust handling of chat history, system instructions, and tool integration.
+It serves as the primary interface for chat-based interactions with language models
+in the system.
+"""
+
 from __future__ import annotations
 
 import json
 import time
 from collections.abc import AsyncIterator, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 from ..agents.output import AgentOutputSchema
 from ..gear.orbs import Orbs
-from ..gear.swords import ComputerSword, FileSearchSword, FunctionSword, WebSearchSword
-from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET
+from ..gear.sword import Sword
+from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET, logger
 from ..util._exceptions import AgentError, UsageError
 from ..util._items import (
     ModelResponse,
@@ -17,7 +27,6 @@ from ..util._items import (
     TResponseOutputItem,
     TResponseStreamEvent,
 )
-from ..util._logger import logger
 from ..util._types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -32,7 +41,7 @@ from ..util._types import (
     ResponseFunctionSwordCall,
     ResponseOutputText,
 )
-from ..util._usage import Usage
+from ..util._types import Usage
 from .interface import Model
 from .settings import ModelSettings
 
@@ -44,9 +53,7 @@ from .settings import ModelSettings
 @dataclass
 class _StreamingState:
     """Maintains the current state of streaming responses."""
-
     text_content_index_and_output: tuple[int, ResponseOutputText] | None = None
-    function_calls: dict[int, ResponseFunctionSwordCall] = field(default_factory=dict)
 
 
 ########################################################
@@ -66,14 +73,14 @@ class ModelChatCompletionsModel(Model):
         self._client = model_client
 
     def _non_null_or_not_given(self, value: Any) -> Any:
-        return None if not value else value
+        return value if value else None
 
     async def get_response(
         self,
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        swords: list[FileSearchSword | WebSearchSword | ComputerSword],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
     ) -> ModelResponse:
@@ -114,7 +121,7 @@ class ModelChatCompletionsModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        swords: list[FileSearchSword | WebSearchSword | ComputerSword],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
     ) -> AsyncIterator[TResponseStreamEvent]:
@@ -182,7 +189,7 @@ class ModelChatCompletionsModel(Model):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        swords: list[FileSearchSword | WebSearchSword | ComputerSword],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
         stream: bool = False,
@@ -211,8 +218,6 @@ class ModelChatCompletionsModel(Model):
             "messages": converted_messages,
             "temperature": self._non_null_or_not_given(model_settings.temperature),
             "top_p": self._non_null_or_not_given(model_settings.top_p),
-            "frequency_penalty": self._non_null_or_not_given(model_settings.frequency_penalty),
-            "presence_penalty": self._non_null_or_not_given(model_settings.presence_penalty),
             "max_tokens": self._non_null_or_not_given(model_settings.max_tokens),
             "stream": stream,
             "extra_headers": HEADERS,
@@ -229,7 +234,7 @@ class ModelChatCompletionsModel(Model):
         if stream:
             request_params["stream_options"] = {"include_usage": True}
 
-        ret = await self._get_client().chat.completions.create(**request_params)
+        ret = await self._client.chat.completions.create(**request_params)
 
         if stream:
             response = Response(
@@ -253,9 +258,6 @@ class ModelChatCompletionsModel(Model):
             return response, ret
 
         return ret
-
-    def _get_client(self) -> AsyncDeepSeek:
-        return self._client
 
 
 ########################################################
@@ -322,22 +324,21 @@ class _Converter:
         return items
 
     @classmethod
-    def maybe_easy_input_message(cls, item: Any) -> dict[str, Any] | None:
-        if not isinstance(item, dict) or item.keys() != {"content", "role"}:
+    def maybe_message(cls, item: Any) -> dict[str, Any] | None:
+        """Check if item is a message of any type and return it if valid."""
+        if not isinstance(item, dict):
             return None
-        role = item.get("role")
-        if role not in ("user", "assistant", "system", "developer") or "content" not in item:
-            return None
-        return cast(dict[str, Any], item)
-
-    @classmethod
-    def maybe_input_message(cls, item: Any) -> dict[str, Any] | None:
-        if (
-            isinstance(item, dict)
-            and item.get("type") == "message"
-            and item.get("role") in ("user", "system", "developer")
-        ):
+            
+        # Check for easy input message format
+        if item.keys() == {"content", "role"}:
+            role = item.get("role")
+            if role in ("user", "assistant", "system", "developer") and "content" in item:
+                return cast(dict[str, Any], item)
+                
+        # Check for input message format
+        if item.get("type") == "message" and item.get("role") in ("user", "system", "developer"):
             return cast(dict[str, Any], item)
+            
 
     @classmethod
     def maybe_file_search_call(cls, item: Any) -> dict[str, Any] | None:
@@ -435,9 +436,9 @@ class _Converter:
             return current_assistant_msg
 
         for item in items:
-            if easy_msg := cls.maybe_easy_input_message(item):
-                role = easy_msg["role"]
-                content = easy_msg["content"]
+            if msg := cls.maybe_message(item):
+                role = msg["role"]
+                content = msg["content"]
 
                 flush_assistant_message()
                 if role == "user":
@@ -469,36 +470,7 @@ class _Converter:
                         }
                     )
                 else:
-                    raise UsageError(f"Unexpected role in easy_input_message: {role}")
-
-            elif in_msg := cls.maybe_input_message(item):
-                role = in_msg["role"]
-                content = in_msg["content"]
-                flush_assistant_message()
-
-                if role == "user":
-                    result.append(
-                        {
-                            "role": "user",
-                            "content": cls.extract_all_content(content),
-                        }
-                    )
-                elif role == "system":
-                    result.append(
-                        {
-                            "role": "system",
-                            "content": cls.extract_text_content(content),
-                        }
-                    )
-                elif role == "developer":
-                    result.append(
-                        {
-                            "role": "developer",
-                            "content": cls.extract_text_content(content),
-                        }
-                    )
-                else:
-                    raise UsageError(f"Unexpected role in input_message: {role}")
+                    raise UsageError(f"Unexpected role in message: {role}")
 
             elif resp_msg := cls.maybe_response_output_message(item):
                 flush_assistant_message()
@@ -587,10 +559,9 @@ class _Converter:
 class SwordConverter:
     @classmethod
     def to_api_format(
-        cls, sword: FileSearchSword | WebSearchSword | ComputerSword
+        cls, sword: Sword
     ) -> ChatCompletionSwordParam:
-        if isinstance(sword, FunctionSword):
-            return {
+        return {
                 "type": "function",
                 "function": {
                     "name": sword.name,
@@ -598,7 +569,6 @@ class SwordConverter:
                     "parameters": sword.params_json_schema,
                 },
             }
-        raise AgentError(f"Received sword type: {type(sword)}, sword: {sword}")
 
     @classmethod
     def convert_orb_sword(cls, orbs: Orbs[Any]) -> ChatCompletionSwordParam:

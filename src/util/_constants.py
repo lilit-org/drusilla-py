@@ -1,104 +1,93 @@
-from __future__ import annotations
-
-from typing import Literal
-
-from ._version import __version__
-
 """
 Constants used throughout the deepseek agentic framework.
 This module contains API configurations, environment settings, and default values.
 """
 
+from __future__ import annotations
+
+import os
+import logging
+import sys
+from typing import Set
+from dotenv import load_dotenv
+
 __all__ = (
     "HEADERS",
-    "Environment",
-    "Button",
-    "IncludeLiteral",
-    "DEFAULT_MODEL",
-    "DEFAULT_BASE_URL",
-    "DEFAULT_WRAPPER_DICT_KEY",
-    "DEFAULT_MAX_TURNS",
+    "UNSET",
+    "FAKE_RESPONSES_ID",
+    "LOG_LEVEL",
+    "BASE_URL",
+    "API_KEY",
+    "MODEL",
+    "MAX_TURNS",
+    "MAX_QUEUE_SIZE",
+    "MAX_GUARDRAIL_QUEUE_SIZE",
     "MAX_SHIELD_QUEUE_SIZE",
+    "LRU_CACHE_SIZE",
     "CHAT_COMPLETIONS_ENDPOINT",
-    "SUPPORTED_LANGUAGES",
     "HTTP_TIMEOUT_TOTAL",
     "HTTP_TIMEOUT_CONNECT",
     "HTTP_TIMEOUT_READ",
     "HTTP_MAX_KEEPALIVE_CONNECTIONS",
     "HTTP_MAX_CONNECTIONS",
-    "LRU_CACHE_SIZE",
-    "UNSET",
-    "FAKE_RESPONSES_ID",
+    "SUPPORTED_LANGUAGES",
 )
 
-# Type Definitions
-Environment = Literal["mac", "windows", "ubuntu", "browser"]
-Button = Literal["left", "right", "wheel", "back", "forward"]
-IncludeLiteral = Literal[
-    "file_search_call.results",
-    "message.input_image.image_url",
-    "computer_call_output.output.image_url",
-]
-
-# Sentinel value for unset values
+# Constants
 UNSET = object()
-
-# Fake response identifier for testing
 FAKE_RESPONSES_ID = "fake_responses"
 
+# Supported languages for translation
+SUPPORTED_LANGUAGES: Set[str] = {
+    "en",  # English
+    "es",  # Spanish
+    "fr",  # French
+    "de",  # German
+    "it",  # Italian
+    "pt",  # Portuguese
+    "ru",  # Russian
+    "ja",  # Japanese
+    "ko",  # Korean
+    "zh",  # Chinese
+    "ar",  # Arabic
+    "hi",  # Hindi
+    "nl",  # Dutch
+    "pl",  # Polish
+    "tr",  # Turkish
+    "vi",  # Vietnamese
+    "he",  # Hebrew
+}
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
+logger = logging.getLogger("deepseek.agents")
+logger.setLevel(getattr(logging, LOG_LEVEL))
+logger.addHandler(logging.StreamHandler(sys.stdout))
+
+# Connection
+BASE_URL = os.getenv("BASE_URL", "http://localhost:11434")
+API_KEY = os.getenv("API_KEY", "NONE")
+MODEL = os.getenv("MODEL", "deepseek-r1")
+
+# Model logic and Optimizations
+MAX_TURNS = int(os.getenv("MAX_TURNS", str(10)))
+MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", "1000"))
+MAX_GUARDRAIL_QUEUE_SIZE = int(os.getenv("MAX_GUARDRAIL_QUEUE_SIZE", "100"))
+MAX_SHIELD_QUEUE_SIZE = 1000
+LRU_CACHE_SIZE = int(os.getenv("LRU_CACHE_SIZE", "128"))
+
+# HTTP Client Configuration
+HTTP_TIMEOUT_TOTAL = float(os.getenv("HTTP_TIMEOUT_TOTAL", "120.0"))
+HTTP_TIMEOUT_CONNECT = float(os.getenv("HTTP_TIMEOUT_CONNECT", "30.0"))
+HTTP_TIMEOUT_READ = float(os.getenv("HTTP_TIMEOUT_READ", "90.0"))
+HTTP_MAX_KEEPALIVE_CONNECTIONS = int(os.getenv("HTTP_MAX_KEEPALIVE_CONNECTIONS", "5"))
+HTTP_MAX_CONNECTIONS = int(os.getenv("HTTP_MAX_CONNECTIONS", "10"))
+
 # API Configuration
-_USER_AGENT = f"Agents/Python {__version__}"
+_USER_AGENT = f"Agents/Python"
 HEADERS = {"User-Agent": _USER_AGENT}
 CHAT_COMPLETIONS_ENDPOINT = "/api/chat"
 
-# Default Settings
-DEFAULT_MODEL = "deepseek-r1:latest"
-DEFAULT_BASE_URL = "http://localhost:11434"
-DEFAULT_WRAPPER_DICT_KEY = "response"
-DEFAULT_MAX_TURNS = 10
-
-# Queue and Cache Limits
-MAX_SHIELD_QUEUE_SIZE = 1000
-LRU_CACHE_SIZE = 128
-
-# HTTP Client Configuration
-HTTP_TIMEOUT_TOTAL = 120.0
-HTTP_TIMEOUT_CONNECT = 30.0
-HTTP_TIMEOUT_READ = 90.0
-HTTP_MAX_KEEPALIVE_CONNECTIONS = 5
-HTTP_MAX_CONNECTIONS = 10
-
-# Language Support
-SUPPORTED_LANGUAGES = {
-    "en": "English",
-    "zh": "Chinese",
-    "es": "Spanish",
-    "fr": "French",
-    "de": "German",
-    "it": "Italian",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "pt": "Portuguese",
-    "ru": "Russian",
-    "ar": "Arabic",
-    "nl": "Dutch",
-    "sv": "Swedish",
-    "no": "Norwegian",
-    "da": "Danish",
-    "fi": "Finnish",
-    "pl": "Polish",
-    "tr": "Turkish",
-    "hr": "Croatian",
-    "ro": "Romanian",
-    "hu": "Hungarian",
-    "cs": "Czech",
-    "sk": "Slovak",
-    "bg": "Bulgarian",
-    "el": "Greek",
-    "he": "Hebrew",
-    "hi": "Hindi",
-    "id": "Indonesian",
-    "ms": "Malay",
-    "th": "Thai",
-    "vi": "Vietnamese",
-}

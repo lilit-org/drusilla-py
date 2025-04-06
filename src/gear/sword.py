@@ -1,8 +1,19 @@
+"""
+Swords Module - Function Wrapping and Schema Generation
+
+This module provides a powerful framework for creating and managing function-based swords,
+which are specialized tools that wrap Python functions with enhanced capabilities including:
+- Automatic schema generation from function signatures
+- Docstring parsing and documentation extraction
+- Type validation and JSON schema generation
+- Context-aware function execution
+- Error handling and reporting
+"""
+
 from __future__ import annotations
 
 import contextlib
 import inspect
-import json
 import logging
 import re
 from collections.abc import Awaitable, Callable
@@ -11,7 +22,6 @@ from functools import lru_cache
 from typing import (
     Any,
     Concatenate,
-    Literal,
     get_args,
     get_origin,
     get_type_hints,
@@ -19,18 +29,14 @@ from typing import (
 )
 
 from griffe import Docstring, DocstringSectionKind
-from pydantic import BaseModel, Field, ValidationError, create_model
+from pydantic import BaseModel, Field, create_model
 from typing_extensions import ParamSpec
 
-from ..util._computer import AsyncComputer, Computer
 from ..util._constants import LRU_CACHE_SIZE
-from ..util._env import get_env_var
-from ..util._exceptions import GenericError, ModelError, UsageError
+from ..util._exceptions import UsageError
 from ..util._items import RunItem
-from ..util._logger import logger
-from ..util._run_context import RunContextWrapper
 from ..util._strict_schema import ensure_strict_json_schema
-from ..util._types import MaybeAwaitable
+from ..util._types import MaybeAwaitable, RunContextWrapper
 
 ########################################################
 #               Private Types
@@ -40,7 +46,6 @@ SwordParams = ParamSpec("SwordParams")
 SwordFunctionWithoutContext = Callable[SwordParams, Any]
 SwordFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], SwordParams], Any]
 SwordFunction = SwordFunctionWithoutContext[SwordParams] | SwordFunctionWithContext[SwordParams]
-CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 
 ########################################################
@@ -55,6 +60,7 @@ class FuncSchema:
     params_pydantic_model: type[BaseModel]
     params_json_schema: dict[str, Any]
     signature: inspect.Signature
+    on_invoke_sword: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
     takes_context: bool = False
     strict_json_schema: bool = True
     _positional_params: list[str] = field(init=False)
@@ -68,9 +74,12 @@ class FuncSchema:
         var_positional: str | None = None
         var_keyword: str | None = None
 
-        for name, param in self.signature.parameters.items():
-            if self.takes_context and name == list(self.signature.parameters.keys())[0]:
-                continue
+        # Skip context parameter if present
+        params = list(self.signature.parameters.items())
+        if self.takes_context and params:
+            params = params[1:]
+
+        for name, param in params:
             if param.kind == param.VAR_POSITIONAL:
                 var_positional = name
             elif param.kind == param.VAR_KEYWORD:
@@ -91,22 +100,23 @@ class FuncSchema:
         keyword_args: dict[str, Any] = {}
 
         for name in self._positional_params:
-            value = getattr(data, name, None)
-            positional_args.append(value)
+            if hasattr(data, name):
+                positional_args.append(getattr(data, name))
 
-        if self._var_positional:
-            value = getattr(data, self._var_positional, None)
-            if value:
-                positional_args.extend(value)
+        if self._var_positional and hasattr(data, self._var_positional):
+            var_args = getattr(data, self._var_positional)
+            if var_args is not None:
+                positional_args.extend(var_args)
 
         for name in self._keyword_params:
-            value = getattr(data, name, None)
-            keyword_args[name] = value
+            if hasattr(data, name):
+                keyword_args[name] = getattr(data, name)
 
-        if self._var_keyword:
-            value = getattr(data, self._var_keyword, None)
-            if value:
-                keyword_args.update(value)
+        # Process variable keyword arguments (**kwargs)
+        if self._var_keyword and hasattr(data, self._var_keyword):
+            var_kwargs = getattr(data, self._var_keyword)
+            if var_kwargs is not None:
+                keyword_args.update(var_kwargs)
 
         return positional_args, keyword_args
 
@@ -121,16 +131,29 @@ class FuncDocumentation:
 
 
 @dataclass(frozen=True)
-class FunctionSwordResult:
-    """Result of running a function sword."""
+class SwordResult:
+    """Result of running a sword."""
 
-    sword: FunctionSword
+    sword: Sword
     output: Any
     run_item: RunItem
 
 
+########################################################
+#           Sword Types
+########################################################
+
+
+def default_sword_error_function(ctx: RunContextWrapper[Any], error: Exception) -> str:
+    """Default error handler for sword failures."""
+    return f"An error occurred while running the sword. Error: {str(error)}"
+
+
+SwordErrorFunction = Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]]
+
+
 @dataclass(frozen=True)
-class FunctionSword:
+class Sword:
     """Sword that wraps a Python function."""
 
     name: str
@@ -138,68 +161,38 @@ class FunctionSword:
     params_json_schema: dict[str, Any]
     on_invoke_sword: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
     strict_json_schema: bool = True
-
-
-@dataclass(frozen=True)
-class FileSearchSword:
-    """Sword for searching vector stores."""
-
-    vector_store_ids: list[str]
-    max_num_results: int | None = None
-    include_search_results: bool = False
-    ranking_options: Any | None = None
-    filters: Any | None = None
-
-    @property
-    def name(self) -> str:
-        return "file_search"
-
-
-@dataclass(frozen=True)
-class WebSearchSword:
-    """Sword for web searching."""
-
-    user_location: Any | None = None
-    search_context_size: Literal["low", "medium", "high"] = "medium"
-
-    @property
-    def name(self) -> str:
-        return "web_search_preview"
-
-
-@dataclass(frozen=True)
-class ComputerSword:
-    """Sword for computer control."""
-
-    computer: Computer | AsyncComputer
-
-    @property
-    def name(self) -> str:
-        return "computer_use_preview"
+    failure_error_function: SwordErrorFunction | None = default_sword_error_function
 
 
 ########################################################
 #               Private Methods
 ########################################################
 
-DocstringStyle = Literal["google", "numpy", "sphinx"]
 
-
-@lru_cache(maxsize=CACHE_SIZE)
-def _detect_docstring_style(doc: str) -> DocstringStyle:
+@lru_cache(maxsize=LRU_CACHE_SIZE)
+def _detect_docstring_style(doc: str):
     """Detect docstring style using pattern matching."""
     patterns = {
-        "sphinx": [r"^:param\s", r"^:type\s", r"^:return:", r"^:rtype:"],
-        "numpy": [
-            r"^Parameters\s*\n\s*-{3,}",
-            r"^Returns\s*\n\s*-{3,}",
-            r"^Yields\s*\n\s*-{3,}",
+        "sphinx": [
+            re.compile(r"^:param\s", re.MULTILINE),
+            re.compile(r"^:type\s", re.MULTILINE),
+            re.compile(r"^:return:", re.MULTILINE),
+            re.compile(r"^:rtype:", re.MULTILINE),
         ],
-        "google": [r"^(Args|Arguments):", r"^(Returns):", r"^(Raises):"],
+        "numpy": [
+            re.compile(r"^Parameters\s*\n\s*-{3,}", re.MULTILINE),
+            re.compile(r"^Returns\s*\n\s*-{3,}", re.MULTILINE),
+            re.compile(r"^Yields\s*\n\s*-{3,}", re.MULTILINE),
+        ],
+        "google": [
+            re.compile(r"^(Args|Arguments):", re.MULTILINE),
+            re.compile(r"^(Returns):", re.MULTILINE),
+            re.compile(r"^(Raises):", re.MULTILINE),
+        ],
     }
 
     scores = {
-        style: sum(1 for pattern in style_patterns if re.search(pattern, doc, re.MULTILINE))
+        style: sum(1 for pattern in style_patterns if pattern.search(doc))
         for style, style_patterns in patterns.items()
     }
 
@@ -221,7 +214,7 @@ def _suppress_griffe_logging():
         logger.setLevel(previous_level)
 
 
-@lru_cache(maxsize=CACHE_SIZE)
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _process_var_positional(
     param: inspect.Parameter, ann: Any, field_description: str | None
 ) -> tuple[Any, Field]:
@@ -238,7 +231,7 @@ def _process_var_positional(
     return ann, Field(default_factory=list, description=field_description)  # type: ignore
 
 
-@lru_cache(maxsize=CACHE_SIZE)
+@lru_cache(maxsize=LRU_CACHE_SIZE)
 def _process_var_keyword(
     param: inspect.Parameter, ann: Any, field_description: str | None
 ) -> tuple[Any, Field]:
@@ -261,7 +254,7 @@ def _process_var_keyword(
 
 
 def generate_func_documentation(
-    func: Callable[..., Any], style: DocstringStyle | None = None
+    func: Callable[..., Any], style: None
 ) -> FuncDocumentation:
     """Extract function metadata from docstring."""
     doc = inspect.getdoc(func)
@@ -293,7 +286,7 @@ def generate_func_documentation(
 
 def function_schema(
     func: Callable[..., Any],
-    docstring_style: DocstringStyle | None = None,
+    docstring_style: None,
     name_override: str | None = None,
     description_override: str | None = None,
     use_docstring_info: bool = True,
@@ -366,6 +359,7 @@ def function_schema(
         params_pydantic_model=dynamic_model,
         params_json_schema=json_schema,
         signature=sig,
+        on_invoke_sword=lambda ctx, sword_name: func(ctx.value, **ctx.args),
         takes_context=takes_context,
         strict_json_schema=strict_json_schema,
     )
@@ -375,16 +369,6 @@ def function_schema(
 #           Sword Types
 ########################################################
 
-Sword = FunctionSword | FileSearchSword | WebSearchSword | ComputerSword
-
-
-def default_sword_error_function(ctx: RunContextWrapper[Any], error: Exception) -> str:
-    """Default error handler for sword failures."""
-    return f"An error occurred while running the sword. Error: {str(error)}"
-
-
-SwordErrorFunction = Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]]
-
 
 @overload
 def function_sword(
@@ -392,11 +376,11 @@ def function_sword(
     *,
     name_override: str | None = None,
     description_override: str | None = None,
-    docstring_style: DocstringStyle | None = None,
+    docstring_style: None = None,
     use_docstring_info: bool = True,
     failure_error_function: SwordErrorFunction | None = None,
     strict_mode: bool = True,
-) -> FunctionSword: ...
+) -> Sword: ...
 
 
 @overload
@@ -404,11 +388,11 @@ def function_sword(
     *,
     name_override: str | None = None,
     description_override: str | None = None,
-    docstring_style: DocstringStyle | None = None,
+    docstring_style: None = None,
     use_docstring_info: bool = True,
     failure_error_function: SwordErrorFunction | None = None,
     strict_mode: bool = True,
-) -> Callable[[SwordFunction[...]], FunctionSword]: ...
+) -> Callable[[SwordFunction[...]], Sword]: ...
 
 
 def function_sword(
@@ -416,12 +400,12 @@ def function_sword(
     *,
     name_override: str | None = None,
     description_override: str | None = None,
-    docstring_style: DocstringStyle | None = None,
+    docstring_style: None = None,
     use_docstring_info: bool = True,
     failure_error_function: SwordErrorFunction | None = default_sword_error_function,
     strict_mode: bool = True,
-) -> FunctionSword | Callable[[SwordFunction[...]], FunctionSword]:
-    def _create_function_sword(the_func: SwordFunction[...]) -> FunctionSword:
+) -> Sword | Callable[[SwordFunction[...]], Sword]:
+    def _create_function_sword(the_func: SwordFunction[...]) -> Sword:
         schema = function_schema(
             func=the_func,
             name_override=name_override,
@@ -431,50 +415,27 @@ def function_sword(
             strict_json_schema=strict_mode,
         )
 
-        async def _on_invoke_sword_impl(ctx: RunContextWrapper[Any], input: str) -> Any:
+        async def _on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
             try:
-                json_data: dict[str, Any] = json.loads(input) if input else {}
-                parsed = (
-                    schema.params_pydantic_model(**json_data)
-                    if json_data
-                    else schema.params_pydantic_model()
-                )
-                args, kwargs_dict = schema.to_call_args(parsed)
-                logger.debug(f"Sword call args: {args}, kwargs: {kwargs_dict}")
-
-                result = the_func(ctx, *args, **kwargs_dict)
-                if inspect.iscoroutine(result):
-                    result = await result
-                return str(result)
-            except json.JSONDecodeError as e:
-                logger.debug(f"Invalid JSON input for sword {schema.name}: {input}")
-                raise ModelError(f"Invalid JSON input for sword {schema.name}: {input}") from e
-            except ValidationError as e:
-                raise ModelError(f"Invalid JSON input for sword {schema.name}: {e}") from e
+                return await schema.on_invoke_sword(ctx, input)
             except Exception as e:
                 if failure_error_function:
                     error_msg = failure_error_function(ctx, e)
                     if inspect.iscoroutine(error_msg):
                         error_msg = await error_msg
                     return error_msg
-                raise GenericError(e) from e
+                raise
 
-        async def _on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
-            try:
-                return await _on_invoke_sword_impl(ctx, input)
-            except Exception as e:
-                logger.debug(f"Sword {schema.name} failed with error: {e}")
-                raise GenericError(e) from e
-
-        return FunctionSword(
+        return Sword(
             name=schema.name,
-            description=schema.description or "",
+            description=schema.description,
             params_json_schema=schema.params_json_schema,
             on_invoke_sword=_on_invoke_sword,
             strict_json_schema=strict_mode,
+            failure_error_function=failure_error_function,
         )
 
-    def decorator(real_func: SwordFunction[...]) -> FunctionSword:
+    def decorator(real_func: SwordFunction[...]) -> Sword:
         return _create_function_sword(real_func)
 
     if func is None:

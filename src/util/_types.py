@@ -1,103 +1,90 @@
+"""
+This module defines core type definitions and data structures used throughout the project.
+
+It includes:
+- Type variables and generic type definitions
+- Data classes for tracking API usage and context management
+- Response output types for API interactions
+- Chat completion related types for LLM interactions
+- Streaming response handling types
+- Input parameter types for API requests
+
+These types provide a consistent interface for working with LLM APIs, handling responses,
+and managing streaming data across the application.
+"""
+
 from __future__ import annotations
 
 import time
 from collections.abc import AsyncIterator, Awaitable, Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any, Literal, NotRequired, TypeAlias, TypedDict
+from dataclasses import dataclass, field
+from typing import Any, Generic, Literal, NotRequired, TypeAlias, TypedDict
 
 from typing_extensions import TypeVar
+
 
 ########################################################
 #              Type Variables
 ########################################################
 
+TContext = TypeVar("TContext", default=Any)
 T = TypeVar("T")
 MaybeAwaitable = Awaitable[T] | T
 
+@dataclass(frozen=True)
+class QueueCompleteSentinel:
+    """Sentinel value used to indicate queue completion."""
+    pass
+
 ########################################################
-#            Data class for Usage
+#            Data class for Usage and Contexts
 ########################################################
 
 
 @dataclass(frozen=True)
 class Usage:
-    """Token usage statistics for API calls."""
+    """Track LLM API token usage and requests."""
 
-    requests: int
-    input_tokens: int
-    output_tokens: int
-    total_tokens: int
+    requests: int = 0
+    """API request count."""
 
+    input_tokens: int = 0
+    """Tokens sent to API."""
 
-########################################################
-#            TypedDict for Computer Actions
-########################################################
+    output_tokens: int = 0
+    """Tokens received from API."""
 
+    total_tokens: int = 0
+    """Total tokens used."""
 
-class ComputerAction(TypedDict):
-    """Computer interaction actions like clicks, typing, etc."""
-
-    type: Literal[
-        "click",
-        "double_click",
-        "drag",
-        "keypress",
-        "move",
-        "screenshot",
-        "scroll",
-        "type",
-        "wait",
-    ]
-    x: NotRequired[int]
-    y: NotRequired[int]
-    button: NotRequired[str]
-    keys: NotRequired[Sequence[str]]
-    path: NotRequired[Sequence[Mapping[str, int]]]
-    scroll_x: NotRequired[int]
-    scroll_y: NotRequired[int]
-    text: NotRequired[str]
+    def add(self, other: "Usage") -> "Usage":
+        return Usage(
+            requests=self.requests + (other.requests or 0),
+            input_tokens=self.input_tokens + (other.input_tokens or 0),
+            output_tokens=self.output_tokens + (other.output_tokens or 0),
+            total_tokens=self.total_tokens + (other.total_tokens or 0)
+        )
 
 
-class ComputerCallOutput(TypedDict):
-    """Output from a computer sword call."""
+@dataclass
+class RunContextWrapper(Generic[TContext]):
+    """Wrapper for context objects passed to Runner.run().
 
-    type: Literal["computer_call_output"]
-    call_id: str
-    output: str
+    Contexts are used to pass dependencies and data to custom code.
+    They are not passed to the LLM.
+    """
+
+    context: TContext
+    """Context object passed to Runner.run()"""
+
+    usage: Usage = field(default_factory=Usage)
+    """Usage stats for the agent run. May be stale during streaming until final chunk."""
+
 
 
 ########################################################
-#            Main classes for Response Outputs
+#            Classes for Response Outputs
 ########################################################
-
-
-@dataclass(frozen=True)
-class ResponseCompletedEvent:
-    """Event indicating completion of a response."""
-
-    response: Response
-
-
-@dataclass(frozen=True)
-class ResponseContentPartAddedEvent:
-    """Event indicating a new content part has been added to a response."""
-
-    content_index: int
-    item_id: str
-    output_index: int
-    part: ResponseOutput
-    type: Literal["response.content_part.added"] = "response.content_part.added"
-
-
-@dataclass(frozen=True)
-class ResponseContentPartDoneEvent:
-    """Event indicating a content part has been completed."""
-
-    content_index: int
-    item_id: str
-    output_index: int
-    part: ResponseOutput
-    type: Literal["response.content_part.done"] = "response.content_part.done"
 
 
 @dataclass(frozen=True)
@@ -125,7 +112,6 @@ class ResponseOutput(TypedDict):
     name: NotRequired[str]
     arguments: NotRequired[Mapping[str, Any]]
     call_id: NotRequired[str]
-    action: NotRequired[ComputerAction]
     role: NotRequired[Literal["user", "assistant", "system", "developer"]]
     status: NotRequired[str]
 
@@ -199,7 +185,7 @@ class ResponseEvent:
 
 
 ########################################################
-#           Chat Completion Types
+#           Classes for Chat Completion Types
 ########################################################
 
 
@@ -315,7 +301,7 @@ ChatCompletionSwordChoiceOptionParam: TypeAlias = (
 
 
 ########################################################
-#            TypedDict for Response Input
+#            Class for Response Input
 ########################################################
 
 
@@ -328,7 +314,6 @@ class ResponseInputItemParam(TypedDict):
     name: NotRequired[str]
     arguments: NotRequired[Mapping[str, Any]]
     call_id: NotRequired[str]
-    action: NotRequired[ComputerAction]
 
 
 class ResponseFormat(TypedDict):
@@ -339,7 +324,7 @@ class ResponseFormat(TypedDict):
 
 
 ########################################################
-#           Main class: AsyncStream
+#           Main class for Async Streaming
 ########################################################
 
 
@@ -412,8 +397,6 @@ class AsyncDeepSeek:
                 swords: Sequence[ChatCompletionSwordParam] | None = None,
                 temperature: float | None = None,
                 top_p: float | None = None,
-                frequency_penalty: float | None = None,
-                presence_penalty: float | None = None,
                 max_tokens: int | None = None,
                 sword_choice: ChatCompletionSwordChoiceOptionParam | None = None,
                 response_format: ResponseFormat | None = None,
@@ -428,8 +411,4 @@ class AsyncDeepSeek:
 
 ResponseOutputItem: TypeAlias = ResponseOutput
 ResponseOutputMessage: TypeAlias = ResponseOutput
-ResponseFileSearchSwordCall: TypeAlias = ResponseOutput
-ResponseFunctionWebSearch: TypeAlias = ResponseOutput
-ResponseComputerSwordCall: TypeAlias = ResponseOutput
-ComputerSwordCall: TypeAlias = ResponseOutput
 ResponseReasoningItem: TypeAlias = ResponseOutput

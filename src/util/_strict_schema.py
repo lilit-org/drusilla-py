@@ -1,26 +1,43 @@
+"""
+This module provides utilities for enforcing strict JSON schema validation rules and managing schema references.
+
+Key features:
+- Enforces strict object property validation by default
+- Recursively processes and validates nested schema definitions
+- Handles schema references ($ref) resolution with caching
+- Supports logical operators (anyOf, allOf)
+- Ensures consistent schema structure and validation rules
+
+The module is particularly useful for ensuring type safety and strict validation
+in JSON schema-based systems, preventing unexpected property additions and
+maintaining consistent data structures.
+"""
+
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, TypeAlias, cast
+from typing import Any, Dict, Final, TypeAlias, cast
 
 from ._constants import LRU_CACHE_SIZE, UNSET
-from ._env import get_env_var
 from ._exceptions import ModelError, UsageError
 
 ########################################################
-#               Private Constants
+#             Type Aliases and Constants                #
 ########################################################
+JSONSchema: TypeAlias = Dict[str, Any]
+SchemaPath: TypeAlias = tuple[str, ...]
 
-EMPTY_JSON_SCHEMA = {
+EMPTY_JSON_SCHEMA: Final[JSONSchema] = {
     "additionalProperties": False,
     "type": "object",
     "properties": {},
     "required": [],
 }
 
-JSONSchema: TypeAlias = dict[str, Any]
-SchemaPath: TypeAlias = tuple[str, ...]
-CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
+CACHE_SIZE: Final[int] = LRU_CACHE_SIZE
+LOGICAL_OPERATORS: Final[tuple[str, ...]] = ("anyOf", "allOf")
+SCHEMA_DEFINITION_KEYS: Final[tuple[str, ...]] = ("definitions", "$defs")
+
 
 ########################################################
 #               Private Methods
@@ -29,18 +46,21 @@ CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 @lru_cache(maxsize=CACHE_SIZE)
 def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
+    """Resolve a JSON schema reference to its target schema with caching."""
     if not ref.startswith("#/"):
         raise ModelError(f"Invalid $ref format {ref!r}; must start with #/")
 
-    resolved = root
-    for key in ref[2:].split("/"):
-        resolved = resolved[key]
-        if not isinstance(resolved, dict):
-            raise ModelError(
-                f"Invalid resolution path for {ref} - " f"encountered non-dictionary at {resolved}"
-            )
-
-    return cast(JSONSchema, resolved)
+    try:
+        resolved = root
+        for key in ref[2:].split("/"):
+            resolved = resolved[key]
+            if not isinstance(resolved, dict):
+                raise ModelError(
+                    f"Invalid resolution path for {ref} - encountered non-dictionary at {resolved}"
+                )
+        return cast(JSONSchema, resolved)
+    except KeyError as e:
+        raise ModelError(f"Invalid $ref path {ref}: {str(e)}")
 
 
 def _enforce_strict_schema_rules(
@@ -50,9 +70,8 @@ def _enforce_strict_schema_rules(
     root: JSONSchema,
 ) -> JSONSchema:
     """Enforces strict JSON schema rules by recursively validating and modifying the schema."""
-
     # Process nested definitions
-    for def_key in ["$defs", "definitions"]:
+    for def_key in SCHEMA_DEFINITION_KEYS:
         if def_key in schema and isinstance(schema[def_key], dict):
             schema[def_key] = {
                 name: _enforce_strict_schema_rules(
@@ -90,7 +109,7 @@ def _enforce_strict_schema_rules(
         )
 
     # Process logical operators
-    for operator in ["anyOf", "allOf"]:
+    for operator in LOGICAL_OPERATORS:
         if operator in schema and isinstance(schema[operator], list):
             values = schema[operator]
             if operator == "allOf" and len(values) == 1:
@@ -104,11 +123,12 @@ def _enforce_strict_schema_rules(
                     for i, entry in enumerate(values)
                 ]
 
+    # Clean up default values
     if schema.get("default", UNSET) is None:
         schema.pop("default")
 
-    ref = schema.get("$ref")
-    if ref is not None:
+    # Handle schema references
+    if ref := schema.get("$ref"):
         if not isinstance(ref, str):
             raise ModelError(f"$ref must be a string, got {ref}")
 
@@ -127,6 +147,7 @@ def _enforce_strict_schema_rules(
 
 
 def ensure_strict_json_schema(schema: JSONSchema) -> JSONSchema:
+    """Ensure a JSON schema follows strict rules."""
     if not schema:
         return EMPTY_JSON_SCHEMA
     return _enforce_strict_schema_rules(schema, path=(), root=schema)

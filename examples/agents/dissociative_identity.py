@@ -16,8 +16,8 @@ from src.agents.agent import Agent
 from src.agents.run import Runner
 from src.util._client import setup_client
 from src.util._exceptions import AgentExecutionError
-from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
-from src.util._run_context import RunContextWrapper
+from src.util._print import pretty_print_result, pretty_print_result_stats
+from src.util._types import RunContextWrapper
 
 ########################################################
 #           Style instructions

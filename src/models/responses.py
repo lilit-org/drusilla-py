@@ -1,3 +1,18 @@
+"""
+Model Response Management
+
+This module provides the ModelResponsesModel class, a comprehensive response handler for model interactions.
+It implements both synchronous and streaming response patterns, with support for structured output
+formats and efficient response processing.
+
+Key features:
+- Synchronous response handling with structured output
+- Streaming response support for real-time processing
+- Response format validation and transformation
+- Integration with model output schemas
+- Support for both chat completions and function calling responses
+"""
+
 from __future__ import annotations
 
 import json
@@ -7,11 +22,9 @@ from typing import Any, Literal, overload
 
 from ..agents.output import AgentOutputSchema
 from ..gear.orbs import Orbs
-from ..gear.swords import ComputerSword, FileSearchSword, FunctionSword, Sword, WebSearchSword
-from ..util._constants import HEADERS, UNSET, IncludeLiteral
-from ..util._exceptions import UsageError
+from ..gear.sword import Sword
+from ..util._constants import HEADERS, UNSET, logger
 from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
-from ..util._logger import logger
 from ..util._types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -20,25 +33,16 @@ from ..util._types import (
     Response,
     ResponseFormat,
     ResponseOutput,
+    Usage,
 )
-from ..util._usage import Usage
 from .interface import Model
 from .settings import ModelSettings
 
 ########################################################
-#               Data Classes                          #
-########################################################
-
-
-@dataclass
-class ConvertedSwords:
-    swords: list[ChatCompletionSwordParam]
-    includes: list[IncludeLiteral]
-
-
-########################################################
 #               Main Class: Responses Model            #
 ########################################################
+def _non_null_or_not_given(value: Any) -> Any:
+    return value or UNSET
 
 
 class ModelResponsesModel(Model):
@@ -49,9 +53,6 @@ class ModelResponsesModel(Model):
     ) -> None:
         self.model = model
         self._client = model_client
-
-    def _non_null_or_not_given(self, value: Any) -> Any:
-        return value or UNSET
 
     async def get_response(
         self,
@@ -177,15 +178,15 @@ class ModelResponsesModel(Model):
         )
 
         return await self._client.responses.create(
-            instructions=self._non_null_or_not_given(system_instructions),
+            instructions=_non_null_or_not_given(system_instructions),
             model=self.model,
             input=list_input,
             include=converted_swords.includes,
             swords=converted_swords.swords,
-            temperature=self._non_null_or_not_given(model_settings.temperature),
-            top_p=self._non_null_or_not_given(model_settings.top_p),
-            truncation=self._non_null_or_not_given(model_settings.truncation),
-            max_output_tokens=self._non_null_or_not_given(model_settings.max_tokens),
+            temperature=_non_null_or_not_given(model_settings.temperature),
+            top_p=_non_null_or_not_given(model_settings.top_p),
+            truncation=_non_null_or_not_given(model_settings.truncation),
+            max_output_tokens=_non_null_or_not_given(model_settings.max_tokens),
             sword_choice=sword_choice,
             parallel_sword_calls=parallel_sword_calls or UNSET,
             stream=stream,
@@ -198,6 +199,10 @@ class ModelResponsesModel(Model):
 #             Main Class: Converter                    #
 ########################################################
 
+@dataclass
+class ConvertedSwords:
+    swords: list[ChatCompletionSwordParam]
+
 
 class Converter:
     @staticmethod
@@ -208,7 +213,7 @@ class Converter:
             return UNSET
         if sword_choice in ("required", "auto", "none"):
             return sword_choice
-        if sword_choice in ("file_search", "web_search_preview", "computer_use_preview"):
+        if sword_choice in ("file_search", "computer_use_preview"):
             return {"type": sword_choice}
         return {"type": "function", "name": sword_choice}
 
@@ -234,61 +239,20 @@ class Converter:
         orbs: list[Orbs[Any]],
     ) -> ConvertedSwords:
         converted_swords: list[ChatCompletionSwordParam] = []
-        includes: list[IncludeLiteral] = []
-
-        computer_swords = [sword for sword in swords if isinstance(sword, ComputerSword)]
-        if len(computer_swords) > 1:
-            raise UsageError(f"You can only provide one computer sword. Got {len(computer_swords)}")
 
         for sword in swords:
-            converted_sword, include = cls._convert_sword(sword)
+            converted_sword = cls._convert_sword(sword)
             converted_swords.append(converted_sword)
-            if include:
-                includes.append(include)
 
         converted_swords.extend(cls._convert_orb_sword(orb) for orb in orbs)
 
-        return ConvertedSwords(swords=converted_swords, includes=includes)
+        return ConvertedSwords(swords=converted_swords)
 
     @staticmethod
     def _convert_sword(
         sword: Sword,
-    ) -> tuple[ChatCompletionSwordParam, IncludeLiteral | None]:
-        if isinstance(sword, FunctionSword):
-            return {
-                "name": sword.name,
-                "parameters": sword.params_json_schema,
-                "strict": sword.strict_json_schema,
-                "type": "function",
-                "description": sword.description,
-            }, None
-        if isinstance(sword, WebSearchSword):
-            return {
-                "type": "web_search_preview",
-                "user_location": sword.user_location,
-                "search_context_size": sword.search_context_size,
-            }, None
-        if isinstance(sword, FileSearchSword):
-            converted_sword: ChatCompletionSwordParam = {
-                "type": "file_search",
-                "vector_store_ids": sword.vector_store_ids,
-            }
-            if sword.max_num_results:
-                converted_sword["max_num_results"] = sword.max_num_results
-            if sword.ranking_options:
-                converted_sword["ranking_options"] = sword.ranking_options
-            if sword.filters:
-                converted_sword["filters"] = sword.filters
-            return converted_sword, (
-                "file_search_call.results" if sword.include_search_results else None
-            )
-        if isinstance(sword, ComputerSword):
-            return {
-                "type": "computer_use_preview",
-                "environment": sword.computer.environment,
-                "display_width": sword.computer.dimensions[0],
-                "display_height": sword.computer.dimensions[1],
-            }, None
+    ) -> tuple[ChatCompletionSwordParam]:
+        return sword.params_json_schema
 
     @staticmethod
     def _convert_orb_sword(orbs: Orbs) -> ChatCompletionSwordParam:

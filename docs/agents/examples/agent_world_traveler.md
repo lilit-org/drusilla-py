@@ -17,22 +17,21 @@ def create_agents() -> Agent:
     return Agent(
         name="Agent World Traveler",
         instructions=(
-            "Coordinate translation requests using provided swords. "
+            "You are a cool special robot who coordinates translation requests."
             "Use appropriate translation swords based on requested languages."
         ),
         swords=[
             Agent(
-                name=f"{lang_name} Translator",
-                instructions=f"Translate English text to {lang_name}",
-                orbs_description=f"English to {lang_name} translator",
+                name=f"{lang_code.upper()} Translator",
+                instructions=f"Translate English text to {lang_code.upper()}",
+                orbs_description=f"English to {lang_code.upper()} translator",
             ).as_sword(
-                sword_name=f"translate_to_{lang_key.lower()}",
-                sword_description=f"Translate text to {lang_name}",
+                sword_name=f"translate_to_{lang_code.lower()}",
+                sword_description=f"Translate text to {lang_code.upper()}",
             )
-            for lang_key, lang_name in SUPPORTED_LANGUAGES.items()
+            for lang_code in SUPPORTED_LANGUAGES
         ],
     )
-
 
 def run_agent() -> str | None:
     try:

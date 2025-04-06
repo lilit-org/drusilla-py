@@ -18,10 +18,10 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.agents.agent import Agent
 from src.agents.run import Runner
 from src.gear.orbs import OrbsInputData, OrbsInputFilter, orbs
-from src.gear.swords import function_sword
+from src.gear.sword import function_sword
 from src.util._client import setup_client
 from src.util._exceptions import AgentExecutionError
-from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
+from src.util._print import pretty_print_result, pretty_print_result_stats
 
 ########################################################
 #              Swords and Filters
@@ -93,7 +93,7 @@ async def run_agent():
 
         result = await run_agent_chain(
             second_agent,
-            [item.to_input_item() for item in result.new_items]
+            [item.input_item for item in result.new_items]
             + [
                 {
                     "content": "Create a sentence about the cypherpunk world with the specified word count.",
@@ -104,7 +104,7 @@ async def run_agent():
 
         await run_agent_chain(
             third_agent,
-            [item.to_input_item() for item in result.new_items]
+            [item.input_item for item in result.new_items]
             + [
                 {
                     "content": "Replace one word with 'love' in a way that makes sense or is entertaining.",

@@ -1,10 +1,22 @@
+"""
+Model Provider Management
+
+This module provides the ModelProvider class, a flexible provider interface for managing model instances
+and their configurations. It handles client initialization, API key management, and model selection
+with support for both chat completions and responses API modes.
+
+Key features:
+- Dynamic client initialization with environment-based configuration
+- API key and base URL management with fallback to environment variables
+- Support for both chat completions and responses API modes
+- Organization and project context management
+- Lazy client loading to prevent premature API key validation
+"""
+
 from __future__ import annotations
 
-import httpx
-
 from src.util._client import DeepSeekClient
-from src.util._constants import DEFAULT_BASE_URL, DEFAULT_MODEL
-from src.util._env import get_env_var
+from src.util._constants import BASE_URL, MODEL
 from src.util._http import DefaultAsyncHttpxClient
 from src.util._types import AsyncDeepSeek
 
@@ -13,24 +25,6 @@ from .chat import ModelChatCompletionsModel
 from .interface import Model
 from .interface import ModelProvider as BaseModelProvider
 from .responses import ModelResponsesModel
-
-########################################################
-#               Constants                                #
-########################################################
-
-MODEL = get_env_var("MODEL", DEFAULT_MODEL)
-BASE_URL = get_env_var("BASE_URL", DEFAULT_BASE_URL)
-_http_client: httpx.AsyncClient | None = None
-
-
-########################################################
-#               Private Methods                        #
-########################################################
-
-
-def shared_http_client() -> httpx.AsyncClient:
-    global _http_client
-    return _http_client or DefaultAsyncHttpxClient()
 
 
 ########################################################
@@ -82,7 +76,7 @@ class ModelProvider(BaseModelProvider):
                 base_url=self._stored_base_url,
                 organization=self._stored_organization,
                 project=self._stored_project,
-                http_client=shared_http_client(),
+                http_client=DefaultAsyncHttpxClient(),
             )
         return self._client
 

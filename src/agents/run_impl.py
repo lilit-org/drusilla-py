@@ -1,3 +1,14 @@
+"""Core implementation for agent execution and run management.
+
+This module provides the core implementation for executing agent runs, handling the flow of agent
+interactions, and processing various types of responses and actions. It manages:
+
+- Processing model responses and converting them into actionable items
+- Executing function calls (swords) and handling their results
+- Managing agent transitions (orbs) between different agent instances
+- Handling input and output shielding for security and validation
+- Streaming run events and managing the execution flow
+"""
 from __future__ import annotations
 
 import asyncio
@@ -6,14 +17,15 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+from ..gear.charm import RunCharms
 from ..gear.orbs import Orbs, OrbsInputData
-from ..gear.shields import (
+from ..gear.shield import (
     InputShield,
     InputShieldResult,
     OutputShield,
     OutputShieldResult,
 )
-from ..gear.swords import ComputerSword, FunctionSword, FunctionSwordResult
+from ..gear.sword import Sword, SwordResult
 from ..util._exceptions import AgentError, ModelError, UsageError
 from ..util._items import (
     ItemHelpers,
@@ -27,15 +39,9 @@ from ..util._items import (
     SwordCallOutputItem,
     TResponseInputItem,
 )
-from ..util._lifecycle import RunHooks
-from ..util._logger import logger
-from ..util._run_context import RunContextWrapper, TContext
+from ..util._constants import logger
 from ..util._stream_events import RunItemStreamEvent, StreamEvent
-from ..util._types import (
-    ComputerAction,
-    ResponseComputerSwordCall,
-    ResponseFunctionSwordCall,
-)
+from ..util._types import QueueCompleteSentinel, ResponseFunctionSwordCall, RunContextWrapper, TContext
 from .agent import Agent, SwordsToFinalOutputResult
 from .output import AgentOutputSchema
 
@@ -44,27 +50,8 @@ if TYPE_CHECKING:
 
 
 ########################################################
-#               Constants
-########################################################
-
-
-async def noop_coroutine() -> None:
-    """A coroutine that does nothing. Used as a fallback when no hooks are defined."""
-    return None
-
-
-class QueueCompleteSentinel:
-    pass
-
-
-QUEUE_COMPLETE_SENTINEL = QueueCompleteSentinel()
-_NOT_FINAL_OUTPUT = SwordsToFinalOutputResult(is_final_output=False, final_output=None)
-
-
-########################################################
 #               Data Classes for Swords
 ########################################################
-
 
 @dataclass(frozen=True)
 class SwordRunOrbs:
@@ -75,13 +62,7 @@ class SwordRunOrbs:
 @dataclass(frozen=True)
 class SwordRunFunction:
     sword_call: ResponseFunctionSwordCall
-    function_sword: FunctionSword
-
-
-@dataclass(frozen=True)
-class SwordRunComputerAction:
-    sword_call: ResponseComputerSwordCall
-    computer_sword: ComputerSword
+    function_sword: Sword
 
 
 @dataclass
@@ -89,10 +70,9 @@ class ProcessedResponse:
     new_items: list[RunItem]
     orbs: list[SwordRunOrbs]
     functions: list[SwordRunFunction]
-    computer_actions: list[SwordRunComputerAction]
 
     def has_swords_to_run(self) -> bool:
-        return bool(self.orbs or self.functions or self.computer_actions)
+        return bool(self.orbs or self.functions)
 
 
 @dataclass(frozen=True)
@@ -127,7 +107,6 @@ class SingleStepResult:
 #               Main Class: RunImpl
 ########################################################
 
-
 class RunImpl:
     EVENT_MAP = {
         MessageOutputItem: "message_output_created",
@@ -137,6 +116,8 @@ class RunImpl:
         SwordCallOutputItem: "sword_output",
         ReasoningItem: "reasoning_item_created",
     }
+
+    _NOT_FINAL_OUTPUT = SwordsToFinalOutputResult(is_final_output=False, final_output=None)
 
     @classmethod
     async def execute_swords_and_side_effects(
@@ -148,28 +129,19 @@ class RunImpl:
         new_response: ModelResponse,
         processed_response: ProcessedResponse,
         output_schema: AgentOutputSchema | None,
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> SingleStepResult:
         new_step_items = processed_response.new_items
 
-        function_results, computer_results = await asyncio.gather(
-            cls.execute_function_sword_calls(
-                agent=agent,
-                sword_runs=processed_response.functions,
-                hooks=hooks,
-                context_wrapper=context_wrapper,
-            ),
-            cls.execute_computer_actions(
-                agent=agent,
-                actions=processed_response.computer_actions,
-                hooks=hooks,
-                context_wrapper=context_wrapper,
-            ),
+        function_results = await cls.execute_function_sword_calls(
+            agent=agent,
+            sword_runs=processed_response.functions,
+            charms=charms,
+            context_wrapper=context_wrapper,
         )
         new_step_items.extend([result.run_item for result in function_results])
-        new_step_items.extend(computer_results)
 
         if run_orbs := processed_response.orbs:
             return await cls.execute_orbs(
@@ -179,7 +151,7 @@ class RunImpl:
                 new_step_items=new_step_items,
                 new_response=new_response,
                 run_orbs=run_orbs,
-                hooks=hooks,
+                charms=charms,
                 context_wrapper=context_wrapper,
                 run_config=run_config,
             )
@@ -204,7 +176,7 @@ class RunImpl:
                 pre_step_items=pre_step_items,
                 new_step_items=new_step_items,
                 final_output=check_sword_use.final_output,
-                hooks=hooks,
+                charms=charms,
                 context_wrapper=context_wrapper,
             )
 
@@ -222,7 +194,7 @@ class RunImpl:
                 pre_step_items=pre_step_items,
                 new_step_items=new_step_items,
                 final_output=final_output,
-                hooks=hooks,
+                charms=charms,
                 context_wrapper=context_wrapper,
             )
         elif (
@@ -235,7 +207,7 @@ class RunImpl:
                 pre_step_items=pre_step_items,
                 new_step_items=new_step_items,
                 final_output=potential_final_output_text or "",
-                hooks=hooks,
+                charms=charms,
                 context_wrapper=context_wrapper,
             )
         else:
@@ -259,16 +231,12 @@ class RunImpl:
         items: list[RunItem] = []
         run_orbs: list[SwordRunOrbs] = []
         functions: list[SwordRunFunction] = []
-        computer_actions: list[SwordRunComputerAction] = []
         orbs_map = {orb.sword_name: orb for orb in orbs}
         function_map = {}
-        computer_sword = None
 
         for sword in agent.swords:
-            if isinstance(sword, FunctionSword):
+            if isinstance(sword, Sword):
                 function_map[sword.name] = sword
-            elif isinstance(sword, ComputerSword):
-                computer_sword = sword
 
         for output in response.output:
             output_type = output["type"]
@@ -281,14 +249,8 @@ class RunImpl:
                     "role": "assistant",
                 }
                 items.append(MessageOutputItem(raw_item=message_output, agent=agent))
-            elif output_type in ("file_search", "web_search", "computer"):
+            elif output_type in ("file_search", "web_search", "interface"):
                 items.append(SwordCallItem(raw_item=output, agent=agent))
-                if output_type == "computer":
-                    if not computer_sword:
-                        raise ModelError("Model produced computer action without a computer sword.")
-                    computer_actions.append(
-                        SwordRunComputerAction(sword_call=output, computer_sword=computer_sword)
-                    )
             elif output_type == "reasoning":
                 items.append(ReasoningItem(raw_item=output, agent=agent))
             elif output_type == "function":
@@ -317,7 +279,6 @@ class RunImpl:
             new_items=items,
             orbs=run_orbs,
             functions=functions,
-            computer_actions=computer_actions,
         )
 
     @classmethod
@@ -326,45 +287,41 @@ class RunImpl:
         *,
         agent: Agent[TContext],
         sword_runs: list[SwordRunFunction],
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
-    ) -> list[FunctionSwordResult]:
+    ) -> list[SwordResult]:
         async def run_single_sword(
-            func_sword: FunctionSword, sword_call: ResponseFunctionSwordCall
+            func_sword: Sword, sword_call: ResponseFunctionSwordCall
         ) -> Any:
             try:
-                _, _, result = await asyncio.gather(
-                    hooks.on_sword_start(context_wrapper, agent, func_sword),
-                    (
-                        agent.hooks.on_sword_start(context_wrapper, agent, func_sword)
-                        if agent.hooks
-                        else noop_coroutine()
-                    ),
+                # Run charms and sword in parallel
+                charms_tasks = [
+                    charms.on_sword_start(context_wrapper, agent, func_sword),
+                    agent.charms.on_sword_start(context_wrapper, agent, func_sword)
+                    if agent.charms else None,
                     func_sword.on_invoke_sword(context_wrapper, sword_call.arguments),
-                )
+                ]
+                _, _, result = await asyncio.gather(*[t for t in charms_tasks if t is not None])
 
-                await asyncio.gather(
-                    hooks.on_sword_end(context_wrapper, agent, func_sword, result),
-                    (
-                        agent.hooks.on_sword_end(context_wrapper, agent, func_sword, result)
-                        if agent.hooks
-                        else noop_coroutine()
-                    ),
-                )
+                # Run end charms in parallel
+                end_charms_tasks = [
+                    charms.on_sword_end(context_wrapper, agent, func_sword, result),
+                    agent.charms.on_sword_end(context_wrapper, agent, func_sword, result)
+                    if agent.charms else None,
+                ]
+                await asyncio.gather(*[t for t in end_charms_tasks if t is not None])
+                return result
             except Exception as e:
                 raise AgentError(e) from e
 
-            return result
-
+        # Run all swords in parallel
         results = await asyncio.gather(
-            *[
-                run_single_sword(sword_run.function_sword, sword_run.sword_call)
-                for sword_run in sword_runs
-            ]
+            *[run_single_sword(sword_run.function_sword, sword_run.sword_call)
+              for sword_run in sword_runs]
         )
 
         return [
-            FunctionSwordResult(
+            SwordResult(
                 sword=sword_run.function_sword,
                 output=result,
                 run_item=SwordCallOutputItem(
@@ -377,27 +334,6 @@ class RunImpl:
         ]
 
     @classmethod
-    async def execute_computer_actions(
-        cls,
-        *,
-        agent: Agent[TContext],
-        actions: list[SwordRunComputerAction],
-        hooks: RunHooks[TContext],
-        context_wrapper: RunContextWrapper[TContext],
-    ) -> list[RunItem]:
-        return await asyncio.gather(
-            *[
-                ComputerAction.execute(
-                    agent=agent,
-                    action=action,
-                    hooks=hooks,
-                    context_wrapper=context_wrapper,
-                )
-                for action in actions
-            ]
-        )
-
-    @classmethod
     async def execute_orbs(
         cls,
         *,
@@ -407,10 +343,11 @@ class RunImpl:
         new_step_items: list[RunItem],
         new_response: ModelResponse,
         run_orbs: list[SwordRunOrbs],
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig | None,
     ) -> SingleStepResult:
+        # Handle multiple orbs case
         if len(run_orbs) > 1:
             ignored_orbs = run_orbs[1:]
             output_message = f"Multiple orbs, ignoring {len(ignored_orbs)} orbs."
@@ -424,12 +361,14 @@ class RunImpl:
                 )
             )
 
+        # Process the first orb
         actual_orbs = run_orbs[0]
         orbs = actual_orbs.orbs
         new_agent: Agent[Any] = await orbs.on_invoke_orbs(
             context_wrapper, actual_orbs.sword_call.arguments
         )
 
+        # Add orb output item
         new_step_items.append(
             OrbsOutputItem(
                 agent=agent,
@@ -442,26 +381,20 @@ class RunImpl:
             )
         )
 
-        await asyncio.gather(
-            hooks.on_orbs(
-                context=context_wrapper,
-                from_agent=agent,
-                to_agent=new_agent,
-            ),
-            (
-                agent.hooks.on_orbs(
-                    context_wrapper,
-                    agent=new_agent,
-                    source=agent,
-                )
-                if agent.hooks
-                else noop_coroutine()
-            ),
-        )
+        # Run charms in parallel
+        charms_tasks = [
+            charms.on_orbs(context=context_wrapper, from_agent=agent, to_agent=new_agent),
+            agent.charms.on_orbs(context_wrapper, agent=new_agent, source=agent)
+            if agent.charms else None,
+        ]
+        await asyncio.gather(*[t for t in charms_tasks if t is not None])
 
+        # Apply input filter if present
         input_filter = orbs.input_filter or (run_config.orbs_input_filter if run_config else None)
         if input_filter:
-            logger.debug("Filtering inputs for orbs")
+            if not callable(input_filter):
+                raise UsageError(f"Invalid input filter: {input_filter}")
+
             orbs_input_data = OrbsInputData(
                 input_history=(
                     tuple(original_input) if isinstance(original_input, list) else original_input
@@ -469,8 +402,7 @@ class RunImpl:
                 pre_orbs_items=tuple(pre_step_items),
                 new_items=tuple(new_step_items),
             )
-            if not callable(input_filter):
-                raise UsageError(f"Invalid input filter: {input_filter}")
+            
             filtered = input_filter(orbs_input_data)
             if not isinstance(filtered, OrbsInputData):
                 raise UsageError(f"Invalid input filter result: {filtered}")
@@ -501,10 +433,10 @@ class RunImpl:
         pre_step_items: list[RunItem],
         new_step_items: list[RunItem],
         final_output: Any,
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
     ) -> SingleStepResult:
-        await cls.run_final_output_hooks(agent, hooks, context_wrapper, final_output)
+        await cls.run_final_output_charms(agent, charms, context_wrapper, final_output)
 
         return SingleStepResult(
             original_input=original_input,
@@ -515,20 +447,20 @@ class RunImpl:
         )
 
     @classmethod
-    async def run_final_output_hooks(
+    async def run_final_output_charms(
         cls,
         agent: Agent[TContext],
-        hooks: RunHooks[TContext],
+        charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         final_output: Any,
     ):
-        if agent.hooks:
+        if agent.charms:
             await asyncio.gather(
-                hooks.on_end(context_wrapper, agent, final_output),
-                agent.hooks.on_end(context_wrapper, agent, final_output),
+                charms.on_end(context_wrapper, agent, final_output),
+                agent.charms.on_end(context_wrapper, agent, final_output),
             )
         else:
-            await hooks.on_end(context_wrapper, agent, final_output)
+            await charms.on_end(context_wrapper, agent, final_output)
 
     @classmethod
     async def run_single_input_shield(
@@ -560,15 +492,13 @@ class RunImpl:
         step_result: SingleStepResult,
         queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel],
     ):
-        events = []
-        for item in step_result.new_step_items:
-            event_name = cls.EVENT_MAP.get(type(item))
-            if event_name:
-                events.append(RunItemStreamEvent(item=item, name=event_name))
-            else:
-                logger.warning(f"Unexpected item type: {type(item)}")
+        events = [
+            RunItemStreamEvent(item=item, name=cls.EVENT_MAP[type(item)])
+            for item in step_result.new_step_items
+            if type(item) in cls.EVENT_MAP
+        ]
 
-        # Batch put all events at once with timeout
+        # Batch put all events with timeout
         for event in events:
             try:
                 await asyncio.wait_for(queue.put(event), timeout=1.0)
@@ -580,14 +510,14 @@ class RunImpl:
         cls,
         *,
         agent: Agent[TContext],
-        sword_results: list[FunctionSwordResult],
+        sword_results: list[SwordResult],
         context_wrapper: RunContextWrapper[TContext],
     ) -> SwordsToFinalOutputResult:
         if not sword_results:
-            return _NOT_FINAL_OUTPUT
+            return cls._NOT_FINAL_OUTPUT
 
         if agent.sword_use_behavior == "run_llm_again":
-            return _NOT_FINAL_OUTPUT
+            return cls._NOT_FINAL_OUTPUT
         elif agent.sword_use_behavior == "stop_on_first_sword":
             return SwordsToFinalOutputResult(
                 is_final_output=True, final_output=sword_results[0].output
@@ -599,7 +529,7 @@ class RunImpl:
                     return SwordsToFinalOutputResult(
                         is_final_output=True, final_output=sword_result.output
                     )
-            return _NOT_FINAL_OUTPUT
+            return cls._NOT_FINAL_OUTPUT
         elif callable(agent.sword_use_behavior):
             if inspect.iscoroutinefunction(agent.sword_use_behavior):
                 if result := await cast(
