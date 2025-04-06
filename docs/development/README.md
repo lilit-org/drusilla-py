@@ -2,6 +2,99 @@
 
 <br>
 
+## pre-requisites
+
+- python 3.9+
+- [poetry](https://python-poetry.org/) for dependency management
+- [docker](https://www.docker.com/) for running github actions locally
+- [act](https://github.com/nektos/act) for testing github actions locally
+
+<br>
+
+#### installing docker
+
+- **macos**:
+  ```bash
+  brew install --cask docker
+  ```
+  after installation, open docker desktop and wait for it to start
+
+- **linux**:
+  ```bash
+  # ubuntu/debian
+  sudo apt-get update
+  sudo apt-get install docker.io
+  sudo systemctl start docker
+  sudo systemctl enable docker
+  ```
+
+- **windows**:
+  download and install [docker desktop](https://www.docker.com/products/docker-desktop)
+
+<br>
+
+#### installing act
+
+- **macos (intel)**:
+  ```bash
+  brew install act
+  ```
+
+- **macos (apple silicon/m1/m2)**:
+  ```bash
+  brew install act
+  ```
+  note: when running act on apple silicon, use `make test-actions-mac` instead of `make test-actions`
+
+- **linux**:
+  ```bash
+  curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+  ```
+
+- **windows**:
+  ```bash
+  choco install act-cli
+  ```
+
+<br>
+
+#### troubleshooting docker issues
+
+if you encounter docker connectivity issues when running act:
+
+1. verify docker is running:
+   ```bash
+   docker info
+   ```
+
+2. check docker network connectivity:
+   ```bash
+   docker run hello-world
+   ```
+
+3. if you're behind a corporate proxy, configure docker to use it:
+   ```bash
+   # create or edit ~/.docker/config.json
+   {
+     "proxies": {
+       "default": {
+         "httpProxy": "http://proxy.example.com:8080",
+         "httpsProxy": "http://proxy.example.com:8080",
+         "noProxy": "localhost,127.0.0.1"
+       }
+     }
+   }
+   ```
+
+4. if you're still having issues, try pulling the image manually first:
+   ```bash
+   docker pull nektos/act-environments-ubuntu:18.04
+   ```
+
+<br>
+
+---
+
 ## running noctira
 
 <br>
@@ -47,3 +140,15 @@ start [ollama](https://ollama.com/) in another terminal window (after downloadin
 ```shell
 ollama serve
 ```
+
+## testing github actions locally
+
+you can test github actions workflows locally using act. this is useful for debugging ci issues before pushing changes.
+
+1. make sure you have act installed (see prerequisites above)
+2. run the tests:
+   ```bash
+   make test-actions  # or make test-actions-mac for apple silicon
+   ```
+
+this will run both the ci and test workflows locally, allowing you to catch any issues before pushing your changes.

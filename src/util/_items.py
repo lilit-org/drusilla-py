@@ -24,7 +24,6 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
-    TypeAlias,
     TypeVar,
     Union,
     cast,
@@ -44,7 +43,7 @@ if TYPE_CHECKING:
 #            Type Aliases and Constants                #
 ########################################################
 
-T = TypeVar("T", bound=TResponseOutputItem | TResponseInputItem)
+T = TypeVar("T")
 
 MESSAGE_TYPE = "message"
 OUTPUT_TEXT_TYPE = "output_text"
@@ -53,7 +52,7 @@ THINK_START = "<think>"
 THINK_END = "</think>"
 ECHOES_START = "Echoes of encrypted hearts"
 
-RunItem: TypeAlias = Union[
+RunItem = Union[
     "MessageOutputItem",
     "OrbsCallItem",
     "OrbsOutputItem",
@@ -271,7 +270,7 @@ class ItemHelpers:
         sword_call: ResponseFunctionSwordCall, output: str
     ) -> FunctionCallOutput:
         return {
-            "call_id": sword_call.call_id,
+            "call_id": sword_call["call_id"],
             "output": output,
             "type": "function_call_output",
         }

@@ -17,7 +17,7 @@ import dataclasses
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
 if TYPE_CHECKING:
     from ..gear.charm import AgentCharms
@@ -28,7 +28,9 @@ from ..gear.shield import InputShield, OutputShield
 from ..gear.sword import Sword, SwordResult, function_sword
 from ..models.settings import ModelSettings
 from ..util._print import transform_string_function_style
-from ..util._types import MaybeAwaitable, RunContextWrapper, TContext
+from ..util._types import MaybeAwaitable, RunContextWrapper
+
+TContext = TypeVar("TContext")
 
 ########################################################
 #                    Private Methods
@@ -62,7 +64,7 @@ class SwordsToFinalOutputResult:
     final_output: Any | None = None
 
 
-SwordsToFinalOutputFunction: TypeAlias = Callable[
+SwordsToFinalOutputFunction = Callable[
     [RunContextWrapper[TContext], list[SwordResult]],
     MaybeAwaitable[SwordsToFinalOutputResult],
 ]

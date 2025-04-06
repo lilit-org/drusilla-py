@@ -10,9 +10,17 @@ clean:
 	@rm -rf venv/lib/python*/site-packages/*.egg
 	@rm -rf .ruff_cache/
 
+.PHONY: test-actions
+test-actions:
+	act -W .github/workflows/ci.yml -W .github/workflows/test.yml
+
+.PHONY: test-actions-mac
+test-actions-mac:
+	act -W .github/workflows/ci.yml -W .github/workflows/test.yml --container-architecture linux/amd64 -P ubuntu-latest=nektos/act-environments-ubuntu:18.04
+
 .PHONY: install
 install:
-	poetry install --no-root
+	poetry install --with dev
 
 .PHONY: test
 test:
