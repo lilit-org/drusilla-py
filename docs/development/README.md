@@ -2,6 +2,39 @@
 
 <br>
 
+## prerequisites
+
+- python 3.9+
+- [poetry](https://python-poetry.org/) for dependency management
+- [act](https://github.com/nektos/act) for testing github actions locally
+
+### installing act
+
+- **macos (intel)**:
+  ```bash
+  brew install act
+  ```
+
+- **macos (apple silicon/m1/m2)**:
+  ```bash
+  brew install act
+  ```
+  note: when running act on apple silicon, use `make test-actions-mac` instead of `make test-actions`
+
+- **linux**:
+  ```bash
+  curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+  ```
+
+- **windows**:
+  ```bash
+  choco install act-cli
+  ```
+
+<br>
+
+---
+
 ## running noctira
 
 <br>
@@ -47,3 +80,15 @@ start [ollama](https://ollama.com/) in another terminal window (after downloadin
 ```shell
 ollama serve
 ```
+
+## testing github actions locally
+
+you can test github actions workflows locally using act. this is useful for debugging ci issues before pushing changes.
+
+1. make sure you have act installed (see prerequisites above)
+2. run the tests:
+   ```bash
+   make test-actions  # or make test-actions-mac for apple silicon
+   ```
+
+this will run both the ci and test workflows locally, allowing you to catch any issues before pushing your changes.
