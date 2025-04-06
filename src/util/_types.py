@@ -336,12 +336,17 @@ class ResponseFormat(TypedDict):
 class AsyncStream(AsyncIterator[ChatCompletionChunk]):
     """Async iterator for streaming chat completion chunks."""
 
-    def __init__(self, stream: AsyncIterator[str]):
+    def __init__(self, stream: AsyncIterator[str | dict]):
         self._stream = stream
 
     async def __anext__(self) -> ChatCompletionChunk:
         try:
             line = await anext(self._stream)
+
+            # If line is already a dictionary, return it directly
+            if isinstance(line, dict):
+                return line
+
             if line.startswith("data: "):
                 line = line[6:]
             if line == "[DONE]":

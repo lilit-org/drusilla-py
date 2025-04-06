@@ -64,7 +64,7 @@ def _format_result(result: Any, show_reasoning: bool = True) -> str:
 
 def _format_agent_info(result: Any) -> str:
     info: list[str] = ["\n👾 Agent Info:"]
-    if hasattr(result, "is_complete"):
+    if isinstance(result, RunResultStreaming):
         info.extend(
             [
                 f"      Name   → {result.current_agent.name}",
@@ -73,7 +73,14 @@ def _format_agent_info(result: Any) -> str:
             ]
         )
     else:
-        info.append(f"      Last Agent → {result.last_agent.name}")
+        info.extend(
+            [
+                f"      Last Agent → {result.last_agent.name}",
+            ]
+        )
+        if hasattr(result, "current_turn") and hasattr(result, "max_turns"):
+            info.append(f"      Turn       → {result.current_turn}/{result.max_turns}")
+        info.append(f"      Status     → {'✔️ Complete' if result.is_complete else '🟡 Running'}")
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
