@@ -32,11 +32,9 @@ from ..util._types import (
     ChatCompletion,
     ChatCompletionMessage,
     ChatCompletionMessageParam,
-    ChatCompletionSwordChoiceOptionParam,
     ChatCompletionSwordParam,
     Response,
     ResponseEvent,
-    ResponseFormat,
     ResponseFunctionSwordCall,
     ResponseOutputText,
     ResponseStreamEvent,
@@ -138,7 +136,7 @@ class ModelChatCompletionsModel(Model):
         )
 
         if not isinstance(stream, AsyncStream):
-            raise TypeError(f"Expected AsyncStream, got {type(stream)}")
+            stream = AsyncStream(stream)
 
         state = _StreamingState()
         async for chunk in stream:
@@ -268,32 +266,20 @@ class ModelChatCompletionsModel(Model):
 
 class _Converter:
     @classmethod
-    def convert_sword_choice(
-        cls, sword_choice: Literal["auto", "required", "none"] | str | None
-    ) -> ChatCompletionSwordChoiceOptionParam | Any:
-        if sword_choice is None:
-            return UNSET
-        if sword_choice in ("auto", "required", "none"):
-            return sword_choice
-        return {
-            "type": "function",
-            "function": {"name": sword_choice},
-        }
+    def convert_sword_choice(cls, choice: str | None) -> str | object:
+        """Convert sword choice to API format."""
+        if choice is None:
+            return "none"
+        return choice
 
     @classmethod
     def convert_response_format(
-        cls, final_output_schema: AgentOutputSchema | None
-    ) -> ResponseFormat | Any:
-        if not final_output_schema or final_output_schema.is_plain_text():
+        cls, output_schema: AgentOutputSchema | None
+    ) -> dict[str, str] | object:
+        """Convert output schema to response format."""
+        if output_schema is None:
             return UNSET
-        return {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "final_output",
-                "strict": final_output_schema.strict_json_schema,
-                "schema": final_output_schema.json_schema(),
-            },
-        }
+        return {"type": "json_object"}
 
     @classmethod
     def message_to_output_items(
@@ -559,22 +545,18 @@ class _Converter:
 class SwordConverter:
     @classmethod
     def to_api_format(cls, sword: Sword) -> ChatCompletionSwordParam:
+        """Convert a Sword to API format."""
         return {
-            "type": "function",
-            "function": {
-                "name": sword.name,
-                "description": sword.description or "",
-                "parameters": sword.params_json_schema,
-            },
+            "name": sword.name,
+            "description": sword.description,
+            "parameters": sword.params_json_schema,
         }
 
     @classmethod
-    def convert_orb_sword(cls, orbs: Orbs[Any]) -> ChatCompletionSwordParam:
+    def convert_orb_sword(cls, orbs: Orbs) -> ChatCompletionSwordParam:
+        """Convert an Orbs instance to a sword parameter."""
         return {
-            "type": "function",
-            "function": {
-                "name": orbs.sword_name,
-                "description": orbs.sword_description,
-                "parameters": orbs.input_json_schema,
-            },
+            "name": orbs.sword_name,
+            "description": orbs.sword_description,
+            "parameters": orbs.input_json_schema,
         }

@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Literal, overload
+from typing import Literal, overload
 
 from ..agents.output import AgentOutputSchema
 from ..gear.orbs import Orbs
@@ -28,10 +28,8 @@ from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
 from ..util._types import (
     AsyncDeepSeek,
     AsyncStream,
-    ChatCompletionSwordChoiceOptionParam,
     ChatCompletionSwordParam,
     Response,
-    ResponseFormat,
     ResponseOutput,
     Usage,
 )
@@ -169,7 +167,7 @@ class ModelResponsesModel(Model):
         logger.debug(
             f"Calling LLM {self.model} with input:\n"
             f"{json.dumps(list_input, indent=2)}\n"
-            f"Swords:\n{json.dumps(converted_swords.swords, indent=2)}\n"
+            f"Swords:\n{json.dumps(converted_swords, indent=2)}\n"
             f"Stream: {stream}\n"
             f"Sword choice: {sword_choice}\n"
             f"Response format: {response_format}\n"
@@ -179,8 +177,8 @@ class ModelResponsesModel(Model):
             instructions=system_instructions,
             model=self.model,
             input=list_input,
-            include=converted_swords.includes,
-            swords=converted_swords.swords,
+            include=converted_swords,
+            swords=converted_swords,
             temperature=model_settings.temperature,
             top_p=model_settings.top_p,
             truncation=model_settings.truncation,
@@ -204,61 +202,40 @@ class ConvertedSwords:
 
 
 class Converter:
-    @staticmethod
-    def convert_sword_choice(
-        sword_choice: Literal["auto", "required", "none"] | str | None,
-    ) -> ChatCompletionSwordChoiceOptionParam:
-        if sword_choice is None:
-            return UNSET
-        if sword_choice in ("required", "auto", "none"):
-            return sword_choice
-        if sword_choice in ("file_search", "computer_use_preview"):
-            return {"type": sword_choice}
-        return {"type": "function", "name": sword_choice}
+    @classmethod
+    def convert_sword_choice(cls, choice: str | None) -> str:
+        """Convert sword choice to API format."""
+        if choice is None:
+            return "auto"
+        return choice
 
-    @staticmethod
-    def get_response_format(
-        output_schema: AgentOutputSchema | None,
-    ) -> ResponseFormat | None:
-        if not output_schema or output_schema.is_plain_text():
-            return UNSET
-        return {
-            "format": {
-                "type": "json_schema",
-                "name": "final_output",
-                "schema": output_schema.json_schema(),
-                "strict": output_schema.strict_json_schema,
-            }
-        }
+    @classmethod
+    def get_response_format(cls, output_schema: AgentOutputSchema | None) -> dict[str, str]:
+        """Convert output schema to response format."""
+        if output_schema is None:
+            return {"type": "text"}
+        return {"type": "json_object"}
 
     @classmethod
     def convert_swords(
-        cls,
-        swords: list[Sword],
-        orbs: list[Orbs[Any]],
-    ) -> ConvertedSwords:
-        converted_swords: list[ChatCompletionSwordParam] = []
-
+        cls, swords: list[Sword], orbs: list[Orbs]
+    ) -> list[ChatCompletionSwordParam]:
+        """Convert swords and orbs to API format."""
+        converted_swords = []
         for sword in swords:
-            converted_sword = cls._convert_sword(sword)
-            converted_swords.append(converted_sword)
-
-        converted_swords.extend(cls._convert_orb_sword(orb) for orb in orbs)
-
-        return ConvertedSwords(swords=converted_swords)
-
-    @staticmethod
-    def _convert_sword(
-        sword: Sword,
-    ) -> tuple[ChatCompletionSwordParam]:
-        return sword.params_json_schema
-
-    @staticmethod
-    def _convert_orb_sword(orbs: Orbs) -> ChatCompletionSwordParam:
-        return {
-            "name": orbs.sword_name,
-            "description": orbs.sword_description,
-            "parameters": orbs.input_json_schema,
-            "strict": orbs.strict_json_schema,
-            "type": "function",
-        }
+            converted_swords.append(
+                {
+                    "name": sword.name,
+                    "description": sword.description,
+                    "parameters": sword.params_json_schema,
+                }
+            )
+        for orb in orbs:
+            converted_swords.append(
+                {
+                    "name": orb.sword_name,
+                    "description": orb.sword_description,
+                    "parameters": orb.params_json_schema,
+                }
+            )
+        return converted_swords
