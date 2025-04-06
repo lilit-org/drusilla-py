@@ -1,9 +1,9 @@
 """
 Model Response Management
 
-This module provides the ModelResponsesModel class, a comprehensive response handler for model interactions.
-It implements both synchronous and streaming response patterns, with support for structured output
-formats and efficient response processing.
+This module provides the ModelResponsesModel class, a comprehensive response handler for
+model interactions. It implements both synchronous and streaming response patterns,
+with support for structured output formats and efficient response processing.
 
 Key features:
 - Synchronous response handling with structured output
@@ -37,6 +37,7 @@ from ..util._types import (
 )
 from .interface import Model
 from .settings import ModelSettings
+
 
 ########################################################
 #               Main Class: Responses Model            #
@@ -198,6 +199,7 @@ class ModelResponsesModel(Model):
 ########################################################
 #             Main Class: Converter                    #
 ########################################################
+
 
 @dataclass
 class ConvertedSwords:

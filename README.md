@@ -20,7 +20,7 @@ noctira is an early work in progress and constantly evolving. documentation is b
 ## contributing
 
 noctira is open source and open to contributions. keep in mind that the project
-is early and core architectural changes are still being made. see the [CONTRIBUTING.md](docs/.internal/CONTRIBUTING.md) file for more information. and 
+is early and core architectural changes are still being made. see the [CONTRIBUTING.md](docs/.internal/CONTRIBUTING.md) file for more information. and
 checkout [this guide](docs/development/README.md) for local development.
 
 <br>

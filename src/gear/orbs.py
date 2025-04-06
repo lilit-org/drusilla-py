@@ -23,8 +23,8 @@ from typing_extensions import TypeVar
 from ..util._exceptions import UsageError
 from ..util._items import RunItem, TResponseInputItem
 from ..util._print import transform_string_function_style, validate_json
-from ..util._types import RunContextWrapper, TContext
 from ..util._strict_schema import ensure_strict_json_schema
+from ..util._types import RunContextWrapper, TContext
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent

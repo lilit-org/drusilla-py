@@ -22,7 +22,6 @@ from typing import Any, Generic, Literal, NotRequired, TypeAlias, TypedDict
 
 from typing_extensions import TypeVar
 
-
 ########################################################
 #              Type Variables
 ########################################################
@@ -31,10 +30,11 @@ TContext = TypeVar("TContext", default=Any)
 T = TypeVar("T")
 MaybeAwaitable = Awaitable[T] | T
 
+
 @dataclass(frozen=True)
 class QueueCompleteSentinel:
     """Sentinel value used to indicate queue completion."""
-    pass
+
 
 ########################################################
 #            Data class for Usage and Contexts
@@ -57,12 +57,12 @@ class Usage:
     total_tokens: int = 0
     """Total tokens used."""
 
-    def add(self, other: "Usage") -> "Usage":
+    def add(self, other: Usage) -> Usage:
         return Usage(
             requests=self.requests + (other.requests or 0),
             input_tokens=self.input_tokens + (other.input_tokens or 0),
             output_tokens=self.output_tokens + (other.output_tokens or 0),
-            total_tokens=self.total_tokens + (other.total_tokens or 0)
+            total_tokens=self.total_tokens + (other.total_tokens or 0),
         )
 
 
@@ -79,7 +79,6 @@ class RunContextWrapper(Generic[TContext]):
 
     usage: Usage = field(default_factory=Usage)
     """Usage stats for the agent run. May be stale during streaming until final chunk."""
-
 
 
 ########################################################

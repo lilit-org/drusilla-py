@@ -17,9 +17,10 @@ and state management throughout the application.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
-from ._items import RunItem, TResponseStreamEvent
+from ._items import RunItem
+from ._types import ResponseStreamEvent
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
@@ -46,7 +47,7 @@ RunItemStreamEventName: TypeAlias = Literal[
 class RawResponsesStreamEvent:
     """Direct pass-through events from the LLM."""
 
-    data: TResponseStreamEvent
+    data: ResponseStreamEvent
     type: Literal["raw_response_event"] = "raw_response_event"
 
 
@@ -81,4 +82,4 @@ class AgentUpdatedStreamEvent:
 #              StreamEvent Type Alias                  #
 ########################################################
 
-StreamEvent: TypeAlias = Union[RawResponsesStreamEvent, RunItemStreamEvent, AgentUpdatedStreamEvent]
+StreamEvent: TypeAlias = RawResponsesStreamEvent | RunItemStreamEvent | AgentUpdatedStreamEvent

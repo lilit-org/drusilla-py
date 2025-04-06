@@ -2,7 +2,7 @@
 
 <br>
 
-this example demonstrates a multi-agent system where three agents work together in a chain to create an entertaining text transformation. 
+this example demonstrates a multi-agent system where three agents work together in a chain to create an entertaining text transformation.
 
 each agent has a specific role and passes its output to the next agent in the chain.
 
@@ -138,16 +138,16 @@ poetry run python examples/agents/friend_with_benefits.py
 ✅ Successfully received model response...
 
 ✅ RunResult Performance:
-  
+
   👾 Agent Info:
         Last Agent → Agent One
-  
+
   📊 Statistics:
         Items     → 1
         Responses → 1
         Input Shield  → 0
         Output Shield → 0
-  
+
   🦾 Configuration:
         Streaming → ❌ Disabled
         Swords     → Available (1 swords)
@@ -161,16 +161,16 @@ The above code will output a random integer **between 3 and 15**, including both
 ✅ Successfully received model response...
 
 ✅ RunResult Performance:
-  
+
   👾 Agent Info:
         Last Agent → Agent Two
-  
+
   📊 Statistics:
         Items     → 1
         Responses → 1
         Input Shield  → 0
         Output Shield → 0
-  
+
   🦾 Configuration:
         Streaming → ❌ Disabled
         Swords     → None
@@ -184,16 +184,16 @@ Neon glow lights up derelict streets in a gritty, dark ambiance where neon clash
 ✅ Successfully received model response...
 
 ✅ RunResult Performance:
-  
+
   👾 Agent Info:
         Last Agent → Assistant Three
-  
+
   📊 Statistics:
         Items     → 1
         Responses → 1
         Input Shield  → 0
         Output Shield → 0
-  
+
   🦾 Configuration:
         Streaming → ❌ Disabled
         Swords     → None

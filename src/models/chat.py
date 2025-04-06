@@ -25,7 +25,6 @@ from ..util._items import (
     ModelResponse,
     TResponseInputItem,
     TResponseOutputItem,
-    TResponseStreamEvent,
 )
 from ..util._types import (
     AsyncDeepSeek,
@@ -40,8 +39,9 @@ from ..util._types import (
     ResponseFormat,
     ResponseFunctionSwordCall,
     ResponseOutputText,
+    ResponseStreamEvent,
+    Usage,
 )
-from ..util._types import Usage
 from .interface import Model
 from .settings import ModelSettings
 
@@ -53,6 +53,7 @@ from .settings import ModelSettings
 @dataclass
 class _StreamingState:
     """Maintains the current state of streaming responses."""
+
     text_content_index_and_output: tuple[int, ResponseOutputText] | None = None
 
 
@@ -124,7 +125,7 @@ class ModelChatCompletionsModel(Model):
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
-    ) -> AsyncIterator[TResponseStreamEvent]:
+    ) -> AsyncIterator[ResponseStreamEvent]:
         """Stream model responses as generated."""
         response, stream = await self._fetch_response(
             system_instructions,
@@ -328,17 +329,16 @@ class _Converter:
         """Check if item is a message of any type and return it if valid."""
         if not isinstance(item, dict):
             return None
-            
+
         # Check for easy input message format
         if item.keys() == {"content", "role"}:
             role = item.get("role")
             if role in ("user", "assistant", "system", "developer") and "content" in item:
                 return cast(dict[str, Any], item)
-                
+
         # Check for input message format
         if item.get("type") == "message" and item.get("role") in ("user", "system", "developer"):
             return cast(dict[str, Any], item)
-            
 
     @classmethod
     def maybe_file_search_call(cls, item: Any) -> dict[str, Any] | None:
@@ -558,17 +558,15 @@ class _Converter:
 
 class SwordConverter:
     @classmethod
-    def to_api_format(
-        cls, sword: Sword
-    ) -> ChatCompletionSwordParam:
+    def to_api_format(cls, sword: Sword) -> ChatCompletionSwordParam:
         return {
-                "type": "function",
-                "function": {
-                    "name": sword.name,
-                    "description": sword.description or "",
-                    "parameters": sword.params_json_schema,
-                },
-            }
+            "type": "function",
+            "function": {
+                "name": sword.name,
+                "description": sword.description or "",
+                "parameters": sword.params_json_schema,
+            },
+        }
 
     @classmethod
     def convert_orb_sword(cls, orbs: Orbs[Any]) -> ChatCompletionSwordParam:

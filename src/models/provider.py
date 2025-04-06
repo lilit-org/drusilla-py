@@ -1,9 +1,10 @@
 """
 Model Provider Management
 
-This module provides the ModelProvider class, a flexible provider interface for managing model instances
-and their configurations. It handles client initialization, API key management, and model selection
-with support for both chat completions and responses API modes.
+This module provides the ModelProvider class, a flexible provider interface for managing
+model instances and their configurations. It handles client initialization, API key
+management, and model selection with support for both chat completions and responses
+API modes.
 
 Key features:
 - Dynamic client initialization with environment-based configuration
@@ -25,7 +26,6 @@ from .chat import ModelChatCompletionsModel
 from .interface import Model
 from .interface import ModelProvider as BaseModelProvider
 from .responses import ModelResponsesModel
-
 
 ########################################################
 #               Main Class: Model Provider

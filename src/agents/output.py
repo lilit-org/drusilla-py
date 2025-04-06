@@ -14,13 +14,11 @@ from functools import lru_cache
 from typing import Any, ClassVar, get_args, get_origin
 
 from pydantic import BaseModel, TypeAdapter
-from typing_extensions import TypedDict
 
 from ..util._constants import LRU_CACHE_SIZE
-from ..util._exceptions import ModelError, UsageError
+from ..util._exceptions import UsageError
 from ..util._print import validate_json
 from ..util._strict_schema import ensure_strict_json_schema
-
 
 ########################################################
 #               Private Methods                        #
@@ -47,19 +45,10 @@ def _type_to_str(t: type[Any]) -> str:
 
 
 @lru_cache(maxsize=LRU_CACHE_SIZE)
-def _get_type_adapter(output_type: type[Any], is_wrapped: bool = False) -> TypeAdapter[Any]:
+def _get_type_adapter(output_type: type[Any]) -> TypeAdapter[Any]:
     """Get or create a type adapter with caching."""
     if output_type is None or output_type is str:
         return TypeAdapter(output_type)
-
-    if is_wrapped:
-        OutputType = TypedDict(
-            "OutputType",
-            {
-                WRAPPER_DICT_KEY: output_type,
-            },
-        )
-        return TypeAdapter(OutputType)
 
     return TypeAdapter(output_type)
 
@@ -75,7 +64,6 @@ class AgentOutputSchema:
 
     output_type: type[Any]
     _type_adapter: TypeAdapter[Any]
-    _is_wrapped: bool
     _output_schema: dict[str, Any]
     strict_json_schema: bool
     _is_plain_text: ClassVar[bool] = False
@@ -93,13 +81,11 @@ class AgentOutputSchema:
         self._type_name = _type_to_str(output_type)
 
         if self._is_plain_text:
-            self._is_wrapped = False
             self._type_adapter = TypeAdapter(output_type)
             self._output_schema = self._type_adapter.json_schema()
             return
 
-        self._is_wrapped = not _is_subclass_of_base_model_or_dict(output_type)
-        self._type_adapter = _get_type_adapter(output_type, self._is_wrapped)
+        self._type_adapter = _get_type_adapter(output_type)
         self._output_schema = self._type_adapter.json_schema()
 
         if self.strict_json_schema:
@@ -114,14 +100,7 @@ class AgentOutputSchema:
         return self._output_schema
 
     def validate_json(self, json_str: str, partial: bool = False) -> Any:
-        validated = validate_json(json_str, self._type_adapter, partial)
-        if self._is_wrapped and isinstance(validated, dict) and 'response' not in validated:
-            raise ModelError(f"Could not find key 'response' in JSON: {json_str}")
-        return (
-            validated["response"]
-            if self._is_wrapped and isinstance(validated, dict)
-            else validated
-        )
+        return validate_json(json_str, self._type_adapter, partial)
 
     def output_type_name(self) -> str:
         return self._type_name

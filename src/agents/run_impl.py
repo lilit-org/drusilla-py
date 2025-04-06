@@ -9,6 +9,7 @@ interactions, and processing various types of responses and actions. It manages:
 - Handling input and output shielding for security and validation
 - Streaming run events and managing the execution flow
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -26,6 +27,7 @@ from ..gear.shield import (
     OutputShieldResult,
 )
 from ..gear.sword import Sword, SwordResult
+from ..util._constants import logger
 from ..util._exceptions import AgentError, ModelError, UsageError
 from ..util._items import (
     ItemHelpers,
@@ -39,9 +41,13 @@ from ..util._items import (
     SwordCallOutputItem,
     TResponseInputItem,
 )
-from ..util._constants import logger
 from ..util._stream_events import RunItemStreamEvent, StreamEvent
-from ..util._types import QueueCompleteSentinel, ResponseFunctionSwordCall, RunContextWrapper, TContext
+from ..util._types import (
+    QueueCompleteSentinel,
+    ResponseFunctionSwordCall,
+    RunContextWrapper,
+    TContext,
+)
 from .agent import Agent, SwordsToFinalOutputResult
 from .output import AgentOutputSchema
 
@@ -52,6 +58,7 @@ if TYPE_CHECKING:
 ########################################################
 #               Data Classes for Swords
 ########################################################
+
 
 @dataclass(frozen=True)
 class SwordRunOrbs:
@@ -106,6 +113,7 @@ class SingleStepResult:
 ########################################################
 #               Main Class: RunImpl
 ########################################################
+
 
 class RunImpl:
     EVENT_MAP = {
@@ -290,15 +298,16 @@ class RunImpl:
         charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
     ) -> list[SwordResult]:
-        async def run_single_sword(
-            func_sword: Sword, sword_call: ResponseFunctionSwordCall
-        ) -> Any:
+        async def run_single_sword(func_sword: Sword, sword_call: ResponseFunctionSwordCall) -> Any:
             try:
                 # Run charms and sword in parallel
                 charms_tasks = [
                     charms.on_sword_start(context_wrapper, agent, func_sword),
-                    agent.charms.on_sword_start(context_wrapper, agent, func_sword)
-                    if agent.charms else None,
+                    (
+                        agent.charms.on_sword_start(context_wrapper, agent, func_sword)
+                        if agent.charms
+                        else None
+                    ),
                     func_sword.on_invoke_sword(context_wrapper, sword_call.arguments),
                 ]
                 _, _, result = await asyncio.gather(*[t for t in charms_tasks if t is not None])
@@ -306,8 +315,11 @@ class RunImpl:
                 # Run end charms in parallel
                 end_charms_tasks = [
                     charms.on_sword_end(context_wrapper, agent, func_sword, result),
-                    agent.charms.on_sword_end(context_wrapper, agent, func_sword, result)
-                    if agent.charms else None,
+                    (
+                        agent.charms.on_sword_end(context_wrapper, agent, func_sword, result)
+                        if agent.charms
+                        else None
+                    ),
                 ]
                 await asyncio.gather(*[t for t in end_charms_tasks if t is not None])
                 return result
@@ -316,8 +328,10 @@ class RunImpl:
 
         # Run all swords in parallel
         results = await asyncio.gather(
-            *[run_single_sword(sword_run.function_sword, sword_run.sword_call)
-              for sword_run in sword_runs]
+            *[
+                run_single_sword(sword_run.function_sword, sword_run.sword_call)
+                for sword_run in sword_runs
+            ]
         )
 
         return [
@@ -384,8 +398,11 @@ class RunImpl:
         # Run charms in parallel
         charms_tasks = [
             charms.on_orbs(context=context_wrapper, from_agent=agent, to_agent=new_agent),
-            agent.charms.on_orbs(context_wrapper, agent=new_agent, source=agent)
-            if agent.charms else None,
+            (
+                agent.charms.on_orbs(context_wrapper, agent=new_agent, source=agent)
+                if agent.charms
+                else None
+            ),
         ]
         await asyncio.gather(*[t for t in charms_tasks if t is not None])
 
@@ -402,7 +419,7 @@ class RunImpl:
                 pre_orbs_items=tuple(pre_step_items),
                 new_items=tuple(new_step_items),
             )
-            
+
             filtered = input_filter(orbs_input_data)
             if not isinstance(filtered, OrbsInputData):
                 raise UsageError(f"Invalid input filter result: {filtered}")

@@ -5,10 +5,10 @@ This module contains API configurations, environment settings, and default value
 
 from __future__ import annotations
 
-import os
 import logging
+import os
 import sys
-from typing import Set
+
 from dotenv import load_dotenv
 
 __all__ = (
@@ -38,7 +38,7 @@ UNSET = object()
 FAKE_RESPONSES_ID = "fake_responses"
 
 # Supported languages for translation
-SUPPORTED_LANGUAGES: Set[str] = {
+SUPPORTED_LANGUAGES: set[str] = {
     "en",  # English
     "es",  # Spanish
     "fr",  # French
@@ -87,7 +87,6 @@ HTTP_MAX_KEEPALIVE_CONNECTIONS = int(os.getenv("HTTP_MAX_KEEPALIVE_CONNECTIONS",
 HTTP_MAX_CONNECTIONS = int(os.getenv("HTTP_MAX_CONNECTIONS", "10"))
 
 # API Configuration
-_USER_AGENT = f"Agents/Python"
+_USER_AGENT = "Agents/Python"
 HEADERS = {"User-Agent": _USER_AGENT}
 CHAT_COMPLETIONS_ENDPOINT = "/api/chat"
-
