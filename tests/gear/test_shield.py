@@ -13,6 +13,7 @@ from src.gear.shield import (
     input_shield,
     output_shield,
 )
+from src.util._exceptions import UsageError
 from src.util._items import TResponseInputItem
 from src.util._types import RunContextWrapper
 
@@ -148,7 +149,7 @@ async def test_shield_tripwire(mock_context: RunContextWrapper[Any], mock_agent:
 @pytest.mark.asyncio
 async def test_shield_error_handling(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
     """Test shield error handling."""
-    with pytest.raises(TypeError, match="shield_function must be callable"):
+    with pytest.raises(UsageError, match="Shield function must be callable, got not a function"):
         shield = InputShield(shield_function="not a function")
         await shield.run(mock_context, mock_agent, "test input")
 

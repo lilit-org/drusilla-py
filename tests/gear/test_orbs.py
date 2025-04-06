@@ -7,8 +7,8 @@ from pydantic import BaseModel
 
 from src.agents.agent import Agent
 from src.gear.orbs import Orbs, OrbsInputData, orbs
+from src.util._exceptions import UsageError
 from src.util._types import RunContextWrapper
-from src.util.exceptions import UsageError
 
 
 class OrbsTestInput(BaseModel):
@@ -121,19 +121,21 @@ def test_orbs_input_filter():
 
 def test_orbs_validation_errors():
     """Test validation errors in orbs creation."""
+    with pytest.raises(UsageError, match="on_orbs must take two arguments: context and input"):
+        # Should raise error when on_orbs takes wrong number of arguments
+        orbs(
+            MockAgent(),
+            on_orbs=lambda ctx, x, y: None,
+            input_type=str,
+        )
+
     with pytest.raises(
-        UsageError, match="You must provide either both on_input and input_type, or neither"
+        UsageError,
+        match="You must provide either both on_input and input_type, or neither",
     ):
         # Should raise error when only one of on_orbs or input_type is provided
         orbs(
             MockAgent(),
             on_orbs=lambda ctx: None,
             input_type=None,
-        )
-
-    with pytest.raises(UsageError, match="on_orbs must take one argument: context"):
-        # Should raise error when on_orbs takes wrong number of arguments
-        orbs(
-            MockAgent(),
-            on_orbs=lambda ctx, x, y: None,
         )
