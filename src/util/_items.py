@@ -271,7 +271,7 @@ class ItemHelpers:
         sword_call: ResponseFunctionSwordCall, output: str
     ) -> FunctionCallOutput:
         return {
-            "call_id": sword_call.call_id,
+            "call_id": sword_call["call_id"],
             "output": output,
             "type": "function_call_output",
         }

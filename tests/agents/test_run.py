@@ -35,13 +35,12 @@ def context_wrapper(mock_context):
 
 @pytest.fixture
 def mock_agent():
-    agent = Agent(
+    return Agent(
         name="test_agent",
         instructions="Test instructions",
         model="test_model",
         model_settings=ModelSettings(),
     )
-    return agent
 
 
 @pytest.fixture
@@ -74,9 +73,7 @@ def message_output():
 
 
 @pytest.fixture
-def mock_model_client(monkeypatch) -> AsyncMock:
-    """Mock model client."""
-    # Create mock response
+def mock_model_client(monkeypatch):
     mock_response = AsyncMock()
     mock_response.json.return_value = {
         "id": "test-id",
@@ -93,7 +90,6 @@ def mock_model_client(monkeypatch) -> AsyncMock:
         "usage": {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
     }
 
-    # Create a mock async iterator for streaming
     async def mock_aiter_lines():
         yield (
             b'data: {"id": "test-id", "object": "chat.completion.chunk", '
@@ -113,35 +109,27 @@ def mock_model_client(monkeypatch) -> AsyncMock:
     mock_response.is_success = True
     mock_response.url = "http://localhost:11434/api/chat"
 
-    # Create mock HTTP client
     mock_http_client = AsyncMock()
     mock_http_client.post = AsyncMock(return_value=mock_response)
 
-    # Create mock deepseek client
     mock_deepseek = AsyncMock()
     mock_deepseek.http_client = mock_http_client
     mock_deepseek.base_url = "http://localhost:11434"
     mock_deepseek.api_key = None
 
-    # Create mock chat completions
     mock_chat_completions = AsyncMock()
     mock_chat_completions.create = AsyncMock(return_value=mock_response)
     mock_deepseek.chat = mock_chat_completions
 
-    # Create mock model
     mock_model = AsyncMock()
     mock_model.get_response = AsyncMock(
         return_value=ModelResponse(output=[], usage=None, referenceable_id=None)
     )
 
-    # Create a mock async iterator for streaming that yields ResponseEvent objects
     async def mock_stream_response(*args, **kwargs):
         async def mock_iterator():
-            # Yield a streaming chunk
             yield {"choices": [{"delta": {"content": "test"}}]}
-            # Yield a streaming chunk
             yield {"choices": [{"delta": {"content": " output"}}]}
-            # Yield the final response
             yield {
                 "type": "completed",
                 "response": {
@@ -155,27 +143,16 @@ def mock_model_client(monkeypatch) -> AsyncMock:
 
     mock_model.stream_response = mock_stream_response
     mock_model._client = mock_deepseek
+    mock_model._fetch_response = AsyncMock(return_value=mock_response)
 
-    # Mock _fetch_response to return a successful response
-    async def mock_fetch_response(*args, **kwargs):
-        return mock_response
-
-    mock_model._fetch_response = mock_fetch_response
-
-    # Create mock provider
     mock_provider = AsyncMock()
     mock_provider._get_client.return_value = mock_deepseek
     mock_provider.get_model.return_value = mock_model
 
-    # Patch the ModelProvider class to return our mock
     monkeypatch.setattr("src.models.provider.ModelProvider", lambda *args, **kwargs: mock_provider)
-
-    # Patch the ModelChatCompletionsModel class to return our mock
     monkeypatch.setattr(
         "src.models.chat.ModelChatCompletionsModel", lambda *args, **kwargs: mock_model
     )
-
-    # Patch the model's _client.chat.completions.create method
     mock_model._client.chat.completions.create = AsyncMock(return_value=mock_response)
 
     return mock_deepseek

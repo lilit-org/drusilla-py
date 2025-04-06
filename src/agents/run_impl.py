@@ -303,7 +303,7 @@ class RunImpl:
                 # Run charms and sword in parallel
                 charms_tasks = [
                     charms.on_sword_start(context_wrapper, agent, func_sword),
-                    func_sword.on_invoke_sword(context_wrapper, sword_call.arguments),
+                    func_sword.on_invoke_sword(context_wrapper, sword_call["arguments"]),
                 ]
                 if agent.charms:
                     charms_tasks.insert(
@@ -378,7 +378,7 @@ class RunImpl:
         actual_orbs = run_orbs[0]
         orbs = actual_orbs.orbs
         new_agent: Agent[Any] = await orbs.on_invoke_orbs(
-            context_wrapper, actual_orbs.sword_call.arguments
+            context_wrapper, actual_orbs.sword_call["arguments"]
         )
 
         # Add orb output item

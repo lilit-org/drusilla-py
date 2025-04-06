@@ -32,7 +32,7 @@ def mock_sword():
                 on_invoke_sword=lambda ctx, input: None,
             )
 
-        async def __call__(self, ctx: RunContextWrapper[Any], input: str) -> Any:
+        async def __call__(self, input: str) -> Any:
             return f"sword_result_{input}"
 
     return MockSword()
@@ -48,7 +48,7 @@ def mock_shield():
                 )
             )
 
-        async def __call__(self, ctx: RunContextWrapper[Any], input: str) -> str:
+        async def __call__(self, input: str) -> str:
             return f"shielded_{input}"
 
     return MockShield()

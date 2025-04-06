@@ -35,10 +35,7 @@ def test_model_schema(test_model):
     assert schema.strict_json_schema is True
 
     json_schema = schema.json_schema()
-    assert "properties" in json_schema
-    assert "name" in json_schema["properties"]
-    assert "age" in json_schema["properties"]
-    assert "is_active" in json_schema["properties"]
+    assert all(key in json_schema["properties"] for key in ["name", "age", "is_active"])
 
 
 def test_plain_text_json_schema_error():
@@ -58,12 +55,11 @@ def test_validate_json_plain_text():
 def test_validate_json_model(test_model):
     """Test JSON validation for Pydantic model output."""
     schema = AgentOutputSchema(test_model)
-    json_str = '{"name": "John", "age": 30}'
-    result = schema.validate_json(json_str)
+    result = schema.validate_json('{"name": "John", "age": 30}')
     assert isinstance(result, test_model)
     assert result.name == "John"
     assert result.age == 30
-    assert result.is_active is True  # Default value
+    assert result.is_active is True
 
 
 def test_validate_json_partial(test_model):
@@ -71,23 +67,20 @@ def test_validate_json_partial(test_model):
     schema = AgentOutputSchema(test_model)
 
     # Test with invalid data (missing required field)
-    json_str = '{"age": 30}'
-    with pytest.raises(ModelError):  # Should fail as name is required
-        schema.validate_json(json_str)
+    with pytest.raises(ModelError):
+        schema.validate_json('{"age": 30}')
 
     # Test with valid data
-    json_str = '{"name": "John", "age": 30}'
-    result = schema.validate_json(json_str)
+    result = schema.validate_json('{"name": "John", "age": 30}')
     assert result.name == "John"
     assert result.age == 30
 
     # Test with partial data (incomplete JSON)
-    json_str = '{"name": "John", "age": 30'  # Missing closing brace
-    with pytest.raises(ModelError):  # Should fail with standard validation
-        schema.validate_json(json_str)
+    with pytest.raises(ModelError):
+        schema.validate_json('{"name": "John", "age": 30')
 
     # Test with partial validation - should handle incomplete JSON
-    result = schema.validate_json(json_str, partial=True)
+    result = schema.validate_json('{"name": "John", "age": 30', partial=True)
     assert result.name == "John"
     assert result.age == 30
 
@@ -102,5 +95,4 @@ def test_non_strict_schema(test_model):
     """Test schema creation with strict validation disabled."""
     schema = AgentOutputSchema(test_model, strict_json_schema=False)
     assert schema.strict_json_schema is False
-    json_schema = schema.json_schema()
-    assert "properties" in json_schema
+    assert "properties" in schema.json_schema()

@@ -1,6 +1,5 @@
 """Unit tests for the RunImpl class."""
 
-from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -35,28 +34,27 @@ from src.util._types import FunctionCallOutput, RunContextWrapper
 
 # Test fixtures
 @pytest.fixture
-def mock_context() -> MagicMock:
+def mock_context():
     return MagicMock()
 
 
 @pytest.fixture
-def context_wrapper(mock_context: MagicMock) -> RunContextWrapper:
+def context_wrapper(mock_context):
     return RunContextWrapper(mock_context)
 
 
 @pytest.fixture
-def mock_agent() -> Agent:
-    agent = Agent(
+def mock_agent():
+    return Agent(
         name="test_agent",
         instructions="Test instructions",
         model="test_model",
         model_settings=ModelSettings(),
     )
-    return agent
 
 
 @pytest.fixture
-def mock_sword() -> AsyncMock:
+def mock_sword():
     sword = AsyncMock(spec=Sword)
     sword.name = "test_sword"
     sword.on_invoke_sword = AsyncMock(return_value="sword_output")
@@ -64,7 +62,7 @@ def mock_sword() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_orb() -> AsyncMock:
+def mock_orb():
     orb = AsyncMock(spec=Orbs)
     orb.name = "test_orb"
     orb.execute = AsyncMock(return_value="orb_output")
@@ -74,8 +72,7 @@ def mock_orb() -> AsyncMock:
 
 
 @pytest.fixture
-def mock_charms() -> RunCharms:
-    """Mock RunCharms instance."""
+def mock_charms():
     charms = RunCharms()
     charms.on_sword_start = AsyncMock(return_value="start")
     charms.on_sword_end = AsyncMock(return_value="end")
@@ -83,13 +80,12 @@ def mock_charms() -> RunCharms:
 
 
 @pytest.fixture
-def message_output() -> dict:
+def message_output():
     return {"type": "message", "content": [{"type": "output_text", "text": "test output"}]}
 
 
 @pytest.fixture
-def mock_model_client(monkeypatch) -> AsyncMock:
-    """Mock model client."""
+def mock_model_client(monkeypatch):
     mock_response = AsyncMock()
     mock_response.json.return_value = {
         "id": "test-id",
@@ -127,41 +123,25 @@ def mock_model_client(monkeypatch) -> AsyncMock:
 
 
 @pytest.fixture
-def sword_call() -> ResponseFunctionSwordCall:
-    @dataclass
-    class ResponseFunctionSwordCall:
-        name: str
-        arguments: dict
-        type: str
-        call_id: str
-        referenceable_id: str | None
-
-    return ResponseFunctionSwordCall(
-        name="test_sword",
-        arguments={},
-        type="function_call",
-        call_id="test_id",
-        referenceable_id=None,
-    )
+def sword_call():
+    return {
+        "type": "function_call",
+        "id": "test_id",
+        "call_id": "test_id",
+        "name": "test_sword",
+        "arguments": "{}",
+    }
 
 
 @pytest.fixture
-def orb_call() -> ResponseFunctionSwordCall:
-    @dataclass
-    class ResponseFunctionSwordCall:
-        name: str
-        arguments: dict
-        type: str
-        call_id: str
-        referenceable_id: str | None
-
-    return ResponseFunctionSwordCall(
-        name="test_orb",
-        arguments={},
-        type="function_call",
-        call_id="test_id",
-        referenceable_id=None,
-    )
+def orb_call():
+    return {
+        "type": "function_call",
+        "id": "test_id",
+        "call_id": "test_id",
+        "name": "test_orb",
+        "arguments": "{}",
+    }
 
 
 # Test cases
@@ -378,7 +358,7 @@ async def test_execute_orbs(
     assert isinstance(result, SingleStepResult)
     assert len(result.new_step_items) == 1
     assert isinstance(result.new_step_items[0], OrbsOutputItem)
-    mock_orb.on_invoke_orbs.assert_called_once_with(context_wrapper, orb_call.arguments)
+    mock_orb.on_invoke_orbs.assert_called_once_with(context_wrapper, orb_call["arguments"])
     mock_charms.on_orbs.assert_called_once_with(
         context=context_wrapper, from_agent=mock_agent, to_agent=mock_agent
     )
