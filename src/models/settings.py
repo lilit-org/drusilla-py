@@ -1,9 +1,10 @@
 """
 Model Configuration Management
 
-This module provides the ModelSettings class, a configuration manager for fine-tuning model behavior.
-It handles critical model parameters such as temperature, top-p sampling, and token limits,
-with built-in validation to ensure parameters stay within safe operating ranges.
+This module provides the ModelSettings class, a configuration manager for
+fine-tuning model behavior. It handles critical model parameters such as
+temperature, top-p sampling, and token limits, with built-in validation to
+ensure parameters stay within safe operating ranges.
 
 The class supports:
 - Temperature control for response creativity (0.0 to 2.0)
@@ -42,8 +43,14 @@ class ModelSettings:
             temperature=other.temperature if other.temperature is not None else self.temperature,
             top_p=other.top_p if other.top_p is not None else self.top_p,
             max_tokens=other.max_tokens if other.max_tokens is not None else self.max_tokens,
-            sword_choice=other.sword_choice if other.sword_choice is not None else self.sword_choice,
-            parallel_sword_calls=other.parallel_sword_calls if other.parallel_sword_calls is not None else self.parallel_sword_calls,
+            sword_choice=(
+                other.sword_choice if other.sword_choice is not None else self.sword_choice
+            ),
+            parallel_sword_calls=(
+                other.parallel_sword_calls
+                if other.parallel_sword_calls is not None
+                else self.parallel_sword_calls
+            ),
         )
 
     def validate(self) -> None:

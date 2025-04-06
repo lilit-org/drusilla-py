@@ -1,6 +1,7 @@
 """
-The Runner class is the core orchestrator for executing agents in the Noctira system. It provides both synchronous
-and asynchronous interfaces for running agents with various configurations and capabilities.
+The Runner class is the core orchestrator for executing agents in the Noctira system.
+It provides both synchronous and asynchronous interfaces for running agents with various
+configurations and capabilities.
 
 Key features:
 - Supports both synchronous (run_sync) and asynchronous (run) execution
@@ -42,7 +43,7 @@ from ..util._exceptions import (
 from ..util._items import ItemHelpers, ModelResponse, RunItem, TResponseInputItem
 from ..util._result import RunResult, RunResultStreaming
 from ..util._stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
-from ..util._types import ResponseEvent, Usage, RunContextWrapper, TContext
+from ..util._types import ResponseEvent, RunContextWrapper, TContext, Usage
 from .agent import Agent
 from .output import AgentOutputSchema
 from .run_impl import (
@@ -53,8 +54,6 @@ from .run_impl import (
     RunImpl,
     SingleStepResult,
 )
-
-
 
 ########################################################
 #               Data class for Run Config
@@ -774,6 +773,6 @@ class Runner:
     ) -> None:
         charm_tasks = [
             charms.on_start(context_wrapper, agent),
-            agent.charms.on_start(context_wrapper, agent) if agent.charms else None
+            agent.charms.on_start(context_wrapper, agent) if agent.charms else None,
         ]
         await asyncio.gather(*[t for t in charm_tasks if t is not None])

@@ -29,7 +29,7 @@ def run_agent() -> str | None:
         setup_client()
         agent = create_agent()
         result = Runner.run_sync(
-            agent, 
+            agent,
             "Write a haiku about love in the cypherpunk world."
         )
         print(pretty_print_result(result))
@@ -48,16 +48,16 @@ you should get something like this:
 
 ```
 ✅ Received Model Response...
-  
+
   👾 Agent Info:
         Last Agent → Agent Dr. Love
-  
+
   📊 Statistics:
         Items     → 1
         Responses → 1
         Input Shield  → 0
         Output Shield → 0
-  
+
   🦾 Configuration:
         Streaming → ❌ Disabled
         Swords    → None
@@ -73,14 +73,14 @@ The first and third lines are five syllables, and the middle line is seven.
 So I need to make sure each line meets that syllable count.
 
 Now, the subject is "love" in the cyberpunk setting.
-Cyberpunk usually involves futuristic cities, neon lights, abandoned places, 
+Cyberpunk usually involves futuristic cities, neon lights, abandoned places,
 high-tech but often dystopian environments.
-Love in such a setting could be portrayed through themes like overcoming 
+Love in such a setting could be portrayed through themes like overcoming
 connections through technology, or ideals versus reality.
 
 I should think about metaphors or symbols related to love that fit into this genre.
 Maybe something like signals, connection points that bring people together who
-wouldn't normally interact like how cyberpunk often features isolated individuals 
+wouldn't normally interact like how cyberpunk often features isolated individuals
 connected by these futuristic means.
 
 In the first line, I want to set a scene or an emotion that starts with "loving."
@@ -90,12 +90,12 @@ So maybe love as something that exists not just in person but also in digital sp
 
 The second line should be longer with seven syllables.
 Here, I can introduce a setting where this love takes place amidst the cyberpunk elements.
-Perhaps mentioning how the environment is both bright and broken, providing contrast between 
+Perhaps mentioning how the environment is both bright and broken, providing contrast between
 light and darkness,
 like neon signs against decay or preserved ruins next to glowing tech.
 
 For the third line, focusing on emotions that come from such love perhaps the connection
-between two people who've been apart for a long time but find each other through 
+between two people who've been apart for a long time but find each other through
 this digital lens.
 Maybe something about memories connecting them now with the help of technology.
 

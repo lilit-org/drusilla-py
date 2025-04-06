@@ -1,4 +1,12 @@
 repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: mixed-line-ending
+        args: ['--fix=lf']
+
 -   repo: https://github.com/psf/black
     rev: 24.2.0
     hooks:
@@ -15,4 +23,4 @@ repos:
     rev: v0.9.2
     hooks:
     -   id: ruff
-        args: [--fix] 
+        args: [--fix, --preview]

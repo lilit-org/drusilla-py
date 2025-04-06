@@ -1,5 +1,6 @@
 """
-This module provides data classes for handling the results of agent runs, including both synchronous and streaming results.
+This module provides data classes for handling the results of agent runs,
+including both synchronous and streaming results.
 
 Key Components:
 1. RunResultBase: Abstract base class defining the core structure for all run results, including:
@@ -15,8 +16,6 @@ Key Components:
    - Turn tracking and completion status
    - Internal task management for shields and execution
    - Exception handling and cleanup
-
-This module serves as the backbone for agent execution results, providing a robust and flexible system for capturing, processing, and streaming agent outputs. It enables seamless integration between synchronous and asynchronous workflows while maintaining consistent access to run results, shield validations, and agent state throughout the execution lifecycle.
 """
 
 from __future__ import annotations
@@ -32,9 +31,8 @@ if TYPE_CHECKING:
 from ..gear.shield import InputShieldResult, OutputShieldResult
 from ._constants import MAX_SHIELD_QUEUE_SIZE, logger
 from ._items import ModelResponse, RunItem, TResponseInputItem
-from ._types import QueueCompleteSentinel
 from ._stream_events import StreamEvent
-
+from ._types import QueueCompleteSentinel
 
 ########################################################
 #               Data Classes for Results
@@ -52,7 +50,7 @@ class RunResultBase(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def last_agent(self) -> "Agent[Any]":
+    def last_agent(self) -> Agent[Any]:
         """Last agent that was run."""
 
     def __str__(self) -> str:
@@ -68,10 +66,10 @@ class RunResultBase(abc.ABC):
 
 @dataclass(frozen=True)
 class RunResult(RunResultBase):
-    _last_agent: "Agent[Any]"
+    _last_agent: Agent[Any]
 
     @property
-    def last_agent(self) -> "Agent[Any]":
+    def last_agent(self) -> Agent[Any]:
         return self._last_agent
 
 
@@ -86,7 +84,7 @@ class RunResultStreaming:
     output_shield_results: list[OutputShieldResult]
 
     # Streaming-specific fields
-    current_agent: "Agent[Any]"
+    current_agent: Agent[Any]
     is_complete: bool = False
     current_turn: int = 0
     max_turns: int = 0
@@ -109,14 +107,14 @@ class RunResultStreaming:
     _stored_exception: Exception | None = field(default=None, repr=False)
 
     @property
-    def last_agent(self) -> "Agent[Any]":
+    def last_agent(self) -> Agent[Any]:
         return self.current_agent
 
     async def stream_events(self) -> AsyncIterator[StreamEvent]:
         try:
             while True:
                 if self._stored_exception:
-                    logger.debug("Breaking stream due to stored exception: {self._stored_exception}")
+                    logger.debug(f"Breaking stream: {self._stored_exception}")
                     self.is_complete = True
                     break
                 if self.is_complete and self._event_queue.empty():

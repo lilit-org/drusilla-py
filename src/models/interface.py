@@ -16,7 +16,8 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..agents.output import AgentOutputSchema
 from ..gear.sword import Sword
-from ..util._items import ModelResponse, TResponseInputItem, TResponseStreamEvent
+from ..util._items import ModelResponse, TResponseInputItem
+from ..util._types import ResponseStreamEvent
 from .settings import ModelSettings
 
 if TYPE_CHECKING:
@@ -55,7 +56,7 @@ class Model(Protocol):
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orb],
-    ) -> AsyncIterator[TResponseStreamEvent]:
+    ) -> AsyncIterator[ResponseStreamEvent]:
         """Stream model responses as they are generated"""
 
 

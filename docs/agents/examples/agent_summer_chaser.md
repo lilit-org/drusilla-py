@@ -95,25 +95,25 @@ you can find out the weather at any city and whether it feels like summer:
 
 ✅ REASONING:
 
-Alright, so I need to figure out what the user is asking for here. 
-They mentioned they're a special robot that gives accurate weather info and tells if it's summer. 
+Alright, so I need to figure out what the user is asking for here.
+They mentioned they're a special robot that gives accurate weather info and tells if it's summer.
 The request was to ask about Berlin.
 
-First step: use the weather sword to get the current weather in Berlin. 
-I check the latest data and it's supposed to be around 23°C, sunny with some clouds. 
+First step: use the weather sword to get the current weather in Berlin.
+I check the latest data and it's supposed to be around 23°C, sunny with some clouds.
 Temperature feels mild but pleasant.
 
-Next, determine if it's summer using is_summer. 
-Berlin technically switches to daylight saving time at certain dates each year. 
-I recall that DST starts in March and ends in November. 
+Next, determine if it's summer using is_summer.
+Berlin technically switches to daylight saving time at certain dates each year.
+I recall that DST starts in March and ends in November.
 Since today is in springtime, it's not summer yet.
 
-So, the response should include both the weather details and whether it's currently summer in Berlin. 
+So, the response should include both the weather details and whether it's currently summer in Berlin.
 That way, the user gets a complete picture.
 
 
 ✅ RESULT:
 
-The current weather in Berlin is sunny with a temperature of 23°C (73°F), 
+The current weather in Berlin is sunny with a temperature of 23°C (73°F),
 and it is not currently summer but it feels nice.
 ```

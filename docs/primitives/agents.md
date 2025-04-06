@@ -64,13 +64,13 @@ class Agent(Generic[TContext]):
 
 ```python
 agent = Agent(
-        name="Agent Dr. Love", 
+        name="Agent Dr. Love",
         instructions="You are a cool special robot who loves")
 
 setup_client()
 
 result = Runner.run_sync(
-            agent, 
+            agent,
             "Write a haiku about love in the cypherpunk world.")
 ```
 

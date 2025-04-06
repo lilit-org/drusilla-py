@@ -253,9 +253,7 @@ def _process_var_keyword(
 ########################################################
 
 
-def generate_func_documentation(
-    func: Callable[..., Any], style: None
-) -> FuncDocumentation:
+def generate_func_documentation(func: Callable[..., Any], style: None) -> FuncDocumentation:
     """Extract function metadata from docstring."""
     doc = inspect.getdoc(func)
     if not doc:

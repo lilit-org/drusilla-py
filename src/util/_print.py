@@ -51,7 +51,7 @@ def _format_final_output(raw_response: ModelResponse) -> tuple[str, str]:
     start = output_text.find("<think>") + len("<think>")
     end = output_text.find("</think>")
     reasoning = output_text[start:end].strip()
-    result = output_text[end + len("</think>"):].strip()
+    result = output_text[end + len("</think>") :].strip()
     result = re.sub(r"^Here are the jokes?:", "", result, flags=re.IGNORECASE).strip()
 
     return (f"\n\n✅ REASONING:\n\n{reasoning}", f"\n\n✅ RESULT:\n\n{result}\n")
