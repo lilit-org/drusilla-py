@@ -26,7 +26,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e ".[dev]"
         pip install hatchling --upgrade
-        pip install pytest pytest-cov
+        pip install pytest pytest-cov pytest-asyncio
 
     - name: Test with pytest
       env:
