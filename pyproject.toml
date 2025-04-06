@@ -60,7 +60,7 @@ textual = "*"
 poetry = ">=1.7.1"
 
 [build-system]
-requires = ["hatchling>=1.0.0"]
+requires = ["hatchling>=1.18.0"]
 build-backend = "hatchling.build"
 
 [tool.ruff]
