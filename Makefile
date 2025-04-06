@@ -18,8 +18,8 @@ install:
 test:
 	poetry run pytest
 
-.PHONY: format
-format:
+.PHONY: lint
+lint:
 	poetry install --with dev --no-root
 	poetry run ruff check src --fix --unsafe-fixes
 	poetry run autoflake -r --in-place --remove-unused-variables src/ examples/

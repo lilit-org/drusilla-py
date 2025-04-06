@@ -1,8 +1,8 @@
-## agent "world traveler": using tools
+# agent "world traveler": an example of an agent as swords
 
 <br>
 
-run our first example of an agent using tools with:
+run with:
 
 ```shell
 make world-traveler
@@ -17,17 +17,17 @@ def create_agents() -> Agent:
     return Agent(
         name="Agent World Traveler",
         instructions=(
-            "Coordinate translation requests using provided tools. "
-            "Use appropriate translation tools based on requested languages."
+            "Coordinate translation requests using provided swords. "
+            "Use appropriate translation swords based on requested languages."
         ),
-        tools=[
+        swords=[
             Agent(
                 name=f"{lang_name} Translator",
                 instructions=f"Translate English text to {lang_name}",
                 orbs_description=f"English to {lang_name} translator",
-            ).as_tool(
-                tool_name=f"translate_to_{lang_key.lower()}",
-                tool_description=f"Translate text to {lang_name}",
+            ).as_sword(
+                sword_name=f"translate_to_{lang_key.lower()}",
+                sword_description=f"Translate text to {lang_name}",
             )
             for lang_key, lang_name in SUPPORTED_LANGUAGES.items()
         ],
@@ -70,20 +70,20 @@ you can input a sentence in any major language and it will translate it for you:
 
   🦾 Configuration:
         Streaming → ❌ Disabled
-        Tools     → Available (2 tools)
+        Swords     → Available (2 swords)
 
 
 ✅ REASONING:
 
 Okay, so the user just sent "eu te amo" which is Portuguese for "I love you."
-They want me to translate this into another language using the appropriate tools.
+They want me to translate this into another language using the appropriate swords.
 
 First, I need to figure out what languages they might be interested in.
 Common choices could be English, Spanish, French, or maybe even German or Italian.
 Since their original message is in Portuguese, they probably speak Portuguese
 and are looking for translations into another language.
 
-I should consider which translation tools are best for accuracy.
+I should consider which translation swords are best for accuracy.
 Google Translate is widely used but sometimes isn't the most accurate, especially with complex phrases.
 Then there's DeepL, which is known for better fidelity, especially with technical texts or idioms.
 ICalify is another option that focuses on natural translations without losing nuances.
@@ -100,7 +100,7 @@ Also, considering cultural nuances, sometimes translations need to be adjusted f
 For example, in some cultures, saying "I love you" might not be sufficient and a more elaborate expression is needed.
 But without specific context, it's safer to stick with straightforward translations.
 
-I should probably mention that if they have a preferred language or tool, I can adjust accordingly.
+I should probably mention that if they have a preferred language or sword, I can adjust accordingly.
 This makes the response helpful and flexible.
 
 

@@ -74,7 +74,7 @@ def _format_stats(result: Any) -> str:
 ########################################################
 
 
-def _format_stream_info(stream: bool, tool_choice: Any, result: Any) -> str:
+def _format_stream_info(stream: bool, sword_choice: Any, result: Any) -> str:
 
     def format_obj(x: Any) -> str:
         if x is None or x is object():
@@ -82,14 +82,14 @@ def _format_stream_info(stream: bool, tool_choice: Any, result: Any) -> str:
         if isinstance(x, bool):
             return "✔️ Enabled" if x else "❌ Disabled"
         if isinstance(x, list):
-            return f"Available ({len(x)} tools)" if x else "None"
+            return f"Available ({len(x)} swords)" if x else "None"
         return str(x)
 
     info = ["\n🦾 Configuration:"]
-    tools = getattr(result, "last_agent", None)
+    swords = getattr(result, "last_agent", None)
     info.append(f"      Streaming → {format_obj(stream)}")
-    if tools and hasattr(tools, "tools"):
-        info.append(f"      Tools     → {format_obj(tools.tools)}")
+    if swords and hasattr(swords, "swords"):
+        info.append(f"      Swords     → {format_obj(swords.swords)}")
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
@@ -105,7 +105,7 @@ def pretty_print_result_stats(result: RunResult) -> str:
         _format_stats(result),
         _format_stream_info(
             stream=hasattr(result, "is_complete"),
-            tool_choice=getattr(result, "tool_choice", None),
+            sword_choice=getattr(result, "sword_choice", None),
             result=result,
         ),
     ]

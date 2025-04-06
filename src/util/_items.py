@@ -19,10 +19,10 @@ from pydantic import BaseModel
 
 from ._types import (
     ComputerCallOutput,
+    ComputerSwordCall,
     FunctionCallOutput,
-    ResponseComputerToolCall,
-    ResponseFileSearchToolCall,
-    ResponseFunctionToolCall,
+    ResponseFileSearchSwordCall,
+    ResponseFunctionSwordCall,
     ResponseFunctionWebSearch,
     ResponseInputItemParam,
     ResponseOutputItem,
@@ -51,10 +51,10 @@ THINK_START = "<think>"
 THINK_END = "</think>"
 ECHOES_START = "Echoes of encrypted hearts"
 
-ToolCallItemTypes: TypeAlias = (
-    ResponseFunctionToolCall
-    | ResponseComputerToolCall
-    | ResponseFileSearchToolCall
+SwordCallItemTypes: TypeAlias = (
+    ResponseFunctionSwordCall
+    | ComputerSwordCall
+    | ResponseFileSearchSwordCall
     | ResponseFunctionWebSearch
 )
 
@@ -62,8 +62,8 @@ RunItem: TypeAlias = Union[
     "MessageOutputItem",
     "OrbsCallItem",
     "OrbsOutputItem",
-    "ToolCallItem",
-    "ToolCallOutputItem",
+    "SwordCallItem",
+    "SwordCallOutputItem",
     "ReasoningItem",
 ]
 
@@ -124,8 +124,8 @@ class MessageOutputItem(RunItemBase[ResponseOutputItem]):
 
 
 @dataclass(frozen=True)
-class OrbsCallItem(RunItemBase[ResponseFunctionToolCall]):
-    raw_item: ResponseFunctionToolCall
+class OrbsCallItem(RunItemBase[ResponseFunctionSwordCall]):
+    raw_item: ResponseFunctionSwordCall
     type: Literal["orbs_call_item"] = "orbs_call_item"
 
 
@@ -138,16 +138,16 @@ class OrbsOutputItem(RunItemBase[TResponseInputItem]):
 
 
 @dataclass(frozen=True)
-class ToolCallItem(RunItemBase[ToolCallItemTypes]):
-    raw_item: ToolCallItemTypes
-    type: Literal["tool_call_item"] = "tool_call_item"
+class SwordCallItem(RunItemBase[ResponseFunctionSwordCall]):
+    raw_item: ResponseFunctionSwordCall
+    type: Literal["sword_called"] = "sword_called"
 
 
 @dataclass(frozen=True)
-class ToolCallOutputItem(RunItemBase[FunctionCallOutput | ComputerCallOutput]):
+class SwordCallOutputItem(RunItemBase[FunctionCallOutput | ComputerCallOutput]):
     raw_item: FunctionCallOutput | ComputerCallOutput
     output: Any
-    type: Literal["tool_call_output_item"] = "tool_call_output_item"
+    type: Literal["sword_call_output_item"] = "sword_call_output_item"
 
 
 @dataclass(frozen=True)
@@ -273,11 +273,11 @@ class ItemHelpers:
             return ""
 
     @staticmethod
-    def tool_call_output_item(
-        tool_call: ResponseFunctionToolCall, output: str
+    def sword_call_output_item(
+        sword_call: ResponseFunctionSwordCall, output: str
     ) -> FunctionCallOutput:
         return {
-            "call_id": tool_call.call_id,
+            "call_id": sword_call.call_id,
             "output": output,
             "type": "function_call_output",
         }

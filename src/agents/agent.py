@@ -1,16 +1,6 @@
 """
-This module implements the Agent class, which provides a flexible framework for creating AI agents.
-
-The Agent class allows you to create AI agents with:
-- Configurable instructions and model settings
-- Tools for performing specific actions
-- Input and output shield for safety and validation
-- Give orbs to other agents or handlers
-- Custom tool use behavior and output processing
-- Hooks for monitoring and modifying agent behavior
-
-Agents can be used standalone or converted into tools for other agents, enabling
-composition of complex AI behaviors from simpler components.
+This module implements the Agent class, which provides a
+flexible framework for creating decentralized AI agents.
 """
 
 from __future__ import annotations
@@ -23,17 +13,15 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, cast
 
 from ..gear.orbs import Orbs
 from ..gear.shields import InputShield, OutputShield
+from ..gear.swords import FunctionSword, FunctionSwordResult, Sword, function_sword
 from ..models.settings import ModelSettings
 from ..util import _json
-from ..util._items import ItemHelpers
 from ..util._run_context import RunContextWrapper, TContext
-from ..util._tool import FunctionToolResult, Tool, function_tool
 from ..util._types import MaybeAwaitable
 
 if TYPE_CHECKING:
     from ..models.interface import Model
     from ..util._lifecycle import AgentHooks
-    from ..util._result import RunResult
 
 
 ########################################################
@@ -41,47 +29,36 @@ if TYPE_CHECKING:
 ########################################################
 
 
-def _create_agent_tool(
-    agent: Agent[Any],
-    tool_name: str | None,
-    tool_description: str | None,
-    custom_output_extractor: Callable[[RunResult], Awaitable[str]] | None,
-) -> Tool:
-
-    @function_tool(
-        name_override=tool_name or _json.transform_string_function_style(agent.name),
-        description_override=tool_description or "",
+def _create_agent_sword(
+    agent: Agent[TContext],
+    sword_name: str | None,
+    sword_description: str | None,
+    custom_output_extractor: Callable[[Any], str] | None = None,
+) -> FunctionSword:
+    @function_sword(
+        name_override=sword_name or _json.transform_string_function_style(agent.name),
+        description_override=sword_description or "",
     )
-    async def run_agent(context: RunContextWrapper, input: str) -> str:
-        from .run import Runner
+    async def _agent_sword(ctx: RunContextWrapper[TContext], input: str) -> Any:
+        return await agent.run(ctx, input, custom_output_extractor)
 
-        output = await Runner.run(
-            starting_agent=agent,
-            input=input,
-            context=context.context,
-        )
-        if custom_output_extractor:
-            return await custom_output_extractor(output)
-
-        return ItemHelpers.text_message_outputs(output.new_items)
-
-    return run_agent
+    return _agent_sword
 
 
 ########################################################
-#            Data Classes for Tools
+#            Data Classes for Swords
 ########################################################
 
 
 @dataclass
-class ToolsToFinalOutputResult:
+class SwordsToFinalOutputResult:
     is_final_output: bool
     final_output: Any | None = None
 
 
-ToolsToFinalOutputFunction: TypeAlias = Callable[
-    [RunContextWrapper[TContext], list[FunctionToolResult]],
-    MaybeAwaitable[ToolsToFinalOutputResult],
+SwordsToFinalOutputFunction: TypeAlias = Callable[
+    [RunContextWrapper[TContext], list[FunctionSwordResult]],
+    MaybeAwaitable[SwordsToFinalOutputResult],
 ]
 
 
@@ -92,7 +69,7 @@ ToolsToFinalOutputFunction: TypeAlias = Callable[
 
 @dataclass
 class Agent(Generic[TContext]):
-    """AI agent with tools, shields, and orbs."""
+    """AI agent with swords, shields, orbs, and charms."""
 
     name: str
     instructions: (
@@ -108,15 +85,14 @@ class Agent(Generic[TContext]):
     orbs: list[Agent[Any] | Orbs[TContext]] = field(default_factory=list)
     model: str | Model = field(default="")
     model_settings: ModelSettings = field(default_factory=ModelSettings)
-    tools: list[Tool] = field(default_factory=list)
+    swords: list[Sword] = field(default_factory=list)
     input_shields: list[InputShield[TContext]] = field(default_factory=list)
     output_shields: list[OutputShield[TContext]] = field(default_factory=list)
     output_type: type[Any] | None = None
     hooks: AgentHooks[TContext] | None = None
-    tool_use_behavior: (
-        Literal["run_llm_again", "stop_on_first_tool"]
-        | dict[Literal["stop_at_tool_names"], list[str]]
-        | ToolsToFinalOutputFunction
+    sword_use_behavior: (
+        Literal["run_llm_again", "stop_on_first_sword"]
+        | dict[Literal["stop_at_sword_names"], list[str]]
     ) = "run_llm_again"
 
     def clone(self, **kwargs: Any) -> Agent[TContext]:
@@ -125,24 +101,24 @@ class Agent(Generic[TContext]):
             "orbs": [],
             "model": "",
             "model_settings": ModelSettings(),
-            "tools": [],
+            "swords": [],
             "input_shields": [],
             "output_shields": [],
             "output_type": None,
             "hooks": None,
-            "tool_use_behavior": "run_llm_again",
+            "sword_use_behavior": "run_llm_again",
         }
         defaults.update(kwargs)
         return dataclasses.replace(self, **defaults)
 
-    def as_tool(
+    def as_sword(
         self,
-        tool_name: str | None,
-        tool_description: str | None,
-        custom_output_extractor: Callable[[RunResult], Awaitable[str]] | None = None,
-    ) -> Tool:
-        """Converts agent to tool for other agents."""
-        return _create_agent_tool(self, tool_name, tool_description, custom_output_extractor)
+        sword_name: str | None,
+        sword_description: str | None,
+        custom_output_extractor: Callable[[Any], str] | None = None,
+    ) -> FunctionSword:
+        """Converts agent to sword for other agents."""
+        return _create_agent_sword(self, sword_name, sword_description, custom_output_extractor)
 
     async def get_system_prompt(self, run_context: RunContextWrapper[TContext]) -> str | None:
         """Get the system prompt for the agent."""

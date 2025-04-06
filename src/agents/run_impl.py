@@ -13,6 +13,7 @@ from ..gear.shields import (
     OutputShield,
     OutputShieldResult,
 )
+from ..gear.swords import ComputerSword, FunctionSword, FunctionSwordResult
 from ..util._exceptions import AgentError, ModelError, UsageError
 from ..util._items import (
     ItemHelpers,
@@ -22,21 +23,20 @@ from ..util._items import (
     OrbsOutputItem,
     ReasoningItem,
     RunItem,
-    ToolCallItem,
-    ToolCallOutputItem,
+    SwordCallItem,
+    SwordCallOutputItem,
     TResponseInputItem,
 )
 from ..util._lifecycle import RunHooks
 from ..util._logger import logger
 from ..util._run_context import RunContextWrapper, TContext
 from ..util._stream_events import RunItemStreamEvent, StreamEvent
-from ..util._tool import ComputerTool, FunctionTool, FunctionToolResult
 from ..util._types import (
     ComputerAction,
-    ResponseComputerToolCall,
-    ResponseFunctionToolCall,
+    ResponseComputerSwordCall,
+    ResponseFunctionSwordCall,
 )
-from .agent import Agent, ToolsToFinalOutputResult
+from .agent import Agent, SwordsToFinalOutputResult
 from .output import AgentOutputSchema
 
 if TYPE_CHECKING:
@@ -58,40 +58,40 @@ class QueueCompleteSentinel:
 
 
 QUEUE_COMPLETE_SENTINEL = QueueCompleteSentinel()
-_NOT_FINAL_OUTPUT = ToolsToFinalOutputResult(is_final_output=False, final_output=None)
+_NOT_FINAL_OUTPUT = SwordsToFinalOutputResult(is_final_output=False, final_output=None)
 
 
 ########################################################
-#               Data Classes for Tools
+#               Data Classes for Swords
 ########################################################
 
 
 @dataclass(frozen=True)
-class ToolRunOrbs:
+class SwordRunOrbs:
     orbs: Orbs
-    tool_call: ResponseFunctionToolCall
+    sword_call: ResponseFunctionSwordCall
 
 
 @dataclass(frozen=True)
-class ToolRunFunction:
-    tool_call: ResponseFunctionToolCall
-    function_tool: FunctionTool
+class SwordRunFunction:
+    sword_call: ResponseFunctionSwordCall
+    function_sword: FunctionSword
 
 
 @dataclass(frozen=True)
-class ToolRunComputerAction:
-    tool_call: ResponseComputerToolCall
-    computer_tool: ComputerTool
+class SwordRunComputerAction:
+    sword_call: ResponseComputerSwordCall
+    computer_sword: ComputerSword
 
 
 @dataclass
 class ProcessedResponse:
     new_items: list[RunItem]
-    orbs: list[ToolRunOrbs]
-    functions: list[ToolRunFunction]
-    computer_actions: list[ToolRunComputerAction]
+    orbs: list[SwordRunOrbs]
+    functions: list[SwordRunFunction]
+    computer_actions: list[SwordRunComputerAction]
 
-    def has_tools_to_run(self) -> bool:
+    def has_swords_to_run(self) -> bool:
         return bool(self.orbs or self.functions or self.computer_actions)
 
 
@@ -133,13 +133,13 @@ class RunImpl:
         MessageOutputItem: "message_output_created",
         OrbsCallItem: "orbs_requested",
         OrbsOutputItem: "orbs_occured",
-        ToolCallItem: "tool_called",
-        ToolCallOutputItem: "tool_output",
+        SwordCallItem: "sword_called",
+        SwordCallOutputItem: "sword_output",
         ReasoningItem: "reasoning_item_created",
     }
 
     @classmethod
-    async def execute_tools_and_side_effects(
+    async def execute_swords_and_side_effects(
         cls,
         *,
         agent: Agent[TContext],
@@ -155,9 +155,9 @@ class RunImpl:
         new_step_items = processed_response.new_items
 
         function_results, computer_results = await asyncio.gather(
-            cls.execute_function_tool_calls(
+            cls.execute_function_sword_calls(
                 agent=agent,
-                tool_runs=processed_response.functions,
+                sword_runs=processed_response.functions,
                 hooks=hooks,
                 context_wrapper=context_wrapper,
             ),
@@ -184,17 +184,17 @@ class RunImpl:
                 run_config=run_config,
             )
 
-        check_tool_use = await cls._check_for_final_output_from_tools(
+        check_sword_use = await cls._check_for_final_output_from_swords(
             agent=agent,
-            tool_results=function_results,
+            sword_results=function_results,
             context_wrapper=context_wrapper,
         )
 
-        if check_tool_use.is_final_output:
+        if check_sword_use.is_final_output:
             if not agent.output_type or agent.output_type is str:
-                check_tool_use.final_output = str(check_tool_use.final_output)
+                check_sword_use.final_output = str(check_sword_use.final_output)
 
-            if check_tool_use.final_output is None:
+            if check_sword_use.final_output is None:
                 logger.error("Model returned None.")
 
             return await cls.execute_final_output(
@@ -203,7 +203,7 @@ class RunImpl:
                 new_response=new_response,
                 pre_step_items=pre_step_items,
                 new_step_items=new_step_items,
-                final_output=check_tool_use.final_output,
+                final_output=check_sword_use.final_output,
                 hooks=hooks,
                 context_wrapper=context_wrapper,
             )
@@ -227,7 +227,7 @@ class RunImpl:
             )
         elif (
             not output_schema or output_schema.is_plain_text()
-        ) and not processed_response.has_tools_to_run():
+        ) and not processed_response.has_swords_to_run():
             return await cls.execute_final_output(
                 agent=agent,
                 original_input=original_input,
@@ -257,18 +257,18 @@ class RunImpl:
         orbs: list[Orbs],
     ) -> ProcessedResponse:
         items: list[RunItem] = []
-        run_orbs: list[ToolRunOrbs] = []
-        functions: list[ToolRunFunction] = []
-        computer_actions: list[ToolRunComputerAction] = []
-        orbs_map = {orb.tool_name: orb for orb in orbs}
+        run_orbs: list[SwordRunOrbs] = []
+        functions: list[SwordRunFunction] = []
+        computer_actions: list[SwordRunComputerAction] = []
+        orbs_map = {orb.sword_name: orb for orb in orbs}
         function_map = {}
-        computer_tool = None
+        computer_sword = None
 
-        for tool in agent.tools:
-            if isinstance(tool, FunctionTool):
-                function_map[tool.name] = tool
-            elif isinstance(tool, ComputerTool):
-                computer_tool = tool
+        for sword in agent.swords:
+            if isinstance(sword, FunctionSword):
+                function_map[sword.name] = sword
+            elif isinstance(sword, ComputerSword):
+                computer_sword = sword
 
         for output in response.output:
             output_type = output["type"]
@@ -282,31 +282,31 @@ class RunImpl:
                 }
                 items.append(MessageOutputItem(raw_item=message_output, agent=agent))
             elif output_type in ("file_search", "web_search", "computer"):
-                items.append(ToolCallItem(raw_item=output, agent=agent))
+                items.append(SwordCallItem(raw_item=output, agent=agent))
                 if output_type == "computer":
-                    if not computer_tool:
-                        raise ModelError("Model produced computer action without a computer tool.")
+                    if not computer_sword:
+                        raise ModelError("Model produced computer action without a computer sword.")
                     computer_actions.append(
-                        ToolRunComputerAction(tool_call=output, computer_tool=computer_tool)
+                        SwordRunComputerAction(sword_call=output, computer_sword=computer_sword)
                     )
             elif output_type == "reasoning":
                 items.append(ReasoningItem(raw_item=output, agent=agent))
             elif output_type == "function":
                 if output["name"] in orbs_map:
                     items.append(OrbsCallItem(raw_item=output, agent=agent))
-                    orbs = ToolRunOrbs(
+                    orbs = SwordRunOrbs(
                         orbs=orbs_map[output["name"]],
-                        tool_call=output,
+                        sword_call=output,
                     )
                     run_orbs.append(orbs)
                 else:
                     if output["name"] not in function_map:
-                        raise ModelError(f"Tool {output['name']} not found in agent {agent.name}")
-                    items.append(ToolCallItem(raw_item=output, agent=agent))
+                        raise ModelError(f"Sword {output['name']} not found in agent {agent.name}")
+                    items.append(SwordCallItem(raw_item=output, agent=agent))
                     functions.append(
-                        ToolRunFunction(
-                            tool_call=output,
-                            function_tool=function_map[output["name"]],
+                        SwordRunFunction(
+                            sword_call=output,
+                            function_sword=function_map[output["name"]],
                         )
                     )
             else:
@@ -321,32 +321,32 @@ class RunImpl:
         )
 
     @classmethod
-    async def execute_function_tool_calls(
+    async def execute_function_sword_calls(
         cls,
         *,
         agent: Agent[TContext],
-        tool_runs: list[ToolRunFunction],
+        sword_runs: list[SwordRunFunction],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
-    ) -> list[FunctionToolResult]:
-        async def run_single_tool(
-            func_tool: FunctionTool, tool_call: ResponseFunctionToolCall
+    ) -> list[FunctionSwordResult]:
+        async def run_single_sword(
+            func_sword: FunctionSword, sword_call: ResponseFunctionSwordCall
         ) -> Any:
             try:
                 _, _, result = await asyncio.gather(
-                    hooks.on_tool_start(context_wrapper, agent, func_tool),
+                    hooks.on_sword_start(context_wrapper, agent, func_sword),
                     (
-                        agent.hooks.on_tool_start(context_wrapper, agent, func_tool)
+                        agent.hooks.on_sword_start(context_wrapper, agent, func_sword)
                         if agent.hooks
                         else noop_coroutine()
                     ),
-                    func_tool.on_invoke_tool(context_wrapper, tool_call.arguments),
+                    func_sword.on_invoke_sword(context_wrapper, sword_call.arguments),
                 )
 
                 await asyncio.gather(
-                    hooks.on_tool_end(context_wrapper, agent, func_tool, result),
+                    hooks.on_sword_end(context_wrapper, agent, func_sword, result),
                     (
-                        agent.hooks.on_tool_end(context_wrapper, agent, func_tool, result)
+                        agent.hooks.on_sword_end(context_wrapper, agent, func_sword, result)
                         if agent.hooks
                         else noop_coroutine()
                     ),
@@ -357,20 +357,23 @@ class RunImpl:
             return result
 
         results = await asyncio.gather(
-            *[run_single_tool(tool_run.function_tool, tool_run.tool_call) for tool_run in tool_runs]
+            *[
+                run_single_sword(sword_run.function_sword, sword_run.sword_call)
+                for sword_run in sword_runs
+            ]
         )
 
         return [
-            FunctionToolResult(
-                tool=tool_run.function_tool,
+            FunctionSwordResult(
+                sword=sword_run.function_sword,
                 output=result,
-                run_item=ToolCallOutputItem(
+                run_item=SwordCallOutputItem(
                     output=result,
-                    raw_item=ItemHelpers.tool_call_output_item(tool_run.tool_call, str(result)),
+                    raw_item=ItemHelpers.sword_call_output_item(sword_run.sword_call, str(result)),
                     agent=agent,
                 ),
             )
-            for tool_run, result in zip(tool_runs, results, strict=False)
+            for sword_run, result in zip(sword_runs, results, strict=False)
         ]
 
     @classmethod
@@ -378,7 +381,7 @@ class RunImpl:
         cls,
         *,
         agent: Agent[TContext],
-        actions: list[ToolRunComputerAction],
+        actions: list[SwordRunComputerAction],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
     ) -> list[RunItem]:
@@ -403,7 +406,7 @@ class RunImpl:
         pre_step_items: list[RunItem],
         new_step_items: list[RunItem],
         new_response: ModelResponse,
-        run_orbs: list[ToolRunOrbs],
+        run_orbs: list[SwordRunOrbs],
         hooks: RunHooks[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig | None,
@@ -412,10 +415,10 @@ class RunImpl:
             ignored_orbs = run_orbs[1:]
             output_message = f"Multiple orbs, ignoring {len(ignored_orbs)} orbs."
             new_step_items.append(
-                ToolCallOutputItem(
+                SwordCallOutputItem(
                     output=output_message,
-                    raw_item=ItemHelpers.tool_call_output_item(
-                        ignored_orbs[0].tool_call, output_message
+                    raw_item=ItemHelpers.sword_call_output_item(
+                        ignored_orbs[0].sword_call, output_message
                     ),
                     agent=agent,
                 )
@@ -424,14 +427,14 @@ class RunImpl:
         actual_orbs = run_orbs[0]
         orbs = actual_orbs.orbs
         new_agent: Agent[Any] = await orbs.on_invoke_orbs(
-            context_wrapper, actual_orbs.tool_call.arguments
+            context_wrapper, actual_orbs.sword_call.arguments
         )
 
         new_step_items.append(
             OrbsOutputItem(
                 agent=agent,
-                raw_item=ItemHelpers.tool_call_output_item(
-                    actual_orbs.tool_call,
+                raw_item=ItemHelpers.sword_call_output_item(
+                    actual_orbs.sword_call,
                     orbs.get_transfer_message(new_agent),
                 ),
                 source_agent=agent,
@@ -573,43 +576,43 @@ class RunImpl:
                 logger.warning(f"Failed to queue event: {event}")
 
     @classmethod
-    async def _check_for_final_output_from_tools(
+    async def _check_for_final_output_from_swords(
         cls,
         *,
         agent: Agent[TContext],
-        tool_results: list[FunctionToolResult],
+        sword_results: list[FunctionSwordResult],
         context_wrapper: RunContextWrapper[TContext],
-    ) -> ToolsToFinalOutputResult:
-        if not tool_results:
+    ) -> SwordsToFinalOutputResult:
+        if not sword_results:
             return _NOT_FINAL_OUTPUT
 
-        if agent.tool_use_behavior == "run_llm_again":
+        if agent.sword_use_behavior == "run_llm_again":
             return _NOT_FINAL_OUTPUT
-        elif agent.tool_use_behavior == "stop_on_first_tool":
-            return ToolsToFinalOutputResult(
-                is_final_output=True, final_output=tool_results[0].output
+        elif agent.sword_use_behavior == "stop_on_first_sword":
+            return SwordsToFinalOutputResult(
+                is_final_output=True, final_output=sword_results[0].output
             )
-        elif isinstance(agent.tool_use_behavior, dict):
-            names = agent.tool_use_behavior.get("stop_at_tool_names", [])
-            for tool_result in tool_results:
-                if tool_result.tool.name in names:
-                    return ToolsToFinalOutputResult(
-                        is_final_output=True, final_output=tool_result.output
+        elif isinstance(agent.sword_use_behavior, dict):
+            names = agent.sword_use_behavior.get("stop_at_sword_names", [])
+            for sword_result in sword_results:
+                if sword_result.sword.name in names:
+                    return SwordsToFinalOutputResult(
+                        is_final_output=True, final_output=sword_result.output
                     )
             return _NOT_FINAL_OUTPUT
-        elif callable(agent.tool_use_behavior):
-            if inspect.iscoroutinefunction(agent.tool_use_behavior):
+        elif callable(agent.sword_use_behavior):
+            if inspect.iscoroutinefunction(agent.sword_use_behavior):
                 if result := await cast(
-                    Awaitable[ToolsToFinalOutputResult],
-                    agent.tool_use_behavior(context_wrapper, tool_results),
+                    Awaitable[SwordsToFinalOutputResult],
+                    agent.sword_use_behavior(context_wrapper, sword_results),
                 ):
                     return result
             else:
                 if result := cast(
-                    ToolsToFinalOutputResult,
-                    agent.tool_use_behavior(context_wrapper, tool_results),
+                    SwordsToFinalOutputResult,
+                    agent.sword_use_behavior(context_wrapper, sword_results),
                 ):
                     return result
 
-        logger.error(f"Invalid tool_use_behavior: {agent.tool_use_behavior}")
-        raise UsageError(f"Invalid tool_use_behavior: {agent.tool_use_behavior}")
+        logger.error(f"Invalid sword_use_behavior: {agent.sword_use_behavior}")
+        raise UsageError(f"Invalid sword_use_behavior: {agent.sword_use_behavior}")

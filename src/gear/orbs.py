@@ -47,19 +47,19 @@ OrbsInputFilter: TypeAlias = Callable[[OrbsInputData], OrbsInputData]
 class Orbs(Generic[TContext]):
     """Represents delegation of a task from one agent to another."""
 
-    tool_name: str
-    tool_description: str
+    sword_name: str
+    sword_description: str
     input_json_schema: dict[str, Any]
     on_invoke_orbs: Callable[[RunContextWrapper[Any], str], Awaitable[Agent[TContext]]]
     agent_name: str
     input_filter: OrbsInputFilter | None = None
 
     @classmethod
-    def default_tool_name(cls, agent: Agent[Any]) -> str:
+    def default_sword_name(cls, agent: Agent[Any]) -> str:
         return transform_string_function_style(f"transfer_to_{agent.name}")
 
     @classmethod
-    def default_tool_description(cls, agent: Agent[Any]) -> str:
+    def default_sword_description(cls, agent: Agent[Any]) -> str:
         return (
             f"Orbs to the {agent.name} agent to handle the request. "
             f"{agent.orbs_description or ''}"
@@ -75,8 +75,8 @@ class Orbs(Generic[TContext]):
 def orbs(
     agent: Agent[TContext],
     *,
-    tool_name_override: str | None = None,
-    tool_description_override: str | None = None,
+    sword_name_override: str | None = None,
+    sword_description_override: str | None = None,
     input_filter: Callable[[OrbsInputData], OrbsInputData] | None = None,
 ) -> Orbs[TContext]: ...
 
@@ -87,8 +87,8 @@ def orbs(
     *,
     on_orbs: OnOrbsWithInput[TOrbsInput],
     input_type: type[TOrbsInput],
-    tool_description_override: str | None = None,
-    tool_name_override: str | None = None,
+    sword_description_override: str | None = None,
+    sword_name_override: str | None = None,
     input_filter: Callable[[OrbsInputData], OrbsInputData] | None = None,
 ) -> Orbs[TContext]: ...
 
@@ -98,16 +98,16 @@ def orbs(
     agent: Agent[TContext],
     *,
     on_orbs: OnOrbsWithoutInput,
-    tool_description_override: str | None = None,
-    tool_name_override: str | None = None,
+    sword_description_override: str | None = None,
+    sword_name_override: str | None = None,
     input_filter: Callable[[OrbsInputData], OrbsInputData] | None = None,
 ) -> Orbs[TContext]: ...
 
 
 def orbs(
     agent: Agent[TContext],
-    tool_name_override: str | None = None,
-    tool_description_override: str | None = None,
+    sword_name_override: str | None = None,
+    sword_description_override: str | None = None,
     on_orbs: OnOrbsWithInput[TOrbsInput] | OnOrbsWithoutInput | None = None,
     input_type: type[TOrbsInput] | None = None,
     input_filter: Callable[[OrbsInputData], OrbsInputData] | None = None,
@@ -156,13 +156,13 @@ def orbs(
 
         return agent
 
-    tool_name = tool_name_override or Orbs.default_tool_name(agent)
-    tool_description = tool_description_override or Orbs.default_tool_description(agent)
+    sword_name = sword_name_override or Orbs.default_sword_name(agent)
+    sword_description = sword_description_override or Orbs.default_sword_description(agent)
     input_json_schema = ensure_strict_json_schema(input_json_schema)
 
     return Orbs(
-        tool_name=tool_name,
-        tool_description=tool_description,
+        sword_name=sword_name,
+        sword_description=sword_description,
         input_json_schema=input_json_schema,
         on_invoke_orbs=_invoke_orbs,
         input_filter=input_filter,

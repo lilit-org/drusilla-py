@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-This script demonstrates the agents-as-tools pattern where a frontline agent selects
+This script demonstrates the agents-as-swords pattern where a frontline agent selects
 translation agents to handle user messages.
 """
 

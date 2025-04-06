@@ -1,7 +1,7 @@
 [project]
-name = "deepseek-agentic-framework"
+name = "noctira"
 version = "0.0.1"
-description = "Lilit's Agentic Framework"
+description = "Lilit's Decentralized Agentic Framework"
 readme = "README.md"
 requires-python = ">=3.10,<4.0"
 authors = [{ name = "bt3gl"}]

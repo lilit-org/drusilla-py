@@ -18,8 +18,8 @@ class ModelSettings:
     top_p: float | None = None
     frequency_penalty: float | None = None
     presence_penalty: float | None = None
-    tool_choice: Literal["auto", "required", "none"] | str | None = None
-    parallel_tool_calls: bool | None = False
+    sword_choice: Literal["auto", "required", "none"] | str | None = None
+    parallel_sword_calls: bool | None = False
     truncation: Literal["auto", "disabled"] | None = None
     max_tokens: int | None = None
 

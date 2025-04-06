@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-This script demonstrates the agents-as-tools pattern where a frontline agent selects
+This script demonstrates the agents-as-swords pattern where a frontline agent selects
 translation agents to handle user messages.
 """
 
@@ -14,12 +14,12 @@ from functools import lru_cache
 
 from src.agents.agent import Agent
 from src.agents.run import Runner
+from src.gear.swords import function_sword
 from src.util._client import setup_client
 from src.util._constants import LRU_CACHE_SIZE
 from src.util._env import get_env_var
 from src.util._exceptions import AgentExecutionError, UsageError
 from src.util._pretty_print import pretty_print_result, pretty_print_result_stats
-from src.util._tool import function_tool
 
 ########################################################
 #           Constants
@@ -30,11 +30,11 @@ CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
 
 ########################################################
-#           Tools
+#           Swords
 ########################################################
 
 
-@function_tool
+@function_sword
 @lru_cache(maxsize=CACHE_SIZE)
 def get_weather(city: str) -> dict:
     print(f"Getting weather for {city}")
@@ -46,7 +46,7 @@ def get_weather(city: str) -> dict:
     }
 
 
-@function_tool
+@function_sword
 @lru_cache(maxsize=CACHE_SIZE)
 def is_summer(city: str) -> bool:
     weather = get_weather(city)
@@ -69,11 +69,11 @@ def create_agent() -> Agent:
         instructions=(
             "You are a cool special robot who provides accurate weather information "
             "and tells whether it's summer or not. For EVERY request: "
-            "1. Use the weather tool to fetch weather data for the requested city "
-            "2. ALWAYS use the is_summer tool to check if it feels like summer "
+            "1. Use the weather sword to fetch weather data for the requested city "
+            "2. ALWAYS use the is_summer sword to check if it feels like summer "
             "3. Present both the weather information AND whether it's summer in your response."
         ),
-        tools=[get_weather, is_summer],
+        swords=[get_weather, is_summer],
     )
 
 

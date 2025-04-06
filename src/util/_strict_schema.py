@@ -69,7 +69,7 @@ def _enforce_strict_schema_rules(
             raise UsageError(
                 "Object types cannot allow additional properties. This may be due to using an "
                 "older Pydantic version or explicit configuration. If needed, update the function "
-                "or output tool to use a non-strict schema."
+                "or output sword to use a non-strict schema."
             )
 
     # Process object properties

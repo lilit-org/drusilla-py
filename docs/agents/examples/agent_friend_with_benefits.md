@@ -1,4 +1,4 @@
-## agents "friend with benefits": chain of agent and orbs
+# agents "friend with benefits": an example of an agent with orbs
 
 <br>
 
@@ -21,7 +21,7 @@ each agent has a specific role and passes its output to the next agent in the ch
 this example showcases:
 - agent chaining using the `orbs` system
 - message filtering between agents
-- tool integration with agents
+- sword integration with agents
 - asynchronous agent execution
 
 <br>
@@ -43,14 +43,14 @@ make friends-with-benefit
 here's the implementation:
 
 ```python
-@function_tool
+@function_sword
 def random_number() -> int:
     return random.randint(3, 15)
 
 
 def orbs_message_filter(orbs_message_data: orbsinputdata) -> orbsinputdata:
-    """filter the message history to remove tools and keep only relevant history."""
-    orbs_message_data = orbsinputfilter.remove_all_tools(orbs_message_data)
+    """filter the message history to remove swords and keep only relevant history."""
+    orbs_message_data = orbsinputfilter.remove_all_swords(orbs_message_data)
     history = (
         tuple(orbs_message_data.input_history[2:])
         if isinstance(orbs_message_data.input_history, tuple)
@@ -79,7 +79,7 @@ second_agent = agent(
 first_agent = agent(
     name="agent one",
     instructions="generate a random between 3 and 15.",
-    tools=[random_number],
+    swords=[random_number],
 )
 
 
@@ -150,7 +150,7 @@ poetry run python examples/agents/friend_with_benefits.py
   
   🦾 Configuration:
         Streaming → ❌ Disabled
-        Tools     → Available (1 tools)
+        Swords     → Available (1 swords)
 
 
 ✅ RESULT:
@@ -173,7 +173,7 @@ The above code will output a random integer **between 3 and 15**, including both
   
   🦾 Configuration:
         Streaming → ❌ Disabled
-        Tools     → None
+        Swords     → None
 
 
 ✅ RESULT:
@@ -196,7 +196,7 @@ Neon glow lights up derelict streets in a gritty, dark ambiance where neon clash
   
   🦾 Configuration:
         Streaming → ❌ Disabled
-        Tools     → None
+        Swords     → None
 
 
 ✅ RESULT:

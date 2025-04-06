@@ -4,8 +4,8 @@ from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..agents.output import AgentOutputSchema
+from ..gear.swords import Sword
 from ..util._items import ModelResponse, TResponseInputItem, TResponseStreamEvent
-from ..util._tool import Tool
 from .settings import ModelSettings
 
 if TYPE_CHECKING:
@@ -30,7 +30,7 @@ class Model(Protocol):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orb],
     ) -> ModelResponse:
@@ -41,7 +41,7 @@ class Model(Protocol):
         system_instructions: str | None,
         input: str | list[TResponseInputItem],
         model_settings: ModelSettings,
-        tools: list[Tool],
+        swords: list[Sword],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orb],
     ) -> AsyncIterator[TResponseStreamEvent]:

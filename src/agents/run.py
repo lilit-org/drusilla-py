@@ -526,7 +526,7 @@ class Runner:
             system_prompt,
             input,
             model_settings,
-            agent.tools,
+            agent.swords,
             output_schema,
             orbs=orbs,
         ):
@@ -559,7 +559,7 @@ class Runner:
                     orbs=orbs,
                 )
 
-                single_step_result = await RunImpl.execute_tools_and_side_effects(
+                single_step_result = await RunImpl.execute_swords_and_side_effects(
                     agent=agent,
                     original_input=streamed_result.input,
                     pre_step_items=streamed_result.new_items,
@@ -650,7 +650,7 @@ class Runner:
             output_schema=output_schema,
             orbs=orbs,
         )
-        return await RunImpl.execute_tools_and_side_effects(
+        return await RunImpl.execute_swords_and_side_effects(
             agent=agent,
             original_input=original_input,
             pre_step_items=pre_step_items,
@@ -735,7 +735,7 @@ class Runner:
             system_instructions=system_prompt,
             input=input,
             model_settings=model_settings,
-            tools=agent.tools,
+            swords=agent.swords,
             output_schema=output_schema,
             orbs=orbs,
         )

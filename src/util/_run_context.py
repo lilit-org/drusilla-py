@@ -16,7 +16,7 @@ TContext = TypeVar("TContext", default=Any)
 class RunContextWrapper(Generic[TContext]):
     """Wrapper for context objects passed to Runner.run().
 
-    Contexts are used to pass dependencies and data to custom code (tools, callbacks, hooks).
+    Contexts are used to pass dependencies and data to custom code (swords, callbacks, hooks).
     They are not passed to the LLM.
     """
 

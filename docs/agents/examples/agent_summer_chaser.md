@@ -1,8 +1,8 @@
-## agent "summer chaser": another example using tools
+# agent "summer chaser":  an example of an agent with swords
 
 <br>
 
-run our second example of an agent using tools with:
+run with:
 
 ```shell
 make summer-chaser
@@ -15,7 +15,7 @@ which creates and runs the following agent:
 ```python
 CACHE_SIZE = int(get_env_var("LRU_CACHE_SIZE", LRU_CACHE_SIZE))
 
-@function_tool
+@function_sword
 @lru_cache(maxsize=CACHE_SIZE)
 def get_weather(city: str) -> dict:
     print(f"Getting weather for {city}")
@@ -27,7 +27,7 @@ def get_weather(city: str) -> dict:
     }
 
 
-@function_tool
+@function_sword
 @lru_cache(maxsize=CACHE_SIZE)
 def is_summer(city: str) -> bool:
     weather = get_weather(city)
@@ -45,11 +45,11 @@ def create_agent() -> Agent:
         instructions=(
             "You are a cool special robot who provides accurate weather information "
             "and tells whether it's summer or not. For EVERY request: "
-            "1. Use the weather tool to fetch weather data for the requested city "
-            "2. ALWAYS use the is_summer tool to check if it feels like summer "
+            "1. Use the weather sword to fetch weather data for the requested city "
+            "2. ALWAYS use the is_summer sword to check if it feels like summer "
             "3. Present both the weather information AND whether it's summer in your response."
         ),
-        tools=[get_weather, is_summer],
+        swords=[get_weather, is_summer],
     )
 
 
@@ -90,7 +90,7 @@ you can find out the weather at any city and whether it feels like summer:
 
   🦾 Configuration:
         Streaming → ❌ Disabled
-        Tools     → Available (2 tools)
+        Swords    → Available (2 swords)
 
 
 ✅ REASONING:
@@ -99,7 +99,7 @@ Alright, so I need to figure out what the user is asking for here.
 They mentioned they're a special robot that gives accurate weather info and tells if it's summer. 
 The request was to ask about Berlin.
 
-First step: use the weather tool to get the current weather in Berlin. 
+First step: use the weather sword to get the current weather in Berlin. 
 I check the latest data and it's supposed to be around 23°C, sunny with some clouds. 
 Temperature feels mild but pleasant.
 

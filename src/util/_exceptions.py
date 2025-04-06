@@ -33,7 +33,7 @@ class MessageError(AgentError):
 
 
 class ModelError(MessageError):
-    """Raised when model acts unexpectedly (e.g. invalid tool calls or malformed JSON)."""
+    """Raised when model acts unexpectedly (e.g. invalid sword calls or malformed JSON)."""
 
 
 class MaxTurnsError(MessageError):
