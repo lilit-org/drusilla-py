@@ -76,6 +76,25 @@ select = [
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
     "UP", # pyupgrade
+    "W291", # trailing whitespace
+    "W292", # no newline at end of file
+    "W293", # blank line contains whitespace
+    "E201", # whitespace after '('
+    "E202", # whitespace before ')'
+    "E203", # whitespace before ':'
+    "E211", # whitespace before '('
+    "E221", # multiple spaces before operator
+    "E222", # multiple spaces after operator
+    "E223", # tab before operator
+    "E224", # tab after operator
+    "E225", # missing whitespace around operator
+    "E226", # missing whitespace around arithmetic operator
+    "E231", # missing whitespace after ','
+    "E251", # unexpected spaces around keyword / parameter equals
+    "E261", # at least two spaces before inline comment
+    "E262", # inline comment should start with '# '
+    "E271", # multiple spaces after keyword
+    "E272", # multiple spaces before keyword
 ]
 
 [tool.ruff.lint.pydocstyle]

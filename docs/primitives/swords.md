@@ -3,10 +3,10 @@
 <br>
 
 
-swords let agents take actions such as: 
+swords let agents take actions such as:
 
 - running code
-- fetching data 
+- fetching data
 - calling external APIs
 
 <br>

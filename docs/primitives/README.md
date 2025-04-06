@@ -9,5 +9,5 @@ the noctira project has a minimal set of core primitives that allows the design 
 - [agents](agents.md): LLM (ro)bots that can be equipped with orbs and shields
 - [swords](swords.md): part of the agent's gear, used to let agents take actions
 - [orbs](orbs.md): part of the agent's gear, used to delegate tasks to other agents
-- [shields](shields.md): part of the agent's gear, used to validate and protect the inputs from agents 
+- [shields](shields.md): part of the agent's gear, used to validate and protect the inputs from agents
 - [charms](charms.md): part of the agent's gear, used to receive callbacks on lifecycle events
