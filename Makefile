@@ -1,12 +1,14 @@
 .PHONY: clean
 clean:
-	@find . -type d -name '__pycache__' -exec rm -rf {} +
-	@find . -type f -name '*.py[co]' -delete
-	@find . -type d -name '*.egg-info' -exec rm -rf {} +
-	@find . -type d -name '.pytest_cache' -exec rm -rf {} +
-	@find . -type d -name '.ruff_cache' -exec rm -rf {} +
-	@rm -rf dist/ build/ .tox/
-	@find venv/lib/python*/site-packages -type d -name '*.egg' -exec rm -rf {} +
+	@find . -iname '*.py[co]' -delete
+	@find . -iname '__pycache__' -delete
+	@rm -rf  '.pytest_cache'
+	@rm -rf dist/
+	@rm -rf build/
+	@rm -rf *.egg-info
+	@rm -rf .tox
+	@rm -rf venv/lib/python*/site-packages/*.egg
+	@rm -rf .ruff_cache/
 
 .PHONY: install
 install:
@@ -46,7 +48,3 @@ cypherpunk-jokes:
 .PHONY: friend-with-benefits
 friend-with-benefits:
 	poetry run python examples/agents/friend_with_benefits.py
-
-.PHONY: web-surfer
-web-surfer:
-	poetry run python examples/agents/web_surfer.py

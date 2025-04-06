@@ -9,7 +9,7 @@ It includes:
    - Input shield errors
    - Output shield errors
 
-2. Specific exception types for:    
+2. Specific exception types for:
    - Agent execution errors
    - Generic errors
    - Message errors

@@ -56,19 +56,16 @@ class BaseCharms(ABC, Generic[TContext]):
 
     async def on_start(self, context: RunContextWrapper[TContext], agent: Agent[TContext]) -> None:
         """Called before agent invocation."""
-        pass
 
     async def on_end(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], output: Any
     ) -> None:
         """Called when agent produces final output."""
-        pass
 
     async def on_sword_start(
         self, context: RunContextWrapper[TContext], agent: Agent[TContext], sword: Sword
     ) -> None:
         """Called before sword invocation."""
-        pass
 
     async def on_sword_end(
         self,
@@ -78,7 +75,6 @@ class BaseCharms(ABC, Generic[TContext]):
         result: Any,
     ) -> None:
         """Called after sword invocation."""
-        pass
 
 
 class RunCharms(BaseCharms[TContext]):
@@ -91,7 +87,6 @@ class RunCharms(BaseCharms[TContext]):
         to_agent: Agent[TContext],
     ) -> None:
         """Called during agent orbs."""
-        pass
 
 
 class AgentCharms(BaseCharms[TContext]):
@@ -104,4 +99,3 @@ class AgentCharms(BaseCharms[TContext]):
         source: Agent[TContext],
     ) -> None:
         """Called when agent receives orbs."""
-        pass

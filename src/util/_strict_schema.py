@@ -1,5 +1,6 @@
 """
-This module provides utilities for enforcing strict JSON schema validation rules and managing schema references.
+This module provides utilities for enforcing strict JSON schema validation
+rules and managing schema references.
 
 Key features:
 - Enforces strict object property validation by default
@@ -16,7 +17,7 @@ maintaining consistent data structures.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Dict, Final, TypeAlias, cast
+from typing import Any, Final, TypeAlias, cast
 
 from ._constants import LRU_CACHE_SIZE, UNSET
 from ._exceptions import ModelError, UsageError
@@ -24,7 +25,7 @@ from ._exceptions import ModelError, UsageError
 ########################################################
 #             Type Aliases and Constants                #
 ########################################################
-JSONSchema: TypeAlias = Dict[str, Any]
+JSONSchema: TypeAlias = dict[str, Any]
 SchemaPath: TypeAlias = tuple[str, ...]
 
 EMPTY_JSON_SCHEMA: Final[JSONSchema] = {
@@ -60,7 +61,7 @@ def _resolve_schema_ref_cached(*, root: JSONSchema, ref: str) -> JSONSchema:
                 )
         return cast(JSONSchema, resolved)
     except KeyError as e:
-        raise ModelError(f"Invalid $ref path {ref}: {str(e)}")
+        raise ModelError(f"Invalid $ref path {ref}: {str(e)}") from e
 
 
 def _enforce_strict_schema_rules(
