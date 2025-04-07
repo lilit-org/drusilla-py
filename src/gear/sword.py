@@ -8,6 +8,7 @@ which are specialized tools that wrap Python functions with enhanced capabilitie
 from __future__ import annotations
 
 import inspect
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import (
@@ -15,17 +16,21 @@ from typing import (
     Concatenate,
     get_origin,
     get_type_hints,
-    overload,
 )
 
 from pydantic import BaseModel, Field, create_model
 from typing_extensions import ParamSpec
 
 from ..util._constants import ERROR_MESSAGES
-from ..util._exceptions import UsageError, create_error_handler
+from ..util._exceptions import ModelError, UsageError, create_error_handler
 from ..util._items import RunItem
 from ..util._strict_schema import ensure_strict_json_schema
-from ..util._types import MaybeAwaitable, RunContextWrapper
+from ..util._types import (
+    MaybeAwaitable,
+    RunContextWrapper,
+    SwordFuncAsync,
+    SwordFuncSync,
+)
 
 #############################################################
 #  Sword System's Private Types Safety and Functionalities
@@ -64,71 +69,64 @@ class SwordResult:
 
 
 ########################################################
-#      Sword through the function sword decorator
+#     Create sword decorator factory
 ########################################################
 
 
-@overload
-def function_sword(
-    func: SwordFunction[...],
-    *,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    use_docstring_info: bool = True,
-    failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-    strict_mode: bool = True,
-) -> Sword: ...
+def create_sword_decorator(
+    sword_class: type[Sword],
+    sync_func_type: type,
+    async_func_type: type,
+):
+    def decorator(
+        func: sync_func_type | async_func_type | None = None,
+        *,
+        name_override: str | None = None,
+        description_override: str | None = None,
+        use_docstring_info: bool = True,
+        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
+        strict_mode: bool = True,
+    ) -> sword_class | Callable[[sync_func_type | async_func_type], sword_class]:
+        def create_sword(f: sync_func_type | async_func_type) -> sword_class:
+            schema = function_schema(
+                func=f,
+                name_override=name_override,
+                description_override=description_override,
+                use_docstring_info=use_docstring_info,
+                strict_json_schema=strict_mode,
+            )
+
+            async def on_invoke(ctx: RunContextWrapper[Any], input: str) -> Any:
+                try:
+                    return await schema.on_invoke_sword(ctx, input)
+                except Exception as e:
+                    if failure_error_function:
+                        error_msg = failure_error_function(ctx, e)
+                        if inspect.iscoroutinefunction(failure_error_function):
+                            error_msg = await error_msg
+                        raise ModelError(error_msg) from e
+                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
+
+            return sword_class(
+                name=schema.name,
+                description=schema.description,
+                params_json_schema=schema.params_json_schema,
+                on_invoke_sword=on_invoke,
+                strict_json_schema=strict_mode,
+                failure_error_function=failure_error_function,
+            )
+
+        return create_sword if func is None else create_sword(func)
+
+    return decorator
 
 
-@overload
-def function_sword(
-    *,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    use_docstring_info: bool = True,
-    failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-    strict_mode: bool = True,
-) -> Callable[[SwordFunction[...]], Sword]: ...
-
-
-def function_sword(
-    func: SwordFunction[...] | None = None,
-    *,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    use_docstring_info: bool = True,
-    failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-    strict_mode: bool = True,
-) -> Sword | Callable[[SwordFunction[...]], Sword]:
-
-    def create_sword(f: SwordFunction[...]) -> Sword:
-        schema = function_schema(
-            func=f,
-            name_override=name_override,
-            description_override=description_override,
-            use_docstring_info=use_docstring_info,
-            strict_json_schema=strict_mode,
-        )
-
-        async def on_invoke(ctx: RunContextWrapper[Any], input: str) -> Any:
-            try:
-                return await schema.on_invoke_sword(ctx, input)
-            except Exception as e:
-                if failure_error_function:
-                    msg = failure_error_function(ctx, e)
-                    return await msg if inspect.iscoroutine(msg) else msg
-                raise
-
-        return Sword(
-            name=schema.name,
-            description=schema.description,
-            params_json_schema=schema.params_json_schema,
-            on_invoke_sword=on_invoke,
-            strict_json_schema=strict_mode,
-            failure_error_function=failure_error_function,
-        )
-
-    return create_sword if func is None else create_sword(func)
+# Type aliases for sword functions
+function_sword = create_sword_decorator(
+    Sword,
+    SwordFuncSync,
+    SwordFuncAsync,
+)
 
 
 ########################################################
@@ -173,7 +171,6 @@ class FuncSchema:
             elif param.kind == param.POSITIONAL_ONLY:
                 positional_params.append(name)
             elif param.kind == param.POSITIONAL_OR_KEYWORD:
-                # Parameters with default values are treated as keyword args
                 if param.default == param.empty:
                     positional_params.append(name)
                 else:
@@ -238,8 +235,17 @@ def function_schema(
     # Create Pydantic model fields
     fields = _create_pydantic_fields(filtered_params, type_hints, param_descs)
 
+    # Create base model with desired configuration
+    class DynamicBase(BaseModel):
+        model_config = {"extra": "forbid" if strict_json_schema else "allow", "strict": True}
+
     # Create dynamic model and schema
-    dynamic_model = create_model(f"{func_name}_args", __base__=BaseModel, **fields)
+    dynamic_model = create_model(
+        f"{func_name}_args",
+        __base__=DynamicBase,
+        **fields,
+    )
+
     json_schema = dynamic_model.model_json_schema()
     if strict_json_schema:
         json_schema = ensure_strict_json_schema(json_schema)
@@ -250,6 +256,7 @@ def function_schema(
         dynamic_model,
         sig,
         takes_context,
+        strict_json_schema,
     )
 
     return FuncSchema(
@@ -265,7 +272,7 @@ def function_schema(
 
 
 ########################################################
-#                Methods for invocation
+#             Invocation Methods
 ########################################################
 
 
@@ -274,28 +281,34 @@ def _create_invocation_handler(
     dynamic_model: type[BaseModel],
     sig: inspect.Signature,
     takes_context: bool,
+    strict_json_schema: bool = True,
 ) -> Callable[[RunContextWrapper[Any], str], Awaitable[Any]]:
     """Create the sword invocation handler."""
 
     async def on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
-        data = dynamic_model.model_validate_json(input)
-        args, kwargs = FuncSchema(
-            name=func.__name__,
-            description=None,
-            params_pydantic_model=dynamic_model,
-            params_json_schema=dynamic_model.model_json_schema(),
-            signature=sig,
-            on_invoke_sword=lambda _, __: None,
-            takes_context=takes_context,
-            strict_json_schema=True,
-        ).to_call_args(data)
+        try:
+            json_data = json.loads(input)
+            data = dynamic_model.model_validate(json_data, strict=strict_json_schema)
 
-        if takes_context:
-            args.insert(0, ctx)
+            args, kwargs = FuncSchema(
+                name=func.__name__,
+                description=None,
+                params_pydantic_model=dynamic_model,
+                params_json_schema=dynamic_model.model_json_schema(),
+                signature=sig,
+                on_invoke_sword=lambda _, __: None,
+                takes_context=takes_context,
+                strict_json_schema=strict_json_schema,
+            ).to_call_args(data)
 
-        if inspect.iscoroutinefunction(func):
-            return await func(*args, **kwargs)
-        return func(*args, **kwargs)
+            if takes_context:
+                args.insert(0, ctx)
+
+            if inspect.iscoroutinefunction(func):
+                return await func(*args, **kwargs)
+            return func(*args, **kwargs)
+        except Exception as e:
+            raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
 
     return on_invoke_sword
 
@@ -336,7 +349,7 @@ def _process_parameters(
 
 
 ########################################################
-#   Data class and methods for FuncDocumentation
+#        FuncDocumentation Dataclass and methods
 ########################################################
 
 
@@ -387,7 +400,7 @@ def _create_pydantic_fields(
     type_hints: dict[str, Any],
     param_descs: dict[str, str],
 ) -> dict[str, tuple[Any, Field]]:
-    """Create Pydantic fields from function parameters."""
+
     fields: dict[str, tuple[Any, Field]] = {}
 
     for name, param in params:

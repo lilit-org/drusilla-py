@@ -21,10 +21,10 @@ from pydantic import TypeAdapter
 from typing_extensions import TypeVar
 
 from ..util._exceptions import UsageError
-from ..util._items import RunItem, TResponseInputItem
+from ..util._items import RunItem
 from ..util._print import transform_string_function_style, validate_json
 from ..util._strict_schema import ensure_strict_json_schema
-from ..util._types import RunContextWrapper, TContext
+from ..util._types import InputItem, RunContextWrapper, TContext
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
@@ -46,7 +46,7 @@ OnOrbsWithoutInput = Callable[[RunContextWrapper[Any]], Any]
 
 @dataclass(frozen=True)
 class OrbsInputData:
-    input_history: str | tuple[TResponseInputItem, ...]
+    input_history: str | tuple[InputItem, ...]
     pre_orbs_items: tuple[RunItem, ...]
     new_items: tuple[RunItem, ...]
 

@@ -30,9 +30,9 @@ if TYPE_CHECKING:
     from ..agents.agent import Agent
 from ..gear.shield import InputShieldResult, OutputShieldResult
 from ._constants import MAX_SHIELD_QUEUE_SIZE, logger
-from ._items import ModelResponse, RunItem, TResponseInputItem
+from ._items import ModelResponse, RunItem
 from ._stream_events import StreamEvent
-from ._types import QueueCompleteSentinel
+from ._types import InputItem, QueueCompleteSentinel
 
 ########################################################
 #               Data Classes for Results
@@ -41,7 +41,7 @@ from ._types import QueueCompleteSentinel
 
 @dataclass(frozen=True)
 class RunResultBase(abc.ABC):
-    input: str | list[TResponseInputItem]
+    input: str | list[InputItem]
     new_items: list[RunItem]
     raw_responses: list[ModelResponse]
     final_output: Any
@@ -77,7 +77,7 @@ class RunResult(RunResultBase):
 @dataclass
 class RunResultStreaming:
     # Core result fields
-    input: str | list[TResponseInputItem]
+    input: str | list[InputItem]
     new_items: list[RunItem]
     raw_responses: list[ModelResponse]
     final_output: Any

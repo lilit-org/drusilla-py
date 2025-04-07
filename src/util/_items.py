@@ -31,9 +31,16 @@ from typing import (
 
 from pydantic import BaseModel
 
-from ._types import FunctionCallOutput, ResponseFunctionSwordCall, ResponseReasoningItem, Usage
-from ._types import ResponseInputItemParam as TResponseInputItem
-from ._types import ResponseOutput as TResponseOutputItem
+from ._types import (
+    FunctionCallOutput,
+    ResponseFunctionSwordCall,
+    ResponseInputItemParam,
+    ResponseReasoningItem,
+    Usage,
+)
+from ._types import (
+    ResponseOutput as TResponseOutputItem,
+)
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
@@ -71,7 +78,7 @@ class RunItemBase(Generic[T], abc.ABC):
     raw_item: T
 
     @cached_property
-    def input_item(self) -> TResponseInputItem:
+    def input_item(self) -> ResponseInputItemParam:
         if isinstance(self.raw_item, dict):
             return self.raw_item
         elif isinstance(self.raw_item, BaseModel):
@@ -120,8 +127,8 @@ class OrbsCallItem(RunItemBase[ResponseFunctionSwordCall]):
 
 
 @dataclass(frozen=True)
-class OrbsOutputItem(RunItemBase[TResponseInputItem]):
-    raw_item: TResponseInputItem
+class OrbsOutputItem(RunItemBase[ResponseInputItemParam]):
+    raw_item: ResponseInputItemParam
     source_agent: Agent[Any]
     target_agent: Agent[Any]
     type: Literal["orbs_output_item"] = "orbs_output_item"
@@ -153,16 +160,16 @@ class ModelResponse:
     referenceable_id: str | None
 
     @cached_property
-    def input_items(self) -> list[TResponseInputItem]:
+    def input_items(self) -> list[ResponseInputItemParam]:
         return [
             cast(
-                TResponseInputItem,
+                ResponseInputItemParam,
                 it.model_dump(exclude_unset=True) if hasattr(it, "model_dump") else it,
             )
             for it in self.output
         ]
 
-    def to_input_items(self) -> list[TResponseInputItem]:
+    def to_input_items(self) -> list[ResponseInputItemParam]:
         return self.input_items
 
 
@@ -219,8 +226,8 @@ class ItemHelpers:
 
     @staticmethod
     def input_to_new_input_list(
-        input: str | list[TResponseInputItem],
-    ) -> list[TResponseInputItem]:
+        input: str | list[ResponseInputItemParam],
+    ) -> list[ResponseInputItemParam]:
         if isinstance(input, str):
             return [{"content": input, "role": "user"}]
         return input.copy()

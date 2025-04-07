@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from src.agents.agent import Agent, SwordsToFinalOutputResult
-from src.gear.shield import InputShield, ShieldFunctionOutput
+from src.gear.shield import InputShield, ShieldResult
 from src.gear.sword import Sword
 from src.models.settings import ModelSettings
 from src.util._types import RunContextWrapper
@@ -43,8 +43,8 @@ def mock_shield():
     class MockShield(InputShield[Any]):
         def __init__(self):
             super().__init__(
-                shield_function=lambda ctx, agent, input: ShieldFunctionOutput(
-                    tripwire_triggered=False, output=f"shielded_{input}"
+                shield_function=lambda ctx, agent, input: ShieldResult(
+                    tripwire_triggered=False, result="processed"
                 )
             )
 

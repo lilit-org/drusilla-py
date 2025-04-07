@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..agents.output import AgentOutputSchema
 from ..gear.sword import Sword
-from ..util._items import ModelResponse, TResponseInputItem
-from ..util._types import ResponseStreamEvent
+from ..util._items import ModelResponse
+from ..util._types import InputItem, ResponseStreamEvent
 from .settings import ModelSettings
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ class Model(Protocol):
     async def get_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -51,7 +51,7 @@ class Model(Protocol):
     async def stream_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,

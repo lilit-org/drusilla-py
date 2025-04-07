@@ -10,7 +10,7 @@ import os
 import sys
 from dataclasses import dataclass
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 __all__ = (
     "HEADERS",
@@ -36,6 +36,9 @@ __all__ = (
     "logger",
     "ERROR_MESSAGES",
 )
+
+# Load .env file
+load_dotenv(find_dotenv())
 
 # Constants
 UNSET = object()
@@ -94,7 +97,7 @@ def load_environment() -> None:
     global LOG_LEVEL, BASE_URL, API_KEY, MODEL, MAX_TURNS, MAX_QUEUE_SIZE
     global MAX_GUARDRAIL_QUEUE_SIZE, LRU_CACHE_SIZE, HTTP_TIMEOUT_TOTAL
     global HTTP_TIMEOUT_CONNECT, HTTP_TIMEOUT_READ, HTTP_MAX_KEEPALIVE_CONNECTIONS
-    global HTTP_MAX_CONNECTIONS
+    global HTTP_MAX_CONNECTIONS, ERROR_MESSAGES
 
     # Load environment variables from .env file
     load_dotenv()
@@ -121,6 +124,9 @@ def load_environment() -> None:
     HTTP_MAX_KEEPALIVE_CONNECTIONS = int(os.getenv("HTTP_MAX_KEEPALIVE_CONNECTIONS", "5"))
     HTTP_MAX_CONNECTIONS = int(os.getenv("HTTP_MAX_CONNECTIONS", "10"))
 
+    # Error Messages
+    ERROR_MESSAGES = ErrorMessages()
+
 
 @dataclass(frozen=True)
 class ErrorMessage:
@@ -131,16 +137,34 @@ class ErrorMessage:
 @dataclass(frozen=True)
 class ErrorMessages:
     SWORD_ERROR: ErrorMessage = ErrorMessage(
-        message=os.getenv("SWORD_ERROR_MESSAGE", "❌ Error while running a sword: {error}"),
+        message=os.environ["SWORD_ERROR_MESSAGE"],
         used_in="src/gear/sword.py",
     )
-    RUN_CONTEXT_ERROR: ErrorMessage = ErrorMessage(
-        message=os.getenv(
-            "RUN_CONTEXT_ERROR_MESSAGE",
-            "❌ RunContextWrapper param found at non-first position: {error}",
-        ),
+    RUNCONTEXT_ERROR: ErrorMessage = ErrorMessage(
+        message=os.environ["RUNCONTEXT_ERROR_MESSAGE"],
         used_in="src/gear/sword.py",
+    )
+    SHIELD_ERROR: ErrorMessage = ErrorMessage(
+        message=os.environ["SHIELD_ERROR_MESSAGE"],
+        used_in="src/gear/shield.py",
     )
 
 
+def validate_required_env_vars() -> None:
+    """Validate that all required environment variables are present."""
+    required_vars = {
+        "SWORD_ERROR_MESSAGE",
+        "RUNCONTEXT_ERROR_MESSAGE",
+        "SHIELD_ERROR_MESSAGE",
+    }
+
+    missing_vars = [var for var in required_vars if var not in os.environ]
+    if missing_vars:
+        raise ValueError(
+            f"❌ Missing required environment variables: {', '.join(missing_vars)}. "
+            f"❌ Please add these variables to your .env file."
+        )
+
+
+validate_required_env_vars()
 ERROR_MESSAGES = ErrorMessages()

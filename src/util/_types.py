@@ -1,5 +1,6 @@
 """
-This module defines core type definitions and data structures used throughout the project.
+This module defines core type definitions and data structures used throughout the
+project.
 
 It includes:
 - Type variables and generic type definitions
@@ -8,19 +9,19 @@ It includes:
 - Chat completion related types for LLM interactions
 - Streaming response handling types
 - Input parameter types for API requests
-
-These types provide a consistent interface for working with LLM APIs, handling responses,
-and managing streaming data across the application.
 """
 
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator, Awaitable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Generic, Literal, TypeAlias, TypedDict
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypedDict
 
 from typing_extensions import NotRequired, TypeVar
+
+if TYPE_CHECKING:
+    from src.util._items import ResponseInputItemParam
 
 ########################################################
 #              Type Variables
@@ -28,17 +29,53 @@ from typing_extensions import NotRequired, TypeVar
 
 TContext = TypeVar("TContext", default=Any)
 T = TypeVar("T")
+TContext_co = TypeVar("TContext_co", covariant=True)
 MaybeAwaitable = Awaitable[T] | T
-
+TResponseInputItem: TypeAlias = "ResponseInputItemParam"
+"""Type alias for response input items."""
 
 ########################################################
-#            Queue Sentinel Types
+#              Decorator Factory
 ########################################################
 
 
-@dataclass(frozen=True)
-class QueueCompleteSentinel:
-    """Sentinel value used to indicate the end of a queue stream."""
+def create_decorator_factory(
+    base_class: type[Generic[TContext_co, Any]],
+    sync_func_type: type,
+    async_func_type: type,
+):
+    """Create a decorator factory for classes that wrap functions.
+
+    Args:
+        base_class: The base class to instantiate
+        sync_func_type: Type for synchronous functions
+        async_func_type: Type for asynchronous functions
+
+    Returns:
+        A decorator that can be used to create instances from functions
+    """
+
+    def decorator(
+        func: sync_func_type | async_func_type | None = None,
+        *,
+        name: str | None = None,
+    ) -> (
+        base_class
+        | Callable[
+            [sync_func_type | async_func_type],
+            base_class,
+        ]
+    ):
+        def create_instance(
+            f: sync_func_type | async_func_type,
+        ) -> base_class:
+            return base_class(shield_function=f, name=name)
+
+        if func is not None:
+            return create_instance(func)
+        return create_instance
+
+    return decorator
 
 
 ########################################################
@@ -84,6 +121,20 @@ class RunContextWrapper(Generic[TContext]):
 
     usage: Usage = field(default_factory=Usage)
     """Usage stats for the agent run. May be stale during streaming until final chunk."""
+
+
+# Sword function type aliases
+SwordFuncSync = Callable[[RunContextWrapper[Any], str], Any]
+SwordFuncAsync = Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
+
+########################################################
+#            Queue Sentinel Types
+########################################################
+
+
+@dataclass(frozen=True)
+class QueueCompleteSentinel:
+    """Sentinel value used to indicate the end of a queue stream."""
 
 
 ########################################################
@@ -319,6 +370,9 @@ class ResponseInputItemParam(TypedDict):
     name: NotRequired[str]
     arguments: NotRequired[Mapping[str, Any]]
     call_id: NotRequired[str]
+
+
+InputItem: TypeAlias = ResponseInputItemParam
 
 
 class ResponseFormat(TypedDict):

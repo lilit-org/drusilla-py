@@ -24,16 +24,18 @@ the sword primitive is defined in the [src/gear/sword.py](../../src/gear/swords.
 ---
 
 ## contents
+
+<br>
+
 - [overview of the sword module](#overview-of-the-sword-module)
     - [the main class `Sword`](#the-main-class-sword)
     - [creating swords with python functions](#creating-swords-with-python-functions)
     - [creating a custom `Sword` object](#creating-a-custom-sword-object)
     - [creating an agent as a sword](#creating-an-agent-as-a-sword)
-- [tests for `sword.py`](#tests-for-swordpy)
 - [tips and best practices](#tips-and-best-practices)
   - [customizing error messages](#customizing-error-messages)
+  - [running tests](#running-tests)
 - [advanced examples](#advanced-examples)
-
 
 <br>
 
@@ -92,72 +94,61 @@ the easiest way to create a sword is by using any python function. they can beco
 
 <br>
 
-`@function_sword` is implemented through the `@overload` pattern, to provide better type hint and documentation for different ways the function can be called:
+`@function_sword` is implemented through a decorator factory utilizing the `@overload` pattern to provide better type hint and documentation for different ways the function can be called.
 
 <br>
 
 ```python
-@overload
-def function_sword(
-    func: SwordFunction[...],
-    *,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    use_docstring_info: bool = True,
-    failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-    strict_mode: bool = True,
-) -> Sword: ...
+
+def create_sword_decorator(
+    sword_class: type[Sword],
+    sync_func_type: type,
+    async_func_type: type,
+):
+    def decorator(
+        func: sync_func_type | async_func_type | None = None,
+        *,
+        name_override: str | None = None,
+        description_override: str | None = None,
+        use_docstring_info: bool = True,
+        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
+        strict_mode: bool = True,
+    ) -> sword_class | Callable[[sync_func_type | async_func_type], sword_class]:
+        def create_sword(f: sync_func_type | async_func_type) -> sword_class:
+            schema = function_schema(
+                func=f,
+                name_override=name_override,
+                description_override=description_override,
+                use_docstring_info=use_docstring_info,
+                strict_json_schema=strict_mode,
+            )
+
+            async def on_invoke(ctx: RunContextWrapper[Any], input: str) -> Any:
+                try:
+                    return await schema.on_invoke_sword(ctx, input)
+                except Exception as e:
+                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
+
+            return sword_class(
+                name=schema.name,
+                description=schema.description,
+                params_json_schema=schema.params_json_schema,
+                on_invoke_sword=on_invoke,
+                strict_json_schema=strict_mode,
+                failure_error_function=failure_error_function,
+            )
+
+        return create_sword if func is None else create_sword(func)
+
+    return decorator
 
 
-@overload
-def function_sword(
-    *,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    use_docstring_info: bool = True,
-    failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-    strict_mode: bool = True,
-) -> Callable[[SwordFunction[...]], Sword]: ...
-
-
-def function_sword(
-    func: SwordFunction[...] | None = None,
-    *,
-    name_override: str | None = None,
-    description_override: str | None = None,
-    use_docstring_info: bool = True,
-    failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-    strict_mode: bool = True,
-) -> Sword | Callable[[SwordFunction[...]], Sword]:
-
-    def create_sword(f: SwordFunction[...]) -> Sword:
-        schema = function_schema(
-            func=f,
-            name_override=name_override,
-            description_override=description_override,
-            use_docstring_info=use_docstring_info,
-            strict_json_schema=strict_mode,
-        )
-
-        async def on_invoke(ctx: RunContextWrapper[Any], input: str) -> Any:
-            try:
-                return await schema.on_invoke_sword(ctx, input)
-            except Exception as e:
-                if failure_error_function:
-                    msg = failure_error_function(ctx, e)
-                    return await msg if inspect.iscoroutine(msg) else msg
-                raise
-
-        return Sword(
-            name=schema.name,
-            description=schema.description,
-            params_json_schema=schema.params_json_schema,
-            on_invoke_sword=on_invoke,
-            strict_json_schema=strict_mode,
-            failure_error_function=failure_error_function,
-        )
-
-    return create_sword if func is None else create_sword(func)
+# Type aliases for sword functions
+function_sword = create_sword_decorator(
+    Sword,
+    SwordFuncSync,
+    SwordFuncAsync,
+)
 ```
 
 <br>
@@ -204,7 +195,6 @@ class FuncSchema:
             elif param.kind == param.POSITIONAL_ONLY:
                 positional_params.append(name)
             elif param.kind == param.POSITIONAL_OR_KEYWORD:
-                # Parameters with default values are treated as keyword arguments
                 if param.default == param.empty:
                     positional_params.append(name)
                 else:
@@ -269,8 +259,17 @@ def function_schema(
     # Create Pydantic model fields
     fields = _create_pydantic_fields(filtered_params, type_hints, param_descs)
 
+    # Create base model with desired configuration
+    class DynamicBase(BaseModel):
+        model_config = {"extra": "forbid" if strict_json_schema else "allow", "strict": True}
+
     # Create dynamic model and schema
-    dynamic_model = create_model(f"{func_name}_args", __base__=BaseModel, **fields)
+    dynamic_model = create_model(
+        f"{func_name}_args",
+        __base__=DynamicBase,
+        **fields,
+    )
+
     json_schema = dynamic_model.model_json_schema()
     if strict_json_schema:
         json_schema = ensure_strict_json_schema(json_schema)
@@ -281,6 +280,7 @@ def function_schema(
         dynamic_model,
         sig,
         takes_context,
+        strict_json_schema,
     )
 
     return FuncSchema(
@@ -307,28 +307,35 @@ def _create_invocation_handler(
     dynamic_model: type[BaseModel],
     sig: inspect.Signature,
     takes_context: bool,
+    strict_json_schema: bool = True,
 ) -> Callable[[RunContextWrapper[Any], str], Awaitable[Any]]:
     """Create the sword invocation handler."""
 
     async def on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
-        data = dynamic_model.model_validate_json(input)
-        args, kwargs = FuncSchema(
-            name=func.__name__,
-            description=None,
-            params_pydantic_model=dynamic_model,
-            params_json_schema=dynamic_model.model_json_schema(),
-            signature=sig,
-            on_invoke_sword=lambda _, __: None,
-            takes_context=takes_context,
-            strict_json_schema=True,
-        ).to_call_args(data)
+        try:
 
-        if takes_context:
-            args.insert(0, ctx)
+            json_data = json.loads(input)
+            data = dynamic_model.model_validate(json_data, strict=strict_json_schema)
 
-        if inspect.iscoroutinefunction(func):
-            return await func(*args, **kwargs)
-        return func(*args, **kwargs)
+            args, kwargs = FuncSchema(
+                name=func.__name__,
+                description=None,
+                params_pydantic_model=dynamic_model,
+                params_json_schema=dynamic_model.model_json_schema(),
+                signature=sig,
+                on_invoke_sword=lambda _, __: None,
+                takes_context=takes_context,
+                strict_json_schema=strict_json_schema,
+            ).to_call_args(data)
+
+            if takes_context:
+                args.insert(0, ctx)
+
+            if inspect.iscoroutinefunction(func):
+                return await func(*args, **kwargs)
+            return func(*args, **kwargs)
+        except Exception as e:
+            raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
 
     return on_invoke_sword
 
@@ -422,7 +429,7 @@ def _create_pydantic_fields(
     type_hints: dict[str, Any],
     param_descs: dict[str, str],
 ) -> dict[str, tuple[Any, Field]]:
-    """Create Pydantic fields from function parameters."""
+
     fields: dict[str, tuple[Any, Field]] = {}
 
     for name, param in params:
@@ -435,11 +442,11 @@ def _create_pydantic_fields(
 
         if param.kind == param.VAR_POSITIONAL:
             # Handle *args - always use list[Any]
-            ann = list[Any]  # type: ignore
+            ann = list[Any]
             field = Field(default_factory=list, description=field_description)
         elif param.kind == param.VAR_KEYWORD:
             # Handle **kwargs - always use dict[str, Any]
-            ann = dict[str, Any]  # type: ignore
+            ann = dict[str, Any]
             field = Field(default_factory=dict, description=field_description)
         else:
             field = Field(
@@ -530,144 +537,6 @@ def create_agents() -> Agent:
 
 <br>
 
-### tests for `sword.py`
-
-<br>
-
-unit tests for the sword primitive can be found inside [test/gear](../../tests/gear/test_sword.py):
-
-<br>
-
-```python
-class SwordTestInput(BaseModel):
-    """Test input model for sword."""
-
-    message: str
-    count: int = 1
-
-
-@pytest.fixture
-def mock_context() -> RunContextWrapper[Any]:
-    """Fixture for creating a mock context."""
-    return RunContextWrapper(context={})
-
-
-class TestSwordErrorHandling:
-    """Test suite for sword error handling functionality."""
-
-    def test_error_handler(self, mock_context: RunContextWrapper[Any]):
-        """Test the sword error handler function."""
-        error = Exception("Test error")
-        error_handler = create_error_handler(ERROR_MESSAGES.SWORD_ERROR.message)
-        result = error_handler(mock_context, error)
-        assert result == ERROR_MESSAGES.SWORD_ERROR.message.format(error="Test error")
-
-    @pytest.mark.asyncio
-    async def test_function_sword_with_error_handling(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with error handling."""
-        @function_sword(failure_error_function=None)
-        async def test_sword(message: str) -> str:
-            raise ValueError("Test error")
-
-        with pytest.raises(ValueError):
-            await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-
-
-class TestFuncSchema:
-    """Test suite for FuncSchema functionality."""
-
-    def test_to_call_args(self):
-        """Test converting Pydantic model to function call arguments."""
-        class TestModel(BaseModel):
-            a: int
-            b: str
-            c: list[int] = []
-            d: dict[str, Any] = {}
-
-        def test_func(a: int, b: str, c: list[int] | None = None, d: dict[str, Any] | None = None) -> None:
-            pass
-
-        schema = FuncSchema(
-            name="test",
-            description="Test schema",
-            params_pydantic_model=TestModel,
-            params_json_schema=TestModel.model_json_schema(),
-            signature=inspect.signature(test_func),
-            on_invoke_sword=lambda ctx, input: None,
-            takes_context=False,
-            strict_json_schema=True,
-        )
-
-        data = TestModel(a=1, b="test", c=[1, 2, 3], d={"key": "value"})
-        positional_args, keyword_args = schema.to_call_args(data)
-
-        assert positional_args == [1, "test"]
-        assert keyword_args == {"c": [1, 2, 3], "d": {"key": "value"}}
-
-
-class TestFunctionSword:
-    """Test suite for function_sword decorator functionality."""
-
-    @pytest.mark.asyncio
-    async def test_basic_functionality(self, mock_context: RunContextWrapper[Any]):
-        """Test basic function sword creation and invocation."""
-        @function_sword
-        async def test_sword(message: str, count: int = 1) -> str:
-            return f"{message} {count}"
-
-        assert isinstance(test_sword, Sword)
-        assert test_sword.name == "test_sword"
-        assert "message" in test_sword.params_json_schema["properties"]
-        assert "count" in test_sword.params_json_schema["properties"]
-
-        result = await test_sword.on_invoke_sword(mock_context, '{"message": "hello", "count": 2}')
-        assert result == "hello 2"
-
-    def test_custom_name_and_description(self):
-        """Test function sword with custom name and description."""
-        @function_sword(
-            name_override="custom_sword",
-            description_override="Custom description"
-        )
-        async def test_sword(ctx: RunContextWrapper[Any], message: str) -> str:
-            return message
-
-        assert test_sword.name == "custom_sword"
-        assert test_sword.description == "Custom description"
-
-    @pytest.mark.asyncio
-    async def test_var_positional_args(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with variable positional arguments."""
-        @function_sword
-        async def test_sword(*args: int) -> int:
-            return sum(args)
-
-        result = await test_sword.on_invoke_sword(mock_context, '{"args": [1, 2, 3]}')
-        assert result == 6
-
-    @pytest.mark.asyncio
-    async def test_var_keyword_args(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with variable keyword arguments."""
-        @function_sword(strict_mode=False)
-        async def test_sword(**kwargs: Any) -> dict[str, Any]:
-            return kwargs
-
-        result = await test_sword.on_invoke_sword(mock_context, '{"kwargs": {"a": 1, "b": 2}}')
-        assert result == {"a": 1, "b": 2}
-
-    @pytest.mark.asyncio
-    async def test_context_parameter(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with context parameter."""
-        @function_sword
-        async def test_sword(ctx: RunContextWrapper[Any], message: str) -> str:
-            return f"Context: {message}"
-
-        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-        assert result == "Context: test"
-```
-
-<br>
-
 ----
 
 ## tips and best practices
@@ -690,6 +559,19 @@ SWORD_ERROR_HANDLER = create_error_handler(ERROR_MESSAGES.SWORD_ERROR.message)
 
 `create_error_handler()` is a method defined inside [util/_exceptions.py](../../src/util/_exceptions.py) and is not intended to be modified. however, the string `ERROR_MESSAGES.SWORD_ERROR.message` (which is imported from [util/_constants.py](../../src/util/_constants.py)) can be directly customized inside your [`.env`](../../.env.example).
 
+<br>
+
+### running tests
+
+<br>
+
+unit tests for `Sword` can be run with:
+
+<br>
+
+```shell
+poetry run pytest tests/gear/test_sword.py -v
+```
 
 <br>
 
