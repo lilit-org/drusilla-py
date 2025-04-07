@@ -1,8 +1,8 @@
-# Documentation
+# documentation
 
 
 <br>
 
-#### [I. Learn about agents and explore examples](agents/)
-#### [II. Learn about primitives and the agent's gear](primitives/)
-#### [III. Start your development journey](development/)
+#### [I. learn about agents and explore examples](agents/)
+#### [II. learn about primitives and the agent's gear](primitives/)
+#### [III. start your development journey](development/)
