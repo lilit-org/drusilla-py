@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  SWORD_ERROR_MESSAGE: ${{ vars.SWORD_ERROR_MESSAGE }}
+  RUNCONTEXT_ERROR_MESSAGE: ${{ vars.RUNCONTEXT_ERROR_MESSAGE }}
+  SHIELD_ERROR_MESSAGE: ${{ vars.SHIELD_ERROR_MESSAGE }}
+  RUNNER_ERROR_MESSAGE: ${{ vars.RUNNER_ERROR_MESSAGE }}
+  ORBS_ERROR_MESSAGE: ${{ vars.ORBS_ERROR_MESSAGE }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -41,23 +48,10 @@ jobs:
           pip install hatchling --upgrade
           pip install pytest pytest-cov pytest-asyncio
 
-      - name: Validate and load .env.example
+      - name: Validate environment variables
         run: |
           python3 << 'EOF'
           import os
-          from dotenv import load_dotenv
-          from pathlib import Path
-
-          # Check if .env.example exists
-          env_file = Path('.env.example')
-          if not env_file.exists():
-              print('Error: .env.example file not found')
-              exit(1)
-
-          # Load .env.example
-          load_dotenv(env_file)
-
-          # Validate required variables
           required_vars = {
               'SWORD_ERROR_MESSAGE',
               'RUNCONTEXT_ERROR_MESSAGE',
@@ -65,16 +59,10 @@ jobs:
               'RUNNER_ERROR_MESSAGE',
               'ORBS_ERROR_MESSAGE',
           }
-          missing_vars = [var for var in required_vars if var not in os.environ]
+          missing_vars = [var for var in required_vars if not os.getenv(var)]
           if missing_vars:
               print(f'Error: Missing required environment variables: {", ".join(missing_vars)}')
               exit(1)
-
-          # Export all variables to GitHub environment
-          with open(os.environ['GITHUB_ENV'], 'a') as f:
-              for key, value in os.environ.items():
-                  if key.startswith(('SWORD_', 'RUNCONTEXT_', 'SHIELD_')):
-                      f.write(f'{key}={value}\n')
           EOF
 
       - name: Test with pytest
