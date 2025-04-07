@@ -31,12 +31,12 @@ from ..gear.shield import (
 from ..models.interface import Model
 from ..models.provider import ModelProvider
 from ..models.settings import ModelSettings
-from ..util._constants import MAX_TURNS
+from ..util._constants import ERROR_MESSAGES, MAX_TURNS
 from ..util._exceptions import (
-    AgentError,
     GenericError,
     InputShieldError,
     MaxTurnsError,
+    MessageError,
     ModelError,
     OutputShieldError,
 )
@@ -131,8 +131,11 @@ class Runner:
             while True:
                 current_turn += 1
                 if current_turn > run_config.max_turns:
-                    max_turns_error = MaxTurnsError(f"Max turns ({run_config.max_turns}) exceeded")
-                    raise GenericError("Max turns exceeded") from max_turns_error
+                    raise MaxTurnsError(
+                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                            error=f"Max turns ({max_turns}) exceeded"
+                        )
+                    )
 
                 try:
                     turn_result = await cls._run_turn(
@@ -147,9 +150,9 @@ class Runner:
                         input,
                     )
                 except Exception as e:
-                    if isinstance(e, GenericError):
-                        raise e
-                    raise GenericError(str(e)) from e
+                    raise MessageError(
+                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(error=str(e))
+                    ) from e
 
                 should_run_agent_start_charms = False
                 model_responses.append(turn_result.model_response)
@@ -173,10 +176,11 @@ class Runner:
                 elif isinstance(turn_result.next_step, NextStepRunAgain):
                     continue
                 else:
-                    agent_error = AgentError(
-                        f"Unknown next step type: {type(turn_result.next_step)}"
+                    raise GenericError(
+                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                            error=f"Unknown next step type: {type(turn_result.next_step)}"
+                        )
                     )
-                    raise GenericError("Unknown next step type") from agent_error
         except Exception as e:
             if isinstance(e, GenericError):
                 raise e
@@ -207,7 +211,7 @@ class Runner:
                 for result in shield_result:
                     if result.output.tripwire_triggered:
                         shield_error = InputShieldError(result)
-                        raise GenericError("Input shield error") from shield_error
+                        raise GenericError(str(shield_error)) from shield_error
 
                 turn_result = await cls._run_single_turn(
                     agent=current_agent,
@@ -257,7 +261,7 @@ class Runner:
             for result in output_shield_results:
                 if result.output.tripwire_triggered:
                     shield_error = OutputShieldError(result)
-                    raise GenericError("Output shield error") from shield_error
+                    raise GenericError(str(shield_error)) from shield_error
 
             return RunResult(
                 input=original_input,
@@ -381,7 +385,11 @@ class Runner:
 
                 if current_turn > max_turns:
                     await cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
-                    raise GenericError(MaxTurnsError(f"Max turns ({max_turns}) exceeded"))
+                    raise MaxTurnsError(
+                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                            error=f"Max turns ({max_turns}) exceeded"
+                        )
+                    )
 
                 if current_turn == 1:
                     streamed_result._input_shields_task = asyncio.create_task(
@@ -517,7 +525,11 @@ class Runner:
             for done in asyncio.as_completed(shield_tasks):
                 result = await done
                 if result.output.tripwire_triggered:
-                    raise GenericError(InputShieldError(result))
+                    raise GenericError(
+                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                            error=str(InputShieldError(result))
+                        )
+                    )
                 streamed_result._input_shield_queue.put_nowait(result)
                 shield_results.append(result)
         except Exception as e:
@@ -614,7 +626,11 @@ class Runner:
                 streamed_result._event_queue, RawResponsesStreamEvent(data=event)
             )
 
-        raise ModelError("Model did not produce a final response!")
+        raise ModelError(
+            ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                error="Model did not produce a final response!"
+            )
+        )
 
     @classmethod
     async def _run_single_turn(
@@ -718,7 +734,11 @@ class Runner:
                 for t in shield_tasks:
                     if not t.done():
                         t.cancel()
-                raise GenericError(InputShieldError(result))
+                raise GenericError(
+                    ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                        error=str(InputShieldError(result))
+                    )
+                )
             shield_results.append(result)
 
         return shield_results
@@ -745,7 +765,11 @@ class Runner:
         for done in asyncio.as_completed(shield_tasks):
             result = await done
             if result.output.tripwire_triggered:
-                raise GenericError(OutputShieldError(result))
+                raise GenericError(
+                    ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                        error=str(OutputShieldError(result))
+                    )
+                )
             for t in shield_tasks:
                 if not t.done():
                     t.cancel()

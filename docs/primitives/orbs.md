@@ -77,12 +77,12 @@ ORBS_ERROR_HANDLER = create_error_handler(ERROR_MESSAGES.ORBS_ERROR.message)
 
 <br>
 
-unit tests for the `Shield` module can be run with:
+unit tests for the `Orbs` module can be run with:
 
 <br>
 
 ```shell
-poetry run pytest tests/gear/test_shield.py -v
+poetry run pytest tests/gear/test_orbs.py -v
 ```
 
 <br>

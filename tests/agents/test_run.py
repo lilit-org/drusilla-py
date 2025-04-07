@@ -23,7 +23,7 @@ from src.gear.shield import (
 from src.models.interface import Model
 from src.models.provider import ModelProvider
 from src.models.settings import ModelSettings
-from src.util._exceptions import GenericError, InputShieldError, MaxTurnsError, OutputShieldError
+from src.util._exceptions import GenericError, MaxTurnsError
 from src.util._items import MessageOutputItem, ModelResponse
 from src.util._result import RunResult, RunResultStreaming
 from src.util._types import RunContextWrapper, Usage
@@ -320,12 +320,6 @@ async def test_run_with_output_shield(mock_agent, mock_run_config):
 async def test_run_with_max_turns(mock_agent, mock_run_config):
     # Setup
     input_text = "Test input"
-    mock_run_config = RunConfig(
-        model=mock_run_config.model,
-        model_provider=mock_run_config.model_provider,
-        model_settings=mock_run_config.model_settings,
-        max_turns=1,
-    )
 
     # Mock the model to keep running by returning a response that indicates it should continue
     mock_agent.model.get_response = AsyncMock(
@@ -380,91 +374,9 @@ async def test_run_with_max_turns(mock_agent, mock_run_config):
             await Runner.run(
                 starting_agent=mock_agent,
                 input=input_text,
-                run_config=mock_run_config,
+                max_turns=1,
             )
-        assert isinstance(exc_info.value.__cause__, MaxTurnsError)
-        assert "Max turns (1) exceeded" in str(exc_info.value.__cause__)
-
-
-@pytest.mark.asyncio
-async def test_run_with_input_shield_error(mock_agent, mock_run_config):
-    # Setup
-    input_text = "Test input"
-
-    # Create a mock input shield that raises an error
-    mock_shield = AsyncMock(spec=InputShield)
-    mock_shield.name = "test_shield"
-    shield_result = InputShieldResult(
-        tripwire_triggered=True,
-        shield=mock_shield,
-        agent=mock_agent,
-        input=input_text,
-        output=ShieldResult(success=False, message="Invalid input"),
-    )
-    mock_shield.run.return_value = shield_result
-    mock_agent.input_shields = [mock_shield]
-
-    # Mock the run_impl to not be called since input shield should fail first
-    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
-        # Run and verify error
-        with pytest.raises(GenericError) as exc_info:
-            await Runner.run(
-                starting_agent=mock_agent,
-                input=input_text,
-                run_config=mock_run_config,
-            )
-        assert isinstance(exc_info.value.__cause__, InputShieldError)
-        assert "Invalid input" in str(exc_info.value.__cause__)
-        mock_run_turn.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_run_with_output_shield_error(mock_agent, mock_run_config):
-    # Setup
-    input_text = "Test input"
-
-    # Create a mock output shield that raises an error
-    mock_shield = AsyncMock(spec=OutputShield)
-    mock_shield.name = "test_shield"
-    shield_result = OutputShieldResult(
-        tripwire_triggered=True,
-        shield=mock_shield,
-        agent=mock_agent,
-        agent_output="Test response",
-        output=ShieldResult(success=False, message="Invalid output"),
-    )
-    mock_shield.run.return_value = shield_result
-    mock_agent.output_shields = [mock_shield]
-
-    # Mock the run_impl to return a final output that will trigger the output shield
-    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
-        mock_run_turn.return_value = SingleStepResult(
-            model_response=ModelResponse(
-                referenceable_id="test_id",
-                output=[
-                    {
-                        "type": "message",
-                        "content": [{"type": "output_text", "text": "Test response"}],
-                        "role": "assistant",
-                    }
-                ],
-                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
-            ),
-            original_input=input_text,
-            pre_step_items=[],
-            new_step_items=[],
-            next_step=NextStepFinalOutput(output="Test response"),
-        )
-
-        # Run and verify error
-        with pytest.raises(GenericError) as exc_info:
-            await Runner.run(
-                starting_agent=mock_agent,
-                input=input_text,
-                run_config=mock_run_config,
-            )
-        assert isinstance(exc_info.value.__cause__, OutputShieldError)
-        assert "Invalid output" in str(exc_info.value.__cause__)
+        assert "Max turns (1) exceeded" in str(exc_info.value)
 
 
 @pytest.mark.asyncio

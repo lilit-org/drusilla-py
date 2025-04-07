@@ -166,9 +166,11 @@ def test_sword_converter_to_api_format(mock_sword):
 
 def test_sword_converter_convert_orb_sword(mock_orb):
     # Test orb conversion
-    mock_orb.name = "test_orb"
-    mock_orb.description = "Test orb description"
-    mock_orb.input_json_schema = {"type": "object", "properties": {}}
+    mock_orb.to_api_format.return_value = {
+        "name": "test_orb",
+        "description": "Test orb description",
+        "parameters": {"type": "object", "properties": {}},
+    }
     result = SwordConverter.convert_orb_sword(mock_orb)
 
     assert isinstance(result, dict)

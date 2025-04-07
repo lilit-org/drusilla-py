@@ -555,8 +555,9 @@ class SwordConverter:
     @classmethod
     def convert_orb_sword(cls, orbs: Orbs) -> ChatCompletionSwordParam:
         """Convert an Orbs instance to a sword parameter."""
+        api_format = orbs.to_api_format()
         return {
-            "name": orbs.name,
-            "description": orbs.description,
-            "parameters": orbs.input_json_schema,
+            "name": str(api_format["name"]),
+            "description": str(api_format["description"]),
+            "parameters": dict(api_format["parameters"]),
         }
