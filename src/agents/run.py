@@ -43,7 +43,7 @@ from ..util._exceptions import (
 from ..util._items import ItemHelpers, ModelResponse, RunItem
 from ..util._result import RunResult, RunResultStreaming
 from ..util._stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
-from ..util._types import ResponseEvent, RunContextWrapper, TContext, TResponseInputItem, Usage
+from ..util._types import InputItem, ResponseEvent, RunContextWrapper, TContext, Usage
 from .agent import Agent
 from .output import AgentOutputSchema
 from .run_impl import (
@@ -81,7 +81,7 @@ class Runner:
     async def _initialize_run(
         cls,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         context: TContext | None,
         max_turns: int,
         charms: RunCharms[TContext] | None,
@@ -90,7 +90,7 @@ class Runner:
         RunCharms[TContext],
         RunConfig,
         RunContextWrapper[TContext],
-        str | list[TResponseInputItem],
+        str | list[InputItem],
         AgentOutputSchema | None,
     ]:
         charms = charms or RunCharms[Any]()
@@ -108,7 +108,7 @@ class Runner:
     async def run(
         cls,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         *,
         context: TContext | None = None,
         max_turns: int = MAX_TURNS,
@@ -176,13 +176,13 @@ class Runner:
         cls,
         current_turn: int,
         current_agent: Agent[TContext],
-        original_input: str | list[TResponseInputItem],
+        original_input: str | list[InputItem],
         generated_items: list[RunItem],
         charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
         should_run_agent_start_charms: bool,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
     ) -> SingleStepResult:
         if current_turn == 1:
             _, turn_result = await asyncio.gather(
@@ -219,7 +219,7 @@ class Runner:
         cls,
         current_agent: Agent[TContext],
         turn_result: SingleStepResult,
-        original_input: str | list[TResponseInputItem],
+        original_input: str | list[InputItem],
         generated_items: list[RunItem],
         model_responses: list[ModelResponse],
         input_shield_results: list[InputShieldResult],
@@ -246,7 +246,7 @@ class Runner:
     def run_sync(
         cls,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         *,
         context: TContext | None = None,
         max_turns: int = MAX_TURNS,
@@ -269,7 +269,7 @@ class Runner:
     async def run_streamed(
         cls,
         starting_agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         context: TContext | None = None,
         max_turns: int = MAX_TURNS,
         charms: RunCharms[TContext] | None = None,
@@ -302,7 +302,7 @@ class Runner:
     @classmethod
     def _create_streamed_result(
         cls,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         starting_agent: Agent[TContext],
         max_turns: int,
         output_schema: AgentOutputSchema | None,
@@ -323,7 +323,7 @@ class Runner:
     @classmethod
     async def _run_streamed_impl(
         cls,
-        starting_input: str | list[TResponseInputItem],
+        starting_input: str | list[InputItem],
         streamed_result: RunResultStreaming,
         starting_agent: Agent[TContext],
         max_turns: int,
@@ -465,7 +465,7 @@ class Runner:
     async def _run_input_shields_with_queue(
         cls,
         agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         context: RunContextWrapper[TContext],
         shields: list[InputShield[TContext]],
         streamed_result: RunResultStreaming,
@@ -588,7 +588,7 @@ class Runner:
         cls,
         *,
         agent: Agent[TContext],
-        original_input: str | list[TResponseInputItem],
+        original_input: str | list[InputItem],
         generated_items: list[RunItem],
         charms: RunCharms[TContext],
         context_wrapper: RunContextWrapper[TContext],
@@ -634,7 +634,7 @@ class Runner:
         cls,
         *,
         agent: Agent[TContext],
-        original_input: str | list[TResponseInputItem],
+        original_input: str | list[InputItem],
         pre_step_items: list[RunItem],
         new_response: ModelResponse,
         output_schema: AgentOutputSchema | None,
@@ -665,7 +665,7 @@ class Runner:
     async def _run_input_shields(
         cls,
         agent: Agent[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         context: RunContextWrapper[TContext],
         shields: list[InputShield[TContext]],
     ) -> list[InputShieldResult]:
@@ -722,7 +722,7 @@ class Runner:
         cls,
         agent: Agent[TContext],
         system_prompt: str | None,
-        input: list[TResponseInputItem],
+        input: list[InputItem],
         output_schema: AgentOutputSchema | None,
         orbs: list[Orbs],
         context_wrapper: RunContextWrapper[TContext],

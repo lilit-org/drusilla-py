@@ -100,6 +100,11 @@ def create_sword_decorator(
                 try:
                     return await schema.on_invoke_sword(ctx, input)
                 except Exception as e:
+                    if failure_error_function:
+                        error_msg = failure_error_function(ctx, e)
+                        if inspect.iscoroutinefunction(failure_error_function):
+                            error_msg = await error_msg
+                        raise ModelError(error_msg) from e
                     raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
 
             return sword_class(
