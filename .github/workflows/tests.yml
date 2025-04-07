@@ -48,7 +48,7 @@ jobs:
         required_vars = {
             'SWORD_ERROR_MESSAGE',
             'RUNCONTEXT_ERROR_MESSAGE',
-            'SHIELD_ERROR_MESSAGE'
+            'SHIELD_ERROR_MESSAGE',
             'RUNNER_ERROR_MESSAGE',
             'ORBS_ERROR_MESSAGE',
         }
