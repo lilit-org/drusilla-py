@@ -28,7 +28,7 @@ there are two types of shields:
 - [tips and best practices](#tips-and-best-practices)
   - [customizing error messages](#customizing-error-messages)
   - [running tests](#running-tests)
-- [advanced examples](#advanced-examples)
+- [available examples](#available-examples)
 
 <br>
 
@@ -124,6 +124,30 @@ def create_shield_decorator(
 
 <br>
 
+for a given agent (the first one in a chain of agents), the input shields run in three steps:
+
+1. receive the same input passed to the agent
+2. run to produce an `InputShield`, which is then wrapped in an `InputShieldResult`
+3. check if `tripwire_triggered == True`:
+
+```python
+if result.output.tripwire_triggered:
+    raise InputShieldError(result)
+```
+
+<br>
+
+the tripwire mechanism is a safety net that allows shields to:
+- detect invalid or unsafe input/output
+- stop the execution pipeline when issues are found
+- provide meaningful error messages about what went wrong
+
+<br>
+
+the dataclasses handling this flow can be seen below:
+
+<br>
+
 ```python
 @dataclass(frozen=True)
 class InputShieldResult:
@@ -164,7 +188,7 @@ we can put everything together and create the decorator `@input_shield`:
 <br>
 
 ```python
-# typeclass for input shield
+# type class for input shield
 InputShieldFuncSync = Callable[
     [RunContextWrapper[TContext_co], "Agent[Any]", str | list[ResponseInputItemParam]],
     ShieldResult,
@@ -184,9 +208,61 @@ input_shield = create_shield_decorator(
 
 <br>
 
+finally, simple example of how to use the `@input_shield` decorator is shown below:
+
+<br>
+
+```python
+class InputMathResult(BaseModel):
+    is_even: bool
+    reasoning: str
+
+
+shield_agent = Agent(
+    name="Shield for integers",
+    instructions="Check if the input is an even number.",
+    output_type=InputMathResult,
+)
+
+
+@input_shield
+async def shield_math(
+    ctx: RunContextWrapper[None], agent: Agent, input: str | list[InputItem]
+) -> InputShieldResult:
+    result = await Runner.run(shield_agent, input, context=ctx.context)
+
+    return InputShieldResult(
+        output_info=result.final_output,
+        tripwire_triggered=result.final_output.is_even,
+    )
+
+
+agent = Agent(
+    name="Agent Math Teacher",
+    instructions="You are a math teacher, helping students with questions",
+    input_guardrails=[shield_math],
+)
+
+async def run(number):
+    try:
+        await Runner.run(agent, number)
+    except InputShieldError:
+        ...
+```
+
+<br>
+
 ----
 
 ### the `OutputShield` dataclass
+
+<br>
+
+output shields also run in three steps (for the last agent in the chain):
+
+1. receive the same output passed to the agent
+2. run to produce an `OutputShield`, which is then wrapped in an `OutputShieldResult`
+3. check if `tripwire_triggered == True`, raising an `OutputShieldError` exception that can be handled
 
 <br>
 
@@ -230,24 +306,73 @@ similarly, we create the `@output_shield` decorator with:
 <br>
 
 ```python
-# typeclass for input shield
-InputShieldFuncSync = Callable[
-    [RunContextWrapper[TContext_co], "Agent[Any]", str | list[ResponseInputItemParam]],
+# typeclass for output shield
+OutputShieldFuncSync = Callable[
+    [RunContextWrapper[TContext_co], "Agent[Any]", Any],
     ShieldResult,
 ]
-InputShieldFuncAsync = Callable[
-    [RunContextWrapper[TContext_co], "Agent[Any]", str | list[ResponseInputItemParam]],
+OutputShieldFuncAsync = Callable[
+    [RunContextWrapper[TContext_co], "Agent[Any]", Any],
     MaybeAwaitable[ShieldResult],
 ]
 
-# decorator for input shield
-input_shield = create_shield_decorator(
-    InputShield,
-    InputShieldFuncSync,
-    InputShieldFuncAsync,
+# decorator for output shield
+output_shield = create_shield_decorator(
+    OutputShield,
+    OutputShieldFuncSync,
+    OutputShieldFuncAsync,
 )
 ```
 
+<br>
+
+
+finally, simple example of how to use the `@output_shield` decorator is shown below:
+
+<br>
+
+```python
+class OutputMathResult(BaseModel):
+    is_even: bool
+    reasoning: str
+
+
+class MessageOutput(BaseModel):
+    response: str
+
+
+shield_agent = Agent(
+    name="Shield for integers",
+    instructions="Check if the output is an even number.",
+    output_type=OutputMathResult,
+)
+
+
+@output_shield
+async def shield_math(
+    ctx: RunContextWrapper[None], agent: Agent, output: str | list[InputItem]
+) -> OutputShieldResult:
+    result = await Runner.run(shield_agent, output, context=ctx.context)
+
+    return OutputShieldResult(
+        output_info=result.final_output,
+        tripwire_triggered=result.final_output.is_even,
+    )
+
+
+agent = Agent(
+    name="Agent Math Teacher",
+    instructions="You are a math teacher, helping students with questions",
+    output_guardrails=[shield_math],
+    output_type=MessageOutput
+)
+
+async def run(number):
+    try:
+        await Runner.run(agent, number)
+    except OutputShieldError:
+        ...
+```
 
 <br>
 
@@ -289,4 +414,4 @@ poetry run pytest tests/gear/test_shield.py -v
 
 ---
 
-## advanced examples
+## available examples

@@ -77,7 +77,7 @@ def run_agent() -> str | None:
     try:
         setup_client()
         agent = create_agent()
-        msg = input("\n❓ Enter a city to check the weather: ").strip()
+        msg = input("\n❓ Enter a city to check the weather: ")
         result = Runner.run_sync(agent, msg)
         print(pretty_print_result(result))
         print(pretty_print_result_stats(result))
