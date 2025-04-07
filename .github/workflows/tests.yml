@@ -28,6 +28,34 @@ jobs:
         pip install hatchling --upgrade
         pip install pytest pytest-cov pytest-asyncio
 
+    - name: Validate and load .env.example
+      run: |
+        # Check if .env.example exists
+        if [ ! -f .env.example ]; then
+          echo "Error: .env.example file not found"
+          exit 1
+        fi
+
+        # Validate required variables are present
+        required_vars=("SWORD_ERROR_MESSAGE" "RUNCONTEXT_ERROR_MESSAGE" "SHIELD_ERROR_MESSAGE")
+        for var in "${required_vars[@]}"; do
+          if ! grep -q "^$var=" .env.example; then
+            echo "Error: Required variable $var not found in .env.example"
+            exit 1
+          fi
+        done
+
+        # Load .env.example into environment
+        while IFS='=' read -r key value; do
+          # Skip comments and empty lines
+          [[ $key =~ ^#.*$ ]] && continue
+          [[ -z $key ]] && continue
+
+          # Remove quotes and export the variable
+          value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//')
+          echo "$key=$value" >> $GITHUB_ENV
+        done < .env.example
+
     - name: Test with pytest
       env:
         PYTHONPATH: ${{ github.workspace }}
