@@ -16,12 +16,12 @@ circuit code connecting.
 
 ## documentation
 
-noctira is an early work in progress and constantly evolving. documentation is being written on [docs](docs/).
+noctira is an early work in progress and constantly evolving. documentation is being written on [docs](docs/), including info on [local development](docs/development/README.md).
 
 ## contributing
 
-noctira is open source and open to contributions. keep in mind that the project
-is early and core architectural changes are still being made. see the [CONTRIBUTING](docs/.internal/CONTRIBUTING.md) file and [our local development docs](docs/development/README.md) for more information.
+noctira is open source and open to contributions. keep in mind that the project is early and core architectural changes are still being made. 
+see the [CONTRIBUTING](docs/.internal/CONTRIBUTING.md) file and [our local development docs](docs/development/README.md) for more information.
 
 <br>
 
