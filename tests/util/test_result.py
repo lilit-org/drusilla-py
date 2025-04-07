@@ -27,7 +27,7 @@ def mock_input_shield_result():
         shield=shield,
         agent=agent,
         input="test input",
-        output=ShieldResult(tripwire_triggered=False, result="processed"),
+        output=ShieldResult(success=True, data="processed"),
     )
 
 
@@ -42,7 +42,7 @@ def mock_output_shield_result():
         shield=shield,
         agent=agent,
         agent_output="test output",
-        output=ShieldResult(tripwire_triggered=False, result="processed"),
+        output=ShieldResult(success=True, data="processed"),
     )
 
 

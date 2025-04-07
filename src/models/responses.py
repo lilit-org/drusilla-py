@@ -18,23 +18,27 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Literal, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 from ..agents.output import AgentOutputSchema
 from ..gear.orbs import Orbs
 from ..gear.sword import Sword
 from ..util._constants import HEADERS, UNSET, logger
-from ..util._items import ItemHelpers, ModelResponse, TResponseInputItem
+from ..util._items import ItemHelpers, ModelResponse
 from ..util._types import (
     AsyncDeepSeek,
     AsyncStream,
     ChatCompletionSwordParam,
+    InputItem,
     Response,
     ResponseOutput,
     Usage,
 )
 from .interface import Model
 from .settings import ModelSettings
+
+if TYPE_CHECKING:
+    pass
 
 ########################################################
 #               Main Class: Responses Model            #
@@ -53,7 +57,7 @@ class ModelResponsesModel(Model):
     async def get_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -100,7 +104,7 @@ class ModelResponsesModel(Model):
     async def stream_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -128,7 +132,7 @@ class ModelResponsesModel(Model):
     async def _fetch_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -140,7 +144,7 @@ class ModelResponsesModel(Model):
     async def _fetch_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -151,7 +155,7 @@ class ModelResponsesModel(Model):
     async def _fetch_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -239,3 +243,56 @@ class Converter:
                 }
             )
         return converted_swords
+
+    async def process_input(
+        self,
+        input: str | list[InputItem],
+        system_instructions: str | None,
+        model_settings: ModelSettings,
+        swords: list[Sword],
+    ) -> None:
+        if isinstance(input, str):
+            await self.process_input_string(input, system_instructions, model_settings, swords)
+        else:
+            await self.process_input_list(input, system_instructions, model_settings, swords)
+
+    async def process_input_list(
+        self,
+        input: str | list[InputItem],
+        system_instructions: str | None,
+        model_settings: ModelSettings,
+        swords: list[Sword],
+    ) -> None:
+        for item in input:
+            await self.process_input_items(item, system_instructions, model_settings, swords)
+
+    async def process_input_string(
+        self,
+        input: str | list[InputItem],
+        system_instructions: str | None,
+        model_settings: ModelSettings,
+        swords: list[Sword],
+    ) -> None:
+        await self.process_input_items(input, system_instructions, model_settings, swords)
+
+    async def process_input_items(
+        self,
+        input: str | list[InputItem],
+        system_instructions: str | None,
+        model_settings: ModelSettings,
+        swords: list[Sword],
+    ) -> None:
+        if isinstance(input, str):
+            await self.process_input_string(input, system_instructions, model_settings, swords)
+        else:
+            await self.process_input_items_list(input, system_instructions, model_settings, swords)
+
+    async def process_input_items_list(
+        self,
+        input: str | list[InputItem],
+        system_instructions: str | None,
+        model_settings: ModelSettings,
+        swords: list[Sword],
+    ) -> None:
+        for item in input:
+            await self.process_input_items(item, system_instructions, model_settings, swords)

@@ -23,7 +23,6 @@ from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET, logger
 from ..util._exceptions import AgentError, UsageError
 from ..util._items import (
     ModelResponse,
-    TResponseInputItem,
     TResponseOutputItem,
 )
 from ..util._types import (
@@ -33,6 +32,7 @@ from ..util._types import (
     ChatCompletionMessage,
     ChatCompletionMessageParam,
     ChatCompletionSwordParam,
+    InputItem,
     Response,
     ResponseEvent,
     ResponseFunctionSwordCall,
@@ -77,7 +77,7 @@ class ModelChatCompletionsModel(Model):
     async def get_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -118,7 +118,7 @@ class ModelChatCompletionsModel(Model):
     async def stream_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -186,7 +186,7 @@ class ModelChatCompletionsModel(Model):
     async def _fetch_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -399,7 +399,7 @@ class _Converter:
     @classmethod
     def items_to_messages(
         cls,
-        items: str | Iterable[TResponseInputItem],
+        items: str | Iterable[InputItem],
     ) -> list[ChatCompletionMessageParam]:
         if isinstance(items, str):
             return [{"role": "user", "content": items}]

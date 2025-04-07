@@ -16,7 +16,6 @@ from typing import (
     Concatenate,
     get_origin,
     get_type_hints,
-    overload,
 )
 
 from pydantic import BaseModel, Field, create_model
@@ -26,7 +25,12 @@ from ..util._constants import ERROR_MESSAGES
 from ..util._exceptions import ModelError, UsageError, create_error_handler
 from ..util._items import RunItem
 from ..util._strict_schema import ensure_strict_json_schema
-from ..util._types import MaybeAwaitable, RunContextWrapper, SwordFuncAsync, SwordFuncSync
+from ..util._types import (
+    MaybeAwaitable,
+    RunContextWrapper,
+    SwordFuncAsync,
+    SwordFuncSync,
+)
 
 #############################################################
 #  Sword System's Private Types Safety and Functionalities
@@ -74,39 +78,6 @@ def create_sword_decorator(
     sync_func_type: type,
     async_func_type: type,
 ):
-
-    @overload
-    def decorator(
-        func: sync_func_type,
-        *,
-        name_override: str | None = None,
-        description_override: str | None = None,
-        use_docstring_info: bool = True,
-        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-        strict_mode: bool = True,
-    ) -> sword_class: ...
-
-    @overload
-    def decorator(
-        func: async_func_type,
-        *,
-        name_override: str | None = None,
-        description_override: str | None = None,
-        use_docstring_info: bool = True,
-        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-        strict_mode: bool = True,
-    ) -> sword_class: ...
-
-    @overload
-    def decorator(
-        *,
-        name_override: str | None = None,
-        description_override: str | None = None,
-        use_docstring_info: bool = True,
-        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-        strict_mode: bool = True,
-    ) -> Callable[[sync_func_type | async_func_type], sword_class]: ...
-
     def decorator(
         func: sync_func_type | async_func_type | None = None,
         *,

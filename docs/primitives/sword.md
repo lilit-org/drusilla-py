@@ -37,7 +37,6 @@ the sword primitive is defined in the [src/gear/sword.py](../../src/gear/swords.
   - [running tests](#running-tests)
 - [advanced examples](#advanced-examples)
 
-
 <br>
 
 ---
@@ -100,44 +99,12 @@ the easiest way to create a sword is by using any python function. they can beco
 <br>
 
 ```python
+
 def create_sword_decorator(
     sword_class: type[Sword],
     sync_func_type: type,
     async_func_type: type,
 ):
-
-    @overload
-    def decorator(
-        func: sync_func_type,
-        *,
-        name_override: str | None = None,
-        description_override: str | None = None,
-        use_docstring_info: bool = True,
-        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-        strict_mode: bool = True,
-    ) -> sword_class: ...
-
-    @overload
-    def decorator(
-        func: async_func_type,
-        *,
-        name_override: str | None = None,
-        description_override: str | None = None,
-        use_docstring_info: bool = True,
-        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-        strict_mode: bool = True,
-    ) -> sword_class: ...
-
-    @overload
-    def decorator(
-        *,
-        name_override: str | None = None,
-        description_override: str | None = None,
-        use_docstring_info: bool = True,
-        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-        strict_mode: bool = True,
-    ) -> Callable[[sync_func_type | async_func_type], sword_class]: ...
-
     def decorator(
         func: sync_func_type | async_func_type | None = None,
         *,

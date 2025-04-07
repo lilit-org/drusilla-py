@@ -39,10 +39,10 @@ from ..util._items import (
     RunItem,
     SwordCallItem,
     SwordCallOutputItem,
-    TResponseInputItem,
 )
 from ..util._stream_events import RunItemStreamEvent, StreamEvent
 from ..util._types import (
+    InputItem,
     QueueCompleteSentinel,
     ResponseFunctionSwordCall,
     RunContextWrapper,
@@ -99,7 +99,7 @@ class NextStepRunAgain:
 
 @dataclass
 class SingleStepResult:
-    original_input: str | list[TResponseInputItem]
+    original_input: str | list[InputItem]
     model_response: ModelResponse
     pre_step_items: list[RunItem]
     new_step_items: list[RunItem]
@@ -132,7 +132,7 @@ class RunImpl:
         cls,
         *,
         agent: Agent[TContext],
-        original_input: str | list[TResponseInputItem],
+        original_input: str | list[InputItem],
         pre_step_items: list[RunItem],
         new_response: ModelResponse,
         processed_response: ProcessedResponse,
@@ -351,7 +351,7 @@ class RunImpl:
         cls,
         *,
         agent: Agent[TContext],
-        original_input: str | list[TResponseInputItem],
+        original_input: str | list[InputItem],
         pre_step_items: list[RunItem],
         new_step_items: list[RunItem],
         new_response: ModelResponse,
@@ -444,7 +444,7 @@ class RunImpl:
         cls,
         *,
         agent: Agent[TContext],
-        original_input: str | list[TResponseInputItem],
+        original_input: str | list[InputItem],
         new_response: ModelResponse,
         pre_step_items: list[RunItem],
         new_step_items: list[RunItem],
@@ -483,7 +483,7 @@ class RunImpl:
         cls,
         agent: Agent[Any],
         shield: InputShield[TContext],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         context: RunContextWrapper[TContext],
     ) -> InputShieldResult:
         return await shield.run(agent, input, context)

@@ -131,7 +131,7 @@ class ErrorMessage:
 @dataclass(frozen=True)
 class ErrorMessages:
     SWORD_ERROR: ErrorMessage = ErrorMessage(
-        message=os.getenv("SWORD_ERROR_MESSAGE", "❌ Error while running a sword: {error}"),
+        message=os.getenv("SWORD_ERROR_MESSAGE", "❌ Sword error: {error}"),
         used_in="src/gear/sword.py",
     )
     RUN_CONTEXT_ERROR: ErrorMessage = ErrorMessage(

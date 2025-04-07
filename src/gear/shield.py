@@ -13,14 +13,22 @@ Key Components:
 from __future__ import annotations
 
 import inspect
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic, overload
+from typing import TYPE_CHECKING, Any, Generic
 
 from ..util._constants import ERROR_MESSAGES
 from ..util._exceptions import UsageError
-from ..util._items import TResponseInputItem
-from ..util._types import MaybeAwaitable, RunContextWrapper, T, TContext, TContext_co
+from ..util._types import (
+    InputItem,
+    MaybeAwaitable,
+    ResponseInputItemParam,
+    RunContextWrapper,
+    T,
+    TContext,
+    TContext_co,
+    create_decorator_factory,
+)
 
 if TYPE_CHECKING:
     from ..agents.agent import Agent
@@ -33,9 +41,12 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ShieldResult:
-    """Result from a shield function."""
+    """Result of a shield validation operation."""
 
-    tripwire_triggered: bool
+    success: bool
+    message: str | None = None
+    data: Any | None = None
+    tripwire_triggered: bool = False
     result: Any | None = None
 
 
@@ -82,6 +93,14 @@ class BaseShield(Generic[T, TContext]):
         return output
 
 
+def create_shield_decorator(
+    shield_class: type[BaseShield[TContext_co, Any]],
+    sync_func_type: type,
+    async_func_type: type,
+):
+    return create_decorator_factory(shield_class, sync_func_type, async_func_type)
+
+
 ########################################################
 #          Dataclasses for Input Shields
 ########################################################
@@ -94,30 +113,47 @@ class InputShieldResult:
     tripwire_triggered: bool
     shield: Any
     agent: Agent[Any]
-    input: str | list[TResponseInputItem]
+    input: str | list[InputItem]
     output: ShieldResult
     result: Any | None = None
 
 
-class InputShield(BaseShield[str | list[TResponseInputItem], TContext]):
+class InputShield(BaseShield[str | list[InputItem], TContext]):
     """Shield that validates agent input before execution."""
 
     async def run(
         self,
         context: RunContextWrapper[TContext],
         agent: Agent[Any],
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
     ) -> InputShieldResult:
         result = await self._run_common(context, agent, input)
         return InputShieldResult(
-            tripwire_triggered=result.tripwire_triggered,
-            result=result.result,
+            tripwire_triggered=not result.success or result.tripwire_triggered,
+            result=result.message if not result.success else result.data,
             shield=self,
             agent=agent,
             input=input,
             output=result,
         )
 
+
+# typeclass for input shield
+InputShieldFuncSync = Callable[
+    [RunContextWrapper[TContext_co], "Agent[Any]", str | list[ResponseInputItemParam]],
+    ShieldResult,
+]
+InputShieldFuncAsync = Callable[
+    [RunContextWrapper[TContext_co], "Agent[Any]", str | list[ResponseInputItemParam]],
+    MaybeAwaitable[ShieldResult],
+]
+
+# decorator for input shield
+input_shield = create_shield_decorator(
+    InputShield,
+    InputShieldFuncSync,
+    InputShieldFuncAsync,
+)
 
 ########################################################
 #          Dataclasses for Output Shields
@@ -147,8 +183,8 @@ class OutputShield(BaseShield[Any, TContext]):
     ) -> OutputShieldResult:
         result = await self._run_common(context, agent, agent_output)
         return OutputShieldResult(
-            tripwire_triggered=result.tripwire_triggered,
-            result=result.result,
+            tripwire_triggered=not result.success or result.tripwire_triggered,
+            result=result.message if not result.success else result.data,
             shield=self,
             agent=agent,
             agent_output=agent_output,
@@ -156,95 +192,19 @@ class OutputShield(BaseShield[Any, TContext]):
         )
 
 
-########################################################
-#       Decorator factory for shield
-########################################################
-
-
-def create_shield_decorator(
-    shield_class: type[BaseShield[TContext_co, Any]],
-    sync_func_type: type,
-    async_func_type: type,
-):
-
-    @overload
-    def decorator(
-        func: sync_func_type,
-    ) -> shield_class: ...
-
-    @overload
-    def decorator(
-        func: async_func_type,
-    ) -> shield_class: ...
-
-    @overload
-    def decorator(
-        *,
-        name: str | None = None,
-    ) -> Callable[
-        [sync_func_type | async_func_type],
-        shield_class,
-    ]: ...
-
-    def decorator(
-        func: sync_func_type | async_func_type | None = None,
-        *,
-        name: str | None = None,
-    ) -> (
-        shield_class
-        | Callable[
-            [sync_func_type | async_func_type],
-            shield_class,
-        ]
-    ):
-        def create_shield(
-            f: sync_func_type | async_func_type,
-        ) -> shield_class:
-            return shield_class(shield_function=f, name=name)
-
-        if func is not None:
-            return create_shield(func)
-        return create_shield
-
-    return decorator
-
-
-########################################################
-#        Type aliases for Input Shields
-########################################################
-
-
-_InputShieldFuncSync = Callable[
-    [RunContextWrapper[TContext_co], "Agent[Any]", str | list[TResponseInputItem]],
-    ShieldResult,
-]
-_InputShieldFuncAsync = Callable[
-    [RunContextWrapper[TContext_co], "Agent[Any]", str | list[TResponseInputItem]],
-    Awaitable[ShieldResult],
-]
-
-input_shield = create_shield_decorator(
-    InputShield,
-    _InputShieldFuncSync,
-    _InputShieldFuncAsync,
-)
-
-
-########################################################
-#        Type aliases for Output Shields
-########################################################
-
-_OutputShieldFuncSync = Callable[
+# typeclass for output shield
+OutputShieldFuncSync = Callable[
     [RunContextWrapper[TContext_co], "Agent[Any]", Any],
     ShieldResult,
 ]
-_OutputShieldFuncAsync = Callable[
+OutputShieldFuncAsync = Callable[
     [RunContextWrapper[TContext_co], "Agent[Any]", Any],
-    Awaitable[ShieldResult],
+    MaybeAwaitable[ShieldResult],
 ]
 
+# decorator for output shield
 output_shield = create_shield_decorator(
     OutputShield,
-    _OutputShieldFuncSync,
-    _OutputShieldFuncAsync,
+    OutputShieldFuncSync,
+    OutputShieldFuncAsync,
 )

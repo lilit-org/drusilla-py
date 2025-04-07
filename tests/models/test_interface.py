@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,15 +11,18 @@ from src.gear.orbs import Orbs
 from src.gear.sword import Sword
 from src.models.interface import Model, ModelProvider
 from src.models.settings import ModelSettings
-from src.util._items import ModelResponse, TResponseInputItem
-from src.util._types import ResponseStreamEvent, Usage
+from src.util._items import ModelResponse
+from src.util._types import InputItem, ResponseStreamEvent, Usage
+
+if TYPE_CHECKING:
+    pass
 
 
 class MockModel(Model):
     async def get_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,
@@ -31,7 +37,7 @@ class MockModel(Model):
     async def stream_response(
         self,
         system_instructions: str | None,
-        input: str | list[TResponseInputItem],
+        input: str | list[InputItem],
         model_settings: ModelSettings,
         swords: list[Sword],
         output_schema: AgentOutputSchema | None,

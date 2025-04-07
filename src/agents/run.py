@@ -40,10 +40,10 @@ from ..util._exceptions import (
     ModelError,
     OutputShieldError,
 )
-from ..util._items import ItemHelpers, ModelResponse, RunItem, TResponseInputItem
+from ..util._items import ItemHelpers, ModelResponse, RunItem
 from ..util._result import RunResult, RunResultStreaming
 from ..util._stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
-from ..util._types import ResponseEvent, RunContextWrapper, TContext, Usage
+from ..util._types import ResponseEvent, RunContextWrapper, TContext, TResponseInputItem, Usage
 from .agent import Agent
 from .output import AgentOutputSchema
 from .run_impl import (
