@@ -1,10 +1,15 @@
 from dataclasses import dataclass
 
 from src.util._items import (
+    THINK_END,
+    THINK_START,
     ItemHelpers,
     MessageOutputItem,
     ModelResponse,
     OrbsCallItem,
+    OrbsOutputItem,
+    ReasoningItem,
+    ResponseReasoningItem,
     SwordCallItem,
     SwordCallOutputItem,
 )
@@ -165,3 +170,120 @@ def test_item_helpers_sword_call_output_item():
     assert result["type"] == "function_call_output"
     assert result["call_id"] == "test_call_id"
     assert result["output"] == "test output"
+
+
+def test_orbs_output_item():
+    """Test OrbsOutputItem creation and attributes."""
+    source_agent = MockAgent(name="source_agent")
+    target_agent = MockAgent(name="target_agent")
+    input_param = ResponseInputItemParam(type="message", content="test content", role="user")
+
+    item = OrbsOutputItem(
+        agent=source_agent,
+        raw_item=input_param,
+        source_agent=source_agent,
+        target_agent=target_agent,
+    )
+    assert item.type == "orbs_output_item"
+    assert item.raw_item == input_param
+    assert item.source_agent == source_agent
+    assert item.target_agent == target_agent
+
+
+def test_reasoning_item():
+    """Test ReasoningItem creation and attributes."""
+    agent = MockAgent(name="test_agent")
+    reasoning_item = ResponseReasoningItem(
+        type="reasoning", content="test reasoning content", step=1
+    )
+
+    item = ReasoningItem(agent=agent, raw_item=reasoning_item)
+    assert item.type == "reasoning_item"
+    assert item.raw_item == reasoning_item
+
+
+def test_item_helpers_extract_last_text():
+    """Test ItemHelpers.extract_last_text method."""
+    # Test case 1: Empty message
+    empty_message = ResponseOutput(type="message", content=[])
+    assert ItemHelpers.extract_last_text(empty_message) is None
+
+    # Test case 2: Text content
+    text_message = ResponseOutput(
+        type="message", content=[{"type": "output_text", "text": "Hello"}]
+    )
+    assert ItemHelpers.extract_last_text(text_message) == "Hello"
+
+    # Test case 3: Non-text content
+    refusal_message = ResponseOutput(
+        type="message", content=[{"type": "refusal", "refusal": "I cannot do that"}]
+    )
+    assert ItemHelpers.extract_last_text(refusal_message) is None
+
+
+def test_item_helpers_text_message_outputs():
+    """Test ItemHelpers.text_message_outputs method."""
+    agent = MockAgent(name="test_agent")
+
+    # Test case 1: Empty list
+    assert ItemHelpers.text_message_outputs([]) == ""
+
+    # Test case 2: Single message
+    message_item = MessageOutputItem(
+        agent=agent,
+        raw_item=ResponseOutput(type="message", content=[{"type": "output_text", "text": "Hello"}]),
+    )
+    assert ItemHelpers.text_message_outputs([message_item]) == "Hello"
+
+    # Test case 3: Multiple messages
+    message_item2 = MessageOutputItem(
+        agent=agent,
+        raw_item=ResponseOutput(type="message", content=[{"type": "output_text", "text": "World"}]),
+    )
+    assert ItemHelpers.text_message_outputs([message_item, message_item2]) == "Hello World"
+
+
+def test_item_helpers_text_message_output():
+    """Test ItemHelpers.text_message_output method."""
+    agent = MockAgent(name="test_agent")
+
+    # Test case 1: Empty content
+    empty_item = MessageOutputItem(agent=agent, raw_item=ResponseOutput(type="message", content=[]))
+    assert ItemHelpers.text_message_output(empty_item) == ""
+
+    # Test case 2: Single text content
+    text_item = MessageOutputItem(
+        agent=agent,
+        raw_item=ResponseOutput(type="message", content=[{"type": "output_text", "text": "Hello"}]),
+    )
+    assert ItemHelpers.text_message_output(text_item) == "Hello"
+
+    # Test case 3: Multiple text contents
+    multi_item = MessageOutputItem(
+        agent=agent,
+        raw_item=ResponseOutput(
+            type="message",
+            content=[
+                {"type": "output_text", "text": "Hello"},
+                {"type": "output_text", "text": "World"},
+            ],
+        ),
+    )
+    assert ItemHelpers.text_message_output(multi_item) == "Hello World"
+
+
+def test_item_helpers_format_content():
+    """Test ItemHelpers.format_content method."""
+    # Test case 1: Empty content
+    assert ItemHelpers.format_content("") == ""
+
+    # Test case 2: Simple content
+    assert ItemHelpers.format_content("Hello") == "Hello"
+
+    # Test case 3: Content with special lines
+    content = f"{THINK_START}Thinking{THINK_END}"
+    assert ItemHelpers.format_content(content) == "Thinking"
+
+    # Test case 4: Content with multiple sections
+    content = f"{THINK_START}First thought{THINK_END}\n{THINK_START}Second thought{THINK_END}"
+    assert ItemHelpers.format_content(content) == "First thought\nSecond thought"

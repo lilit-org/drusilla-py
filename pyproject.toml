@@ -1,5 +1,5 @@
 [project]
-name = "noctira"
+name = "drusilla"
 version = "0.0.1"
 description = "Lilit's Decentralized Agentic Framework"
 readme = "README.md"
@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [tool.poetry]
-name = "noctira"
+name = "drusilla"
 version = "0.0.1"
 description = "Lilit's Decentralized Agentic Framework"
 authors = ["bt3gl"]

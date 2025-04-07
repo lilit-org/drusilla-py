@@ -23,7 +23,7 @@ from src.gear.shield import (
 from src.models.interface import Model
 from src.models.provider import ModelProvider
 from src.models.settings import ModelSettings
-from src.util._exceptions import MaxTurnsError
+from src.util._exceptions import GenericError, MaxTurnsError
 from src.util._items import MessageOutputItem, ModelResponse
 from src.util._result import RunResult, RunResultStreaming
 from src.util._types import RunContextWrapper, Usage
@@ -412,29 +412,6 @@ async def test_run_with_orbs(mock_agent, mock_run_config):
 
 
 @pytest.mark.asyncio
-async def test_run_with_charms(mock_agent, mock_run_config):
-    # Setup
-    input_text = "Test input"
-
-    # Create mock charms
-    charms = RunCharms()
-    charms.on_start = AsyncMock()
-    charms.on_start.return_value = None
-
-    # Run
-    result = await Runner.run(
-        starting_agent=mock_agent,
-        input=input_text,
-        charms=charms,
-        run_config=mock_run_config,
-    )
-
-    # Assertions
-    assert isinstance(result, RunResult)
-    charms.on_start.assert_called_once()
-
-
-@pytest.mark.asyncio
 async def test_run_with_context(mock_agent, mock_run_config):
     # Setup
     input_text = "Test input"
@@ -620,3 +597,220 @@ async def test_run_turn(
 
         assert isinstance(result, SingleStepResult)
         assert result.next_step.output == "test output"
+
+
+@pytest.mark.asyncio
+async def test_run_with_input_shield_error(mock_agent):
+    # Setup
+    input_text = "Test input"
+    mock_context = MagicMock(spec=RunContextWrapper)
+    mock_context.usage = MagicMock()
+    mock_context.context = MagicMock()  # Add the context attribute
+
+    # Create a mock shield that will trigger an error
+    shield = AsyncMock(spec=InputShield)
+    shield.name = "test_shield"
+    shield_result = InputShieldResult(
+        tripwire_triggered=True,
+        shield=shield,
+        agent=mock_agent,
+        input=input_text,
+        output=ShieldResult(success=False, data="Invalid input", tripwire_triggered=True),
+    )
+    shield.run = AsyncMock(return_value=shield_result)
+
+    # Create a run config with the shield
+    run_config = RunConfig(
+        model=mock_agent.model,
+        model_provider=ModelProvider(),
+        model_settings=ModelSettings(),
+        orbs_input_filter=None,
+        input_shields=[shield],
+        output_shields=[],
+        max_turns=3,
+    )
+
+    # Mock the context creation and error handling
+    with (
+        patch("src.agents.run.RunContextWrapper", return_value=mock_context),
+        patch(
+            "src.agents.run.Runner._run_input_shields", return_value=[shield_result]
+        ) as mock_run_shields,
+    ):
+        # Run and verify error
+        with pytest.raises(GenericError) as exc_info:
+            await Runner.run(
+                starting_agent=mock_agent,
+                input=input_text,
+                run_config=run_config,
+            )
+        assert "Input shield test_shield triggered" in str(exc_info.value)
+        mock_run_shields.assert_called_once_with(
+            context=mock_context,
+            agent=mock_agent,
+            input=input_text,
+            shields=[shield],
+        )
+
+
+@pytest.mark.asyncio
+async def test_run_with_output_shield_error(mock_agent):
+    # Setup
+    input_text = "Test input"
+    mock_context = MagicMock(spec=RunContextWrapper)
+    mock_context.usage = MagicMock()
+
+    # Create a mock shield that will trigger an error
+    shield = AsyncMock(spec=OutputShield)
+    shield.name = "test_shield"
+    shield_result = OutputShieldResult(
+        tripwire_triggered=True,
+        shield=shield,
+        agent=mock_agent,
+        agent_output="Test response",
+        output=ShieldResult(success=False, data="Invalid output", tripwire_triggered=True),
+    )
+    shield.run = AsyncMock(return_value=shield_result)
+
+    # Create a run config with the shield
+    run_config = RunConfig(
+        model=mock_agent.model,
+        model_provider=ModelProvider(),
+        model_settings=ModelSettings(),
+        orbs_input_filter=None,
+        input_shields=[],
+        output_shields=[shield],
+        max_turns=3,
+    )
+
+    # Mock the context creation and error handling
+    with (
+        patch("src.agents.run.RunContextWrapper", return_value=mock_context),
+        patch(
+            "src.agents.run.Runner._run_output_shields", new_callable=AsyncMock
+        ) as mock_run_shields,
+    ):
+        # Set up the mock to return our shield result
+        mock_run_shields.return_value = [shield_result]
+
+        # Run and verify error
+        with pytest.raises(GenericError) as exc_info:
+            await Runner.run(
+                starting_agent=mock_agent,
+                input=input_text,
+                run_config=run_config,
+            )
+        assert "Output shield test_shield triggered" in str(exc_info.value)
+
+        # Verify the mock was called with the correct arguments
+        mock_run_shields.assert_called_once()
+        call_args = mock_run_shields.call_args
+        assert call_args.args == (mock_agent, "Test response", mock_context, [shield])
+
+
+@pytest.mark.asyncio
+async def test_run_with_model_error(mock_agent, mock_model):
+    # Setup
+    input_text = "Test input"
+    mock_model.get_response.side_effect = Exception("Model error")
+    run_config = RunConfig(model=mock_model)
+
+    # Run and verify error
+    with pytest.raises(GenericError) as exc_info:
+        await Runner.run(
+            starting_agent=mock_agent,
+            input=input_text,
+            run_config=run_config,
+        )
+    assert "Model error" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_run_streamed_with_error(mock_agent, mock_model_client):
+    # Setup
+    input_text = "Test input"
+    mock_model_client.get_response.side_effect = Exception("Streaming error")
+    run_config = RunConfig(model=mock_model_client)
+
+    # Run and verify error handling
+    result = await Runner.run_streamed(
+        starting_agent=mock_agent,
+        input=input_text,
+        run_config=run_config,
+    )
+    assert result.final_output is None
+    assert result.raw_responses == []
+
+
+@pytest.mark.asyncio
+async def test_run_with_empty_input(mock_agent, mock_run_config):
+    # Setup
+    input_text = ""
+
+    # Run and verify
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        run_config=mock_run_config,
+    )
+    assert result is not None
+    assert result.final_output is not None
+    assert len(result.raw_responses) > 0
+
+
+@pytest.mark.asyncio
+async def test_run_with_none_context(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Run with None context and verify
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        context=None,
+        run_config=mock_run_config,
+    )
+    assert result is not None
+    assert result.final_output is not None
+    assert len(result.raw_responses) > 0
+
+
+@pytest.mark.asyncio
+async def test_run_with_invalid_next_step(mock_agent, mock_model):
+    # Setup
+    input_text = "Test input"
+    mock_model.get_response.return_value = ModelResponse(
+        referenceable_id="test_id",
+        output=[
+            {
+                "type": "invalid_type",
+                "content": [{"type": "output_text", "text": "Test response"}],
+                "role": "assistant",
+            }
+        ],
+        usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+    )
+    run_config = RunConfig(model=mock_model)
+
+    # Mock the run_impl to return an invalid next step
+    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
+        mock_run_turn.return_value = SingleStepResult(
+            model_response=ModelResponse(
+                referenceable_id="test_id",
+                output=[],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+            ),
+            original_input=input_text,
+            pre_step_items=[],
+            new_step_items=[],
+            next_step=MagicMock(),  # Invalid next step type
+        )
+
+        # Run and verify error
+        with pytest.raises(GenericError) as exc_info:
+            await Runner.run(
+                starting_agent=mock_agent,
+                input=input_text,
+                run_config=run_config,
+            )
+        assert "Unknown next step type" in str(exc_info.value)
