@@ -89,7 +89,7 @@ class BaseShield(Generic[T, TContext]):
         data: T,
     ) -> ShieldResult:
         if not callable(self.shield_function):
-            error_msg = ERROR_MESSAGES.SHIELD_FUNCTION_ERROR.message.format(
+            error_msg = ERROR_MESSAGES.SHIELD_ERROR.message.format(
                 error=self.shield_function
             )
             raise UsageError(error_msg)

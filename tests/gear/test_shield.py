@@ -156,7 +156,7 @@ async def test_shield_error_handling(mock_context: RunContextWrapper[Any], mock_
     """Test shield error handling."""
     with pytest.raises(
         UsageError,
-        match=ERROR_MESSAGES.SHIELD_FUNCTION_ERROR.message.format(error="not a function"),
+        match=ERROR_MESSAGES.SHIELD_ERROR.message.format(error="not a function"),
     ):
         shield = InputShield(shield_function="not a function")
         await shield.run(mock_context, mock_agent, "test input")
