@@ -218,11 +218,37 @@ class ItemHelpers:
 
     @staticmethod
     def extract_last_text(message: TResponseOutputItem) -> str | None:
-        if hasattr(message, "type") and message.type == MESSAGE_TYPE:
-            last_content = message.content[-1]
-            if last_content.type == OUTPUT_TEXT_TYPE:
-                return last_content.text
-        return None
+        try:
+            message_type = (
+                message.get("type") if isinstance(message, dict) else getattr(message, "type", None)
+            )
+            if message_type != MESSAGE_TYPE:
+                return None
+
+            content = (
+                message.get("content", [])
+                if isinstance(message, dict)
+                else getattr(message, "content", [])
+            )
+            if not content:
+                return None
+
+            last_content = content[-1]
+            content_type = (
+                last_content.get("type")
+                if isinstance(last_content, dict)
+                else getattr(last_content, "type", None)
+            )
+
+            if content_type == OUTPUT_TEXT_TYPE:
+                return (
+                    last_content.get("text", "")
+                    if isinstance(last_content, dict)
+                    else getattr(last_content, "text", "")
+                )
+            return None
+        except (AttributeError, IndexError, KeyError):
+            return None
 
     @staticmethod
     def input_to_new_input_list(

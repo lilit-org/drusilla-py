@@ -24,7 +24,7 @@ install:
 
 .PHONY: test
 test:
-	poetry run pytest
+	poetry run pytest tests/ --cov=src --cov-report=term-missing
 
 .PHONY: lint
 lint:

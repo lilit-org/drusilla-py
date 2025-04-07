@@ -96,7 +96,15 @@ def create_shield_decorator(
     sync_func_type: type,
     async_func_type: type,
 ):
-    return create_decorator_factory(shield_class, sync_func_type, async_func_type)
+    return create_decorator_factory(
+        shield_class,
+        sync_func_type,
+        async_func_type,
+        constructor_params={
+            "shield_function": None,
+            "name": None,
+        },
+    )
 
 
 ########################################################

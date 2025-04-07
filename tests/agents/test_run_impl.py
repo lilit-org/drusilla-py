@@ -16,7 +16,7 @@ from src.agents.run_impl import (
     SwordRunFunction,
     SwordRunOrbs,
 )
-from src.gear.charm import RunCharms
+from src.gear.charms import RunCharms
 from src.gear.orbs import Orbs
 from src.gear.sword import Sword
 from src.models.chat import ModelChatCompletionsModel

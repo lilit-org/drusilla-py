@@ -12,7 +12,6 @@ there are two types of shields:
 - `InputShield`: validates and sanitizes agent input before execution
 - `OutputShield`: validates and formats agent output after execution
 
-
 <br>
 
 ---
@@ -113,7 +112,15 @@ def create_shield_decorator(
     sync_func_type: type,
     async_func_type: type,
 ):
-    return create_decorator_factory(shield_class, sync_func_type, async_func_type)
+    return create_decorator_factory(
+        shield_class,
+        sync_func_type,
+        async_func_type,
+        constructor_params={
+            "shield_function": None,
+            "name": None,
+        },
+    )
 ```
 
 <br>
@@ -397,6 +404,8 @@ SHIELD_ERROR_HANDLER = create_error_handler(ERROR_MESSAGES.SHIELD_ERROR.message)
 `create_error_handler()` is a method defined in [util/_exceptions.py](../../src/util/_exceptions.py) and is not intended to be modified. however, the string `ERROR_MESSAGES.SHIELD_ERROR.message` (which is imported from [util/_constants.py](../../src/util/_constants.py)) can be directly customized inside your [`.env`](../../.env.example).
 
 <br>
+
+---
 
 ### running tests
 

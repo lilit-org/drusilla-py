@@ -7,8 +7,10 @@ from pydantic import BaseModel
 
 from src.agents.agent import Agent
 from src.gear.orbs import Orbs, OrbsInputData, orbs
+from src.util._constants import ERROR_MESSAGES
 from src.util._exceptions import UsageError
-from src.util._types import RunContextWrapper
+from src.util._items import MessageOutputItem
+from src.util._types import ResponseInputItemParam, RunContextWrapper
 
 
 class OrbsTestInput(BaseModel):
@@ -20,122 +22,218 @@ class OrbsTestInput(BaseModel):
 class MockAgent(Agent[Any]):
     """Mock agent for testing."""
 
-    def __init__(self, name: str = "test_agent"):
+    def __init__(self, name: str = "test_agent", orbs_description: str = "Test agent description"):
         super().__init__(name=name)
-        self.orbs_description = "Test agent description"
+        self.orbs_description = orbs_description
 
 
 @pytest.fixture
-def mock_agent() -> MockAgent:
+def mock_agent():
     """Fixture for creating a mock agent."""
     return MockAgent()
 
 
 @pytest.fixture
-def mock_context() -> RunContextWrapper[Any]:
+def mock_context():
     """Fixture for creating a mock context."""
-    return RunContextWrapper(context={})
+    return RunContextWrapper(context={}, usage=None)
 
 
-def test_orbs_default_sword_name(mock_agent: MockAgent):
-    """Test the default sword name generation."""
-    expected_name = "transfer_to_test_agent"
-    assert Orbs.default_sword_name(mock_agent) == expected_name
-
-
-def test_orbs_default_sword_description(mock_agent: MockAgent):
-    """Test the default sword description generation."""
-    expected_description = (
-        "Orbs to the test_agent agent to handle the request. Test agent description"
+@pytest.fixture
+def sample_input_data(mock_agent):
+    """Fixture for creating sample input data."""
+    input_item: ResponseInputItemParam = {
+        "type": "message",
+        "content": "test history",
+        "role": "user",
+    }
+    return OrbsInputData(
+        input_history=(input_item,),
+        pre_orbs_items=(
+            MessageOutputItem(
+                agent=mock_agent,
+                raw_item={
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": "pre item"}],
+                },
+            ),
+        ),
+        new_items=(
+            MessageOutputItem(
+                agent=mock_agent,
+                raw_item={
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": "new item"}],
+                },
+            ),
+        ),
     )
-    assert Orbs.default_sword_description(mock_agent) == expected_description
 
 
 @pytest.mark.asyncio
-async def test_orbs_without_input(mock_agent: MockAgent, mock_context: RunContextWrapper[Any]):
-    """Test creating orbs without input."""
-    orb = orbs(
-        mock_agent,
+async def test_orbs_creation_and_defaults(
+    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
+):
+    """Test basic orbs creation and default values."""
+    orb = Orbs(
+        on_invoke_orbs=lambda ctx, input_json=None: mock_agent,
+        name="test_orbs",
+        description="Test orbs description",
     )
 
-    assert orb.sword_name == "transfer_to_test_agent"
-    assert (
-        orb.sword_description
-        == "Orbs to the test_agent agent to handle the request. Test agent description"
-    )
-    assert orb.input_json_schema == {
-        "additionalProperties": False,
-        "properties": {},
-        "required": [],
-        "type": "object",
-    }
-    assert orb.agent_name == "test_agent"
+    assert isinstance(orb, Orbs)
+    assert orb.name == "test_orbs"
+    assert orb.description == "Test orbs description"
+    assert orb.input_json_schema is None
     assert orb.input_filter is None
 
-    # Test invoking the orbs
-    result = await orb.on_invoke_orbs(mock_context)
-    assert result == mock_agent
+    # Test default name and description
+    assert Orbs.default_name(mock_agent) == "transfer_to_test_agent"
+    assert (
+        Orbs.default_description(mock_agent)
+        == "Orbs to the test_agent agent to handle the request. Test agent description"
+    )
 
 
 @pytest.mark.asyncio
-async def test_orbs_with_input(mock_agent: MockAgent, mock_context: RunContextWrapper[Any]):
-    """Test creating orbs with input."""
+async def test_orbs_with_input_schema(mock_agent: MockAgent, mock_context: RunContextWrapper[Any]):
+    """Test orbs with input schema and validation."""
 
-    async def on_orbs(ctx: RunContextWrapper[Any], input_data: OrbsTestInput) -> None:
+    async def test_orbs(ctx: RunContextWrapper[Any], input_data: OrbsTestInput) -> None:
         assert ctx == mock_context
         assert input_data.message == "test message"
 
-    orb = orbs(
-        mock_agent,
-        on_orbs=on_orbs,
-        input_type=OrbsTestInput,
+    # Create orbs instance with input schema
+    orb = Orbs(
+        on_invoke_orbs=lambda ctx, input_json=None: mock_agent,
+        name="test_orbs",
+        description="Test orbs description",
+        input_json_schema=OrbsTestInput.model_json_schema(),
     )
 
-    assert orb.sword_name == "transfer_to_test_agent"
-    assert (
-        orb.sword_description
-        == "Orbs to the test_agent agent to handle the request. Test agent description"
-    )
-    assert "message" in orb.input_json_schema["properties"]
-    assert orb.agent_name == "test_agent"
-    assert orb.input_filter is None
-
-    # Test invoking the orbs
-    result = await orb.on_invoke_orbs(mock_context, '{"message": "test message"}')
-    assert result == mock_agent
+    assert orb.input_json_schema is not None
+    assert orb.input_json_schema["title"] == "OrbsTestInput"
 
 
-def test_orbs_input_filter():
-    """Test the input filter functionality."""
+def test_orbs_input_data_creation(sample_input_data):
+    """Test OrbsInputData creation and properties."""
+    assert isinstance(sample_input_data, OrbsInputData)
+    assert sample_input_data.input_history[0]["content"] == "test history"
+    assert len(sample_input_data.pre_orbs_items) == 1
+    assert len(sample_input_data.new_items) == 1
+    assert sample_input_data.pre_orbs_items[0].text_content == "pre item"
+    assert sample_input_data.new_items[0].text_content == "new item"
+
+
+def test_orbs_input_filter_with_data(sample_input_data, mock_agent):
+    """Test the input filter functionality with actual data."""
 
     def input_filter(data: OrbsInputData) -> OrbsInputData:
-        return data
+        # Modify the input data
+        new_item: ResponseInputItemParam = {
+            "type": "message",
+            "content": "modified",
+            "role": "user",
+        }
+        return OrbsInputData(
+            input_history=data.input_history + (new_item,),
+            pre_orbs_items=data.pre_orbs_items,
+            new_items=data.new_items,
+        )
 
-    orb = orbs(
-        MockAgent(),
+    orb = Orbs(
+        on_invoke_orbs=lambda ctx, input_json=None: None,
+        name="test_orbs",
         input_filter=input_filter,
     )
 
-    assert orb.input_filter == input_filter
+    filtered_data = orb.input_filter(sample_input_data)
+    assert filtered_data.input_history[0]["content"] == "test history"
+    assert filtered_data.input_history[1]["content"] == "modified"
+    assert filtered_data.pre_orbs_items == sample_input_data.pre_orbs_items
+    assert filtered_data.new_items == sample_input_data.new_items
 
 
-def test_orbs_validation_errors():
+def test_orbs_validation_errors(mock_agent):
     """Test validation errors in orbs creation."""
-    with pytest.raises(UsageError, match="on_orbs must take two arguments: context and input"):
-        # Should raise error when on_orbs takes wrong number of arguments
-        orbs(
-            MockAgent(),
-            on_orbs=lambda ctx, x, y: None,
-            input_type=str,
-        )
+
+    class InvalidInput:
+        """Invalid input class without model_json_schema."""
+
+    async def test_orbs(ctx: RunContextWrapper[Any], input_data: InvalidInput) -> None:
+        pass
+
+    # Add input_type to the function
+    test_orbs.input_type = InvalidInput
 
     with pytest.raises(
         UsageError,
-        match="You must provide either both on_input and input_type, or neither",
+        match=ERROR_MESSAGES.ORBS_ERROR.message.format(
+            error="type object 'InvalidInput' has no attribute 'model_json_schema'"
+        ),
     ):
-        # Should raise error when only one of on_orbs or input_type is provided
-        orbs(
-            MockAgent(),
-            on_orbs=lambda ctx: None,
-            input_type=None,
-        )
+        # Create orbs instance with invalid input type
+        orbs(mock_agent)(test_orbs)
+
+
+@pytest.mark.asyncio
+async def test_orbs_decorator_with_input(
+    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
+):
+    """Test the orbs decorator with input handling."""
+
+    @orbs(mock_agent)
+    async def test_orbs(ctx: RunContextWrapper[Any], input_data: OrbsTestInput) -> None:
+        assert ctx == mock_context
+        assert input_data.message == "test message"
+
+    # Add input_type to the function
+    test_orbs.input_type = OrbsTestInput
+
+    result = await test_orbs.on_invoke_orbs(mock_context, '{"message": "test message"}')
+    assert result == mock_agent
+
+
+@pytest.mark.asyncio
+async def test_orbs_decorator_without_input(
+    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
+):
+    """Test the orbs decorator without input."""
+
+    @orbs(mock_agent)
+    async def test_orbs(ctx: RunContextWrapper[Any]) -> None:
+        assert ctx == mock_context
+
+    result = await test_orbs.on_invoke_orbs(mock_context)
+    assert result == mock_agent
+
+
+@pytest.mark.asyncio
+async def test_orbs_decorator_sync_function(
+    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
+):
+    """Test the orbs decorator with a synchronous function."""
+
+    @orbs(mock_agent)
+    def test_orbs(ctx: RunContextWrapper[Any]) -> None:
+        assert ctx == mock_context
+
+    result = await test_orbs.on_invoke_orbs(mock_context)
+    assert result == mock_agent
+
+
+@pytest.mark.asyncio
+async def test_orbs_decorator_invalid_json(
+    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
+):
+    """Test the orbs decorator with invalid JSON input."""
+
+    @orbs(mock_agent)
+    async def test_orbs(ctx: RunContextWrapper[Any], input_data: OrbsTestInput) -> None:
+        pass
+
+    # Add input_type to the function
+    test_orbs.input_type = OrbsTestInput
+
+    with pytest.raises(UsageError):
+        await test_orbs.on_invoke_orbs(mock_context, '{"invalid": "json"}')

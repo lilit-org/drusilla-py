@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar, cast
 
 if TYPE_CHECKING:
-    from ..gear.charm import AgentCharms
+    from ..gear.charms import AgentCharms
     from ..gear.orbs import Orbs
     from ..models.interface import Model
 

@@ -106,7 +106,6 @@ the easiest way to create a sword is by using any python function. they can beco
 <br>
 
 ```python
-
 def create_sword_decorator(
     sword_class: type[Sword],
     sync_func_type: type,
@@ -537,7 +536,7 @@ async def run_sword_func(_ctx_: RunContextWrapper[Any], args: str) -> str:
 
 <br>
 
-a [charms](charm.md) (the agent's workflow) may use an agent to orchestrate a network of specialized agents (instead of handing off control). this can be done by modeling agents as swords.
+a [charms](charms.md) (the agent's workflow) may use an agent to orchestrate a network of specialized agents (instead of handing off control). this can be done by modeling agents as swords.
 
 a simple example is given on our [agent world traveler](../../examples/agents/world_traveler.py):
 
@@ -590,6 +589,8 @@ SWORD_ERROR_HANDLER = create_error_handler(ERROR_MESSAGES.SWORD_ERROR.message)
 `create_error_handler()` is a method defined inside [util/_exceptions.py](../../src/util/_exceptions.py) and is not intended to be modified. however, the string `ERROR_MESSAGES.SWORD_ERROR.message` (which is imported from [util/_constants.py](../../src/util/_constants.py)) can be directly customized inside your [`.env`](../../.env.example).
 
 <br>
+
+---
 
 ### running tests
 

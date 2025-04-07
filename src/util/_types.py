@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 TContext = TypeVar("TContext", default=Any)
 T = TypeVar("T")
 TContext_co = TypeVar("TContext_co", covariant=True)
+TOrbsInput = TypeVar("TOrbsInput", default=Any)
 MaybeAwaitable = Awaitable[T] | T
 TResponseInputItem: TypeAlias = "ResponseInputItemParam"
 """Type alias for response input items."""
@@ -43,6 +44,9 @@ def create_decorator_factory(
     base_class: type[Generic[TContext_co, Any]],
     sync_func_type: type,
     async_func_type: type,
+    *,
+    constructor_params: dict[str, Any] | None = None,
+    pre_init_hook: Callable[[Any, dict[str, Any]], dict[str, Any]] | None = None,
 ):
     """Create a decorator factory for classes that wrap functions.
 
@@ -50,6 +54,8 @@ def create_decorator_factory(
         base_class: The base class to instantiate
         sync_func_type: Type for synchronous functions
         async_func_type: Type for asynchronous functions
+        constructor_params: Default parameters for the constructor
+        pre_init_hook: Optional hook to modify parameters before instantiation
 
     Returns:
         A decorator that can be used to create instances from functions
@@ -57,8 +63,7 @@ def create_decorator_factory(
 
     def decorator(
         func: sync_func_type | async_func_type | None = None,
-        *,
-        name: str | None = None,
+        **kwargs: Any,
     ) -> (
         base_class
         | Callable[
@@ -69,7 +74,20 @@ def create_decorator_factory(
         def create_instance(
             f: sync_func_type | async_func_type,
         ) -> base_class:
-            return base_class(shield_function=f, name=name)
+            # Start with default constructor params
+            params = dict(constructor_params or {})
+
+            # Add the function as the first parameter
+            params[next(iter(params.keys()) if params else "function")] = f
+
+            # Add any additional kwargs
+            params.update(kwargs)
+
+            # Allow pre-init hook to modify params
+            if pre_init_hook:
+                params = pre_init_hook(f, params)
+
+            return base_class(**params)
 
         if func is not None:
             return create_instance(func)
