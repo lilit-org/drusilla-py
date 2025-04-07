@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      RUNNER_ERROR_MESSAGE: "Default error message"
     strategy:
       matrix:
         python-version: ["3.10", "3.11"]
