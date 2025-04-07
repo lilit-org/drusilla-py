@@ -14,7 +14,7 @@ swords are specialized tools that wrap python functions with enhanced capabiliti
 
 <br>
 
-the sword primitive is defined in the [src/gear/sword.py](../../src/gear/swords.py) module. swords can be defined by:
+the sword primitive is defined in the [src/gear/swords.py](../../src/gear/swords.py) module. swords can be defined by:
 
 - functions and decorators (function swords), or
 - an agent (agent swords)
@@ -35,7 +35,7 @@ the sword primitive is defined in the [src/gear/sword.py](../../src/gear/swords.
 - [tips and best practices](#tips-and-best-practices)
   - [customizing error messages](#customizing-error-messages)
   - [running tests](#running-tests)
-- [advanced examples](#advanced-examples)
+- [available examples](#available-examples)
 
 <br>
 
@@ -64,8 +64,15 @@ class Sword:
     failure_error_function: (
         Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]] | None
     ) = SWORD_ERROR_HANDLER
+```
 
+<br>
 
+in addition, results for `Sword` are in the form of:
+
+<br>
+
+```python
 @dataclass(frozen=True)
 class SwordResult:
     sword: Sword
@@ -85,7 +92,7 @@ where `RunItem` is a union type that represents different types of items that ca
 
 <br>
 
-the easiest way to create a sword is by using any python function. they can become a sword by attaching the decorator `@function_sword':
+the easiest way to create a sword is by using any python function. they can become a sword by attaching the decorator `@function_sword`:
 
 1. the name of the sword will be the name of the python function
 2. the description is the docstring of the function
@@ -150,6 +157,21 @@ function_sword = create_sword_decorator(
     SwordFuncAsync,
 )
 ```
+
+<br>
+
+the parameters for `Sword` (and its decorator) are:
+
+<br>
+
+| Parameter                  | Type                | Default              |
+|----------------------------|---------------------|----------------------|
+| `name_override`            | `str`               | `None`               |
+| `description_override`     | `str`               | `None`               |
+| `use_docstring_info`       | `bool`              | `True`               |
+| `failure_error_function`   | `SwordErrorFunction`| `SWORD_ERROR_HANDLER`|
+| `strict_mode`              | `bool`              | `True`               |
+
 
 <br>
 
@@ -461,6 +483,14 @@ def _create_pydantic_fields(
 
 <br>
 
+in summary, the decorator to create a `Sword` from a function and by default, it will:
+
+1. parse the function signature to create a `JSON` schema for the sword's parameters
+2. use the function's docstring to populate the sword's description
+3. use the function's docstring to populate argument descriptions (the docstring style is detected automatically, but it can be overriden)
+
+<br>
+
 ----
 
 ### creating a custom `Sword` object
@@ -478,7 +508,7 @@ alternatively, we might want to create a custom sword instead of using an existi
 
 note that, again, the function signature is parsed to extract the schema for the sword, and the docstring is parsed to extract descriptions for the sword and for individual arguments (defined by `FuncSchema` and `function_schema`).
 
-this pseudo code illustrate this approach (where `model_validate_json()` and `model_validate_json()` are pydantic methods):
+this pseudo code illustrates this approach (where `model_validate_json()` and `model_validate_json()` are pydantic methods):
 
 <br>
 
@@ -577,4 +607,8 @@ poetry run pytest tests/gear/test_sword.py -v
 
 ---
 
-## advanced examples
+## available examples
+
+<br>
+
+* [agent world traveler](../../examples/agents/world_traveler.py)

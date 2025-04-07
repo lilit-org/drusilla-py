@@ -133,7 +133,7 @@ def run_agent():
         print(f"\n✅ Using style: {style.value.replace('_', ' ').title()}")
         print(f"✅ Style description: {STYLE_INSTRUCTIONS[style]}\n")
 
-        msg = input("❓ Enter your message: ").strip()
+        msg = input("❓ Enter your message: ")
         result = Runner.run_sync(agent, msg, context=style)
         print(pretty_print_result(result))
         print(pretty_print_result_stats(result))

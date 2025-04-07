@@ -134,6 +134,48 @@ async def test_run_result_streaming_initialization(mock_streaming_result):
 
 
 @pytest.mark.asyncio
+async def test_run_result_streaming_input_stripping(mock_agent):
+    """Test that string input is properly stripped in RunResultStreaming."""
+    # Test with leading and trailing whitespace
+    result = RunResultStreaming(
+        input="  test input with spaces  ",
+        new_items=[],
+        raw_responses=[],
+        final_output=None,
+        input_shield_results=[],
+        output_shield_results=[],
+        current_agent=mock_agent,
+    )
+    assert result.input == "test input with spaces"
+
+    # Test with newlines
+    result = RunResultStreaming(
+        input="\ntest input with newlines\n",
+        new_items=[],
+        raw_responses=[],
+        final_output=None,
+        input_shield_results=[],
+        output_shield_results=[],
+        current_agent=mock_agent,
+    )
+    assert result.input == "test input with newlines"
+
+    # Test with list input (should not be stripped)
+    list_input = ["test item 1", "  test item 2  "]
+    result = RunResultStreaming(
+        input=list_input,
+        new_items=[],
+        raw_responses=[],
+        final_output=None,
+        input_shield_results=[],
+        output_shield_results=[],
+        current_agent=mock_agent,
+    )
+    assert result.input == list_input
+    assert result.input[1] == "  test item 2  "  # List items should not be stripped
+
+
+@pytest.mark.asyncio
 async def test_run_result_streaming_events(mock_streaming_result):
     """Test RunResultStreaming event streaming functionality."""
     result = mock_streaming_result

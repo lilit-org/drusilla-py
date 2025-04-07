@@ -67,11 +67,21 @@ class RunResultBase(abc.ABC):
 @dataclass(frozen=True)
 class RunResult(RunResultBase):
     _last_agent: Agent[Any]
+    input_shield_results: list[InputShieldResult]
+    output_shield_results: list[OutputShieldResult]
+    final_output: Any
     is_complete: bool = True
 
     @property
     def last_agent(self) -> Agent[Any]:
         return self._last_agent
+
+    def __post_init__(self):
+        """Initialize the final output field."""
+        if not hasattr(self, "final_output"):
+            object.__setattr__(self, "final_output", self.final_output)
+        if isinstance(self.input, str):
+            object.__setattr__(self, "input", self.input.strip())
 
 
 @dataclass
@@ -80,12 +90,12 @@ class RunResultStreaming:
     input: str | list[InputItem]
     new_items: list[RunItem]
     raw_responses: list[ModelResponse]
-    final_output: Any
     input_shield_results: list[InputShieldResult]
     output_shield_results: list[OutputShieldResult]
+    current_agent: Agent[Any]
+    final_output: Any = None
 
     # Streaming-specific fields
-    current_agent: Agent[Any]
     is_complete: bool = False
     current_turn: int = 0
     max_turns: int = 0
@@ -110,6 +120,13 @@ class RunResultStreaming:
     @property
     def last_agent(self) -> Agent[Any]:
         return self.current_agent
+
+    def __post_init__(self):
+        """Initialize the final output field and strip input string if it's a string."""
+        if not hasattr(self, "final_output"):
+            object.__setattr__(self, "final_output", self.final_output)
+        if isinstance(self.input, str):
+            object.__setattr__(self, "input", self.input.strip())
 
     async def stream_events(self) -> AsyncIterator[StreamEvent]:
         try:
