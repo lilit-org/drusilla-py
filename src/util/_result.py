@@ -78,8 +78,6 @@ class RunResult(RunResultBase):
 
     def __post_init__(self):
         """Initialize the final output field."""
-        if not hasattr(self, "final_output"):
-            object.__setattr__(self, "final_output", self.final_output)
         if isinstance(self.input, str):
             object.__setattr__(self, "input", self.input.strip())
 
@@ -123,8 +121,6 @@ class RunResultStreaming:
 
     def __post_init__(self):
         """Initialize the final output field and strip input string if it's a string."""
-        if not hasattr(self, "final_output"):
-            object.__setattr__(self, "final_output", self.final_output)
         if isinstance(self.input, str):
             object.__setattr__(self, "input", self.input.strip())
 
