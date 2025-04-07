@@ -4,7 +4,7 @@ import inspect
 from typing import Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from src.gear.sword import (
     FuncSchema,
@@ -50,6 +50,22 @@ class TestSwordErrorHandling:
         with pytest.raises(ValueError):
             await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
 
+    @pytest.mark.asyncio
+    async def test_function_sword_with_custom_error_handler(
+        self, mock_context: RunContextWrapper[Any]
+    ):
+        """Test function sword with custom error handler."""
+
+        def custom_error_handler(ctx: RunContextWrapper[Any], error: Exception) -> str:
+            return f"Custom error: {str(error)}"
+
+        @function_sword(failure_error_function=custom_error_handler)
+        async def test_sword(message: str) -> str:
+            raise ValueError("Test error")
+
+        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        assert result == "Custom error: Test error"
+
 
 class TestFuncSchema:
     """Test suite for FuncSchema functionality."""
@@ -85,6 +101,32 @@ class TestFuncSchema:
         assert positional_args == [1, "test"]
         assert keyword_args == {"c": [1, 2, 3], "d": {"key": "value"}}
 
+    def test_to_call_args_with_context(self):
+        """Test converting Pydantic model to function call arguments with context."""
+
+        class TestModel(BaseModel):
+            message: str
+
+        def test_func(ctx: RunContextWrapper[Any], message: str) -> None:
+            pass
+
+        schema = FuncSchema(
+            name="test",
+            description="Test schema",
+            params_pydantic_model=TestModel,
+            params_json_schema=TestModel.model_json_schema(),
+            signature=inspect.signature(test_func),
+            on_invoke_sword=lambda ctx, input: None,
+            takes_context=True,
+            strict_json_schema=True,
+        )
+
+        data = TestModel(message="test")
+        positional_args, keyword_args = schema.to_call_args(data)
+
+        assert positional_args == ["test"]
+        assert keyword_args == {}
+
 
 class TestFunctionSword:
     """Test suite for function_sword decorator functionality."""
@@ -114,6 +156,20 @@ class TestFunctionSword:
 
         assert test_sword.name == "custom_sword"
         assert test_sword.description == "Custom description"
+
+    def test_docstring_name_and_description(self):
+        """Test function sword with docstring-based name and description."""
+
+        @function_sword(use_docstring_info=True)
+        async def test_sword(ctx: RunContextWrapper[Any], message: str) -> str:
+            """Test sword with docstring.
+
+            This is a test sword that demonstrates docstring usage.
+            """
+            return message
+
+        assert test_sword.name == "test_sword"
+        assert "This is a test sword" in test_sword.description
 
     @pytest.mark.asyncio
     async def test_var_positional_args(self, mock_context: RunContextWrapper[Any]):
@@ -147,3 +203,52 @@ class TestFunctionSword:
 
         result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
         assert result == "Context: test"
+
+    @pytest.mark.asyncio
+    async def test_sync_function(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with synchronous function."""
+
+        @function_sword
+        def test_sword(message: str) -> str:
+            return message
+
+        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        assert result == "test"
+
+    @pytest.mark.asyncio
+    async def test_strict_json_schema(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with strict JSON schema validation."""
+
+        @function_sword(strict_mode=True)
+        async def test_sword(message: str) -> str:
+            return message
+
+        # Test with valid input
+        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        assert result == "test"
+
+        # Test with invalid input (extra field)
+        with pytest.raises(ValidationError):
+            await test_sword.on_invoke_sword(mock_context, '{"message": "test", "extra": "field"}')
+
+    @pytest.mark.asyncio
+    async def test_parameter_validation(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword parameter validation."""
+
+        @function_sword
+        async def test_sword(message: str, count: int) -> str:
+            return f"{message} {count}"
+
+        # Test with valid input
+        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test", "count": 1}')
+        assert result == "test 1"
+
+        # Test with invalid input (wrong type)
+        with pytest.raises(ValidationError):
+            await test_sword.on_invoke_sword(
+                mock_context, '{"message": "test", "count": "not a number"}'
+            )
+
+        # Test with missing required parameter
+        with pytest.raises(ValidationError):
+            await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')

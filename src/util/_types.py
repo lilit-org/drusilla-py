@@ -16,7 +16,7 @@ and managing streaming data across the application.
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator, Awaitable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, TypeAlias, TypedDict
 
@@ -28,18 +28,8 @@ from typing_extensions import NotRequired, TypeVar
 
 TContext = TypeVar("TContext", default=Any)
 T = TypeVar("T")
+TContext_co = TypeVar("TContext_co", covariant=True)
 MaybeAwaitable = Awaitable[T] | T
-
-
-########################################################
-#            Queue Sentinel Types
-########################################################
-
-
-@dataclass(frozen=True)
-class QueueCompleteSentinel:
-    """Sentinel value used to indicate the end of a queue stream."""
-
 
 ########################################################
 #            Data class for Usage and Contexts
@@ -84,6 +74,20 @@ class RunContextWrapper(Generic[TContext]):
 
     usage: Usage = field(default_factory=Usage)
     """Usage stats for the agent run. May be stale during streaming until final chunk."""
+
+
+# Sword function type aliases
+SwordFuncSync = Callable[[RunContextWrapper[Any], str], Any]
+SwordFuncAsync = Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
+
+########################################################
+#            Queue Sentinel Types
+########################################################
+
+
+@dataclass(frozen=True)
+class QueueCompleteSentinel:
+    """Sentinel value used to indicate the end of a queue stream."""
 
 
 ########################################################

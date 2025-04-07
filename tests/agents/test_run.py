@@ -205,6 +205,7 @@ async def test_run_with_shields(
         new_items=[MessageOutputItem(agent=mock_agent, raw_item=message_output)],
         input_shield_results=[
             InputShieldResult(
+                tripwire_triggered=False,
                 shield=mock_input_shield,
                 input="test input",
                 output="shielded_input",
@@ -213,6 +214,7 @@ async def test_run_with_shields(
         ],
         output_shield_results=[
             OutputShieldResult(
+                tripwire_triggered=False,
                 shield=mock_output_shield,
                 agent=mock_agent,
                 agent_output="test output",

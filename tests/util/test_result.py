@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.gear.shield import InputShieldResult, OutputShieldResult, ShieldFunctionOutput
+from src.gear.shield import InputShieldResult, OutputShieldResult, ShieldResult
 from src.util._items import MessageOutputItem, ModelResponse
 from src.util._result import RunResult, RunResultStreaming
 from src.util._types import QueueCompleteSentinel, Usage
@@ -23,10 +23,11 @@ def mock_input_shield_result():
     agent = MagicMock()
     agent.name = "test_agent"
     return InputShieldResult(
+        tripwire_triggered=False,
         shield=shield,
         agent=agent,
         input="test input",
-        output=ShieldFunctionOutput(tripwire_triggered=False, output="processed"),
+        output=ShieldResult(tripwire_triggered=False, result="processed"),
     )
 
 
@@ -37,10 +38,11 @@ def mock_output_shield_result():
     agent = MagicMock()
     agent.name = "test_agent"
     return OutputShieldResult(
+        tripwire_triggered=False,
         shield=shield,
         agent=agent,
         agent_output="test output",
-        output=ShieldFunctionOutput(tripwire_triggered=False, output="processed"),
+        output=ShieldResult(tripwire_triggered=False, result="processed"),
     )
 
 

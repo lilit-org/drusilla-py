@@ -141,6 +141,13 @@ class ErrorMessages:
         ),
         used_in="src/gear/sword.py",
     )
+    SHIELD_FUNCTION_ERROR: ErrorMessage = ErrorMessage(
+        message=os.getenv(
+            "SHIELD_FUNCTION_ERROR_MESSAGE",
+            "❌ Shield function must be callable: {error}",
+        ),
+        used_in="src/gear/shield.py",
+    )
 
 
 ERROR_MESSAGES = ErrorMessages()
