@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from dataclasses import dataclass
 
 from dotenv import load_dotenv
 
@@ -33,6 +34,7 @@ __all__ = (
     "SUPPORTED_LANGUAGES",
     "load_environment",
     "logger",
+    "ERROR_MESSAGES",
 )
 
 # Constants
@@ -118,3 +120,27 @@ def load_environment() -> None:
     HTTP_TIMEOUT_READ = float(os.getenv("HTTP_TIMEOUT_READ", "90.0"))
     HTTP_MAX_KEEPALIVE_CONNECTIONS = int(os.getenv("HTTP_MAX_KEEPALIVE_CONNECTIONS", "5"))
     HTTP_MAX_CONNECTIONS = int(os.getenv("HTTP_MAX_CONNECTIONS", "10"))
+
+
+@dataclass(frozen=True)
+class ErrorMessage:
+    message: str
+    used_in: str
+
+
+@dataclass(frozen=True)
+class ErrorMessages:
+    SWORD_ERROR: ErrorMessage = ErrorMessage(
+        message=os.getenv("SWORD_ERROR_MESSAGE", "❌ Error while running a sword: {error}"),
+        used_in="src/gear/sword.py",
+    )
+    RUN_CONTEXT_ERROR: ErrorMessage = ErrorMessage(
+        message=os.getenv(
+            "RUN_CONTEXT_ERROR_MESSAGE",
+            "❌ RunContextWrapper param found at non-first position: {error}",
+        ),
+        used_in="src/gear/sword.py",
+    )
+
+
+ERROR_MESSAGES = ErrorMessages()

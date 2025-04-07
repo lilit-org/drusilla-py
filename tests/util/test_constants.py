@@ -170,3 +170,38 @@ def test_environment_variables():
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+def test_error_messages():
+    """Test error message constants and environment variable overrides."""
+    import importlib
+
+    from src.util import _constants
+
+    # Test default error messages
+    assert (
+        _constants.ERROR_MESSAGES.SWORD_ERROR.message == "❌ Error while running a sword: {error}"
+    )
+    assert _constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
+    assert (
+        _constants.ERROR_MESSAGES.RUN_CONTEXT_ERROR.message
+        == "❌ RunContextWrapper param found at non-first position: {error}"
+    )
+    assert _constants.ERROR_MESSAGES.RUN_CONTEXT_ERROR.used_in == "src/gear/sword.py"
+
+    # Test environment variable overrides
+    custom_sword_message = "Custom sword error: {error}"
+    custom_context_message = "Custom context error: {function_name}"
+    with patch.dict(
+        os.environ,
+        {
+            "SWORD_ERROR_MESSAGE": custom_sword_message,
+            "RUN_CONTEXT_ERROR_MESSAGE": custom_context_message,
+        },
+    ):
+        # Reload the module to pick up the new environment variables
+        importlib.reload(_constants)
+        assert _constants.ERROR_MESSAGES.SWORD_ERROR.message == custom_sword_message
+        assert _constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
+        assert _constants.ERROR_MESSAGES.RUN_CONTEXT_ERROR.message == custom_context_message
+        assert _constants.ERROR_MESSAGES.RUN_CONTEXT_ERROR.used_in == "src/gear/sword.py"

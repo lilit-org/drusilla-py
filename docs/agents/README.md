@@ -19,7 +19,7 @@ which creates and runs the following agent:
 ```python
 def create_agent() -> Agent:
     return Agent(
-        name="Agent Dr. Love", i
+        name="Agent Dr. Love",
         instructions="You are a cool special robot who loves"
     )
 

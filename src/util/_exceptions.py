@@ -20,7 +20,8 @@ It includes:
    - Output shield errors
 """
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..gear.shield import InputShieldResult, OutputShieldResult
@@ -80,3 +81,32 @@ class OutputShieldError(AgentError):
     def __init__(self, result: "OutputShieldResult") -> None:
         self.result = result
         super().__init__(f"Output shield {result.shield.name or 'unnamed'} triggered")
+
+
+def format_error_message(error: Exception, message_template: str) -> str:
+    """Format an error message using a template string.
+
+    Args:
+        error: The exception that occurred
+        message_template: A string template that can contain {error} placeholder
+
+    Returns:
+        Formatted error message string
+    """
+    return message_template.format(error=str(error))
+
+
+def create_error_handler(message_template: str) -> Callable[[Any, Exception], str]:
+    """Create a context-aware error handler function.
+
+    Args:
+        message_template: A string template that can contain {error} placeholder
+
+    Returns:
+        A function that takes a context and error and returns a formatted message
+    """
+
+    def error_handler(_: Any, error: Exception) -> str:
+        return format_error_message(error, message_template)
+
+    return error_handler
