@@ -7,7 +7,7 @@
 <br>
 
 this is an early-stage project that is expected to undergo frequent changes.
-qhile we welcome contributions, please note that the API and functionality may
+while we welcome contributions, please note that the API and functionality may
 change significantly as we evolve.
 
 <br>
