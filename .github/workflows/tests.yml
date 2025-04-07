@@ -30,7 +30,7 @@ jobs:
 
     - name: Validate and load .env.example
       run: |
-        python3 -c "
+        python3 << 'EOF'
         import os
         from dotenv import load_dotenv
         from pathlib import Path
@@ -60,10 +60,14 @@ jobs:
             for key, value in os.environ.items():
                 if key.startswith(('SWORD_', 'RUNCONTEXT_', 'SHIELD_')):
                     f.write(f'{key}={value}\n')
-        "
+        EOF
 
     - name: Test with pytest
       env:
         PYTHONPATH: ${{ github.workspace }}
       run: |
-        pytest tests/ --cov=src --cov-report=xml
+        pytest tests/ \
+          --cov=src \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          --cov-fail-under=80
