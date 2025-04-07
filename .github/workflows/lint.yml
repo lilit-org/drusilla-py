@@ -1,4 +1,4 @@
-name: Formatiting
+name: Formatting
 
 on:
   pull_request:

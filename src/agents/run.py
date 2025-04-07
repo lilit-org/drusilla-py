@@ -20,7 +20,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-from ..gear.charm import RunCharms
+from ..gear.charms import RunCharms
 from ..gear.orbs import Orbs, OrbsInputFilter, orbs
 from ..gear.shield import (
     InputShield,
@@ -115,35 +115,41 @@ class Runner:
         charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> RunResult:
-        charms, run_config, context_wrapper, input, _ = await cls._initialize_run(
-            starting_agent, input, context, max_turns, charms, run_config
-        )
-
-        current_turn = 0
-        original_input = input if isinstance(input, str) else input.copy()
-        generated_items = []
-        model_responses = []
-        input_shield_results = []
-        current_agent = starting_agent
-        should_run_agent_start_charms = True
-
         try:
+            charms, run_config, context_wrapper, input, _ = await cls._initialize_run(
+                starting_agent, input, context, max_turns, charms, run_config
+            )
+
+            current_turn = 0
+            original_input = input if isinstance(input, str) else input.copy()
+            generated_items = []
+            model_responses = []
+            input_shield_results = []
+            current_agent = starting_agent
+            should_run_agent_start_charms = True
+
             while True:
                 current_turn += 1
                 if current_turn > run_config.max_turns:
-                    raise MaxTurnsError(f"Max turns ({run_config.max_turns}) exceeded")
+                    max_turns_error = MaxTurnsError(f"Max turns ({run_config.max_turns}) exceeded")
+                    raise GenericError("Max turns exceeded") from max_turns_error
 
-                turn_result = await cls._run_turn(
-                    current_turn,
-                    current_agent,
-                    original_input,
-                    generated_items,
-                    charms,
-                    context_wrapper,
-                    run_config,
-                    should_run_agent_start_charms,
-                    input,
-                )
+                try:
+                    turn_result = await cls._run_turn(
+                        current_turn,
+                        current_agent,
+                        original_input,
+                        generated_items,
+                        charms,
+                        context_wrapper,
+                        run_config,
+                        should_run_agent_start_charms,
+                        input,
+                    )
+                except Exception as e:
+                    if isinstance(e, GenericError):
+                        raise e
+                    raise GenericError(str(e)) from e
 
                 should_run_agent_start_charms = False
                 model_responses.append(turn_result.model_response)
@@ -167,9 +173,14 @@ class Runner:
                 elif isinstance(turn_result.next_step, NextStepRunAgain):
                     continue
                 else:
-                    raise AgentError(f"Unknown next step type: {type(turn_result.next_step)}")
+                    agent_error = AgentError(
+                        f"Unknown next step type: {type(turn_result.next_step)}"
+                    )
+                    raise GenericError("Unknown next step type") from agent_error
         except Exception as e:
-            raise GenericError(e) from e
+            if isinstance(e, GenericError):
+                raise e
+            raise GenericError(str(e)) from e
 
     @classmethod
     async def _run_turn(
@@ -185,14 +196,20 @@ class Runner:
         input: str | list[InputItem],
     ) -> SingleStepResult:
         if current_turn == 1:
-            _, turn_result = await asyncio.gather(
-                cls._run_input_shields(
+            try:
+                shield_result = await cls._run_input_shields(
                     agent=current_agent,
                     input=input,
                     context=context_wrapper,
                     shields=current_agent.input_shields + run_config.input_shields,
-                ),
-                cls._run_single_turn(
+                )
+                # Check shield results for errors
+                for result in shield_result:
+                    if result.output.tripwire_triggered:
+                        shield_error = InputShieldError(result)
+                        raise GenericError("Input shield error") from shield_error
+
+                turn_result = await cls._run_single_turn(
                     agent=current_agent,
                     original_input=original_input,
                     generated_items=generated_items,
@@ -200,8 +217,11 @@ class Runner:
                     context_wrapper=context_wrapper,
                     run_config=run_config,
                     should_run_agent_start_charms=should_run_agent_start_charms,
-                ),
-            )
+                )
+            except Exception as e:
+                if isinstance(e, GenericError):
+                    raise e
+                raise GenericError(str(e)) from e
         else:
             turn_result = await cls._run_single_turn(
                 agent=current_agent,
@@ -226,21 +246,32 @@ class Runner:
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> RunResult:
-        output_shield_results = await cls._run_output_shields(
-            current_agent,
-            turn_result.next_step.output,
-            context_wrapper,
-            current_agent.output_shields + run_config.output_shields,
-        )
-        return RunResult(
-            input=original_input,
-            new_items=generated_items,
-            raw_responses=model_responses,
-            final_output=turn_result.next_step.output,
-            _last_agent=current_agent,
-            input_shield_results=input_shield_results,
-            output_shield_results=output_shield_results,
-        )
+        try:
+            output_shield_results = await cls._run_output_shields(
+                current_agent,
+                turn_result.next_step.output,
+                context_wrapper,
+                current_agent.output_shields + run_config.output_shields,
+            )
+            # Check output shield results for errors
+            for result in output_shield_results:
+                if result.output.tripwire_triggered:
+                    shield_error = OutputShieldError(result)
+                    raise GenericError("Output shield error") from shield_error
+
+            return RunResult(
+                input=original_input,
+                new_items=generated_items,
+                raw_responses=model_responses,
+                final_output=turn_result.next_step.output,
+                _last_agent=current_agent,
+                input_shield_results=input_shield_results,
+                output_shield_results=output_shield_results,
+            )
+        except Exception as e:
+            if isinstance(e, GenericError):
+                raise e
+            raise GenericError(str(e)) from e
 
     @classmethod
     def run_sync(
@@ -350,7 +381,7 @@ class Runner:
 
                 if current_turn > max_turns:
                     await cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
-                    break
+                    raise GenericError(MaxTurnsError(f"Max turns ({max_turns}) exceeded"))
 
                 if current_turn == 1:
                     streamed_result._input_shields_task = asyncio.create_task(
@@ -406,9 +437,9 @@ class Runner:
                             pass
                     elif isinstance(turn_result.next_step, NextStepRunAgain):
                         continue
-                except Exception:
+                except Exception as e:
                     cls._handle_streamed_error(streamed_result)
-                    raise
+                    raise GenericError(e) from e
 
             streamed_result.is_complete = True
         except Exception as e:
@@ -486,13 +517,15 @@ class Runner:
             for done in asyncio.as_completed(shield_tasks):
                 result = await done
                 if result.output.tripwire_triggered:
-                    raise InputShieldError(result)
+                    raise GenericError(InputShieldError(result))
                 streamed_result._input_shield_queue.put_nowait(result)
                 shield_results.append(result)
-        except Exception:
+        except Exception as e:
             for t in shield_tasks:
                 t.cancel()
-            raise
+            if isinstance(e, GenericError):
+                raise e
+            raise GenericError(e) from e
 
         streamed_result.input_shield_results = shield_results
 
@@ -680,10 +713,12 @@ class Runner:
         shield_results = []
         for done in asyncio.as_completed(shield_tasks):
             result = await done
-            # Cancel all shield tasks if a tripwire is triggered.
-            for t in shield_tasks:
-                if not t.done():
-                    t.cancel()
+            if result.output.tripwire_triggered:
+                # Cancel all shield tasks if a tripwire is triggered.
+                for t in shield_tasks:
+                    if not t.done():
+                        t.cancel()
+                raise GenericError(InputShieldError(result))
             shield_results.append(result)
 
         return shield_results
@@ -710,7 +745,7 @@ class Runner:
         for done in asyncio.as_completed(shield_tasks):
             result = await done
             if result.output.tripwire_triggered:
-                raise OutputShieldError(result)
+                raise GenericError(OutputShieldError(result))
             for t in shield_tasks:
                 if not t.done():
                     t.cancel()

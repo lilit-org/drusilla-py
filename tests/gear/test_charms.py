@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from src.agents.agent import Agent
-from src.gear.charm import AgentCharms, BaseCharms, RunCharms
+from src.gear.charms import AgentCharms, BaseCharms, RunCharms
 from src.gear.sword import Sword
 from src.util._types import RunContextWrapper
 

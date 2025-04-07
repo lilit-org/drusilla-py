@@ -18,7 +18,7 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from ..gear.charm import RunCharms
+from ..gear.charms import RunCharms
 from ..gear.orbs import Orbs, OrbsInputData
 from ..gear.shield import (
     InputShield,
@@ -239,7 +239,7 @@ class RunImpl:
         items: list[RunItem] = []
         run_orbs: list[SwordRunOrbs] = []
         functions: list[SwordRunFunction] = []
-        orbs_map = {orb.sword_name: orb for orb in orbs}
+        orbs_map = {orb.name: orb for orb in orbs}
         function_map = {}
 
         for sword in agent.swords:

@@ -5,21 +5,28 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.agents.agent import Agent
-from src.agents.run import (
-    RunConfig,
-    Runner,
-)
+from src.agents.run import RunConfig, Runner
 from src.agents.run_impl import (
     NextStepFinalOutput,
+    NextStepOrbs,
     SingleStepResult,
 )
-from src.gear.charm import RunCharms
-from src.gear.shield import InputShield, InputShieldResult, OutputShield, OutputShieldResult
+from src.gear.charms import RunCharms
+from src.gear.orbs import Orbs
+from src.gear.shield import (
+    InputShield,
+    InputShieldResult,
+    OutputShield,
+    OutputShieldResult,
+    ShieldResult,
+)
+from src.models.interface import Model
+from src.models.provider import ModelProvider
 from src.models.settings import ModelSettings
-from src.util._exceptions import MaxTurnsError
+from src.util._exceptions import GenericError, InputShieldError, MaxTurnsError, OutputShieldError
 from src.util._items import MessageOutputItem, ModelResponse
 from src.util._result import RunResult, RunResultStreaming
-from src.util._types import RunContextWrapper
+from src.util._types import RunContextWrapper, Usage
 
 
 # Test fixtures
@@ -35,27 +42,68 @@ def context_wrapper(mock_context):
 
 @pytest.fixture
 def mock_agent():
-    return Agent(
-        name="test_agent",
-        instructions="Test instructions",
-        model="test_model",
-        model_settings=ModelSettings(),
+    agent = MagicMock(spec=Agent)
+    agent.name = "test_agent"
+    agent.orbs = []
+    agent.model_settings = MagicMock()
+    agent.model_settings.resolve.return_value = None
+    agent.output_type = str
+    agent.swords = []
+    agent.input_shields = []
+    agent.output_shields = []
+    agent.charms = None
+    agent.instructions = "Test instructions"
+    agent.get_system_prompt = AsyncMock(return_value="Test system prompt")
+
+    # Create a mock model with get_response method
+    mock_model = MagicMock(spec=Model)
+    mock_model.get_response = AsyncMock(
+        return_value=ModelResponse(
+            referenceable_id="test_id",
+            output=[
+                {
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": "Test response"}],
+                    "role": "assistant",
+                }
+            ],
+            usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+        )
     )
+    agent.model = mock_model
+
+    return agent
 
 
 @pytest.fixture
 def mock_input_shield():
     shield = AsyncMock(spec=InputShield)
-    shield.name = "test_input_shield"
-    shield.return_value = "shielded_input"
+    shield.name = "test_shield"
+    shield.run = AsyncMock(
+        return_value=InputShieldResult(
+            tripwire_triggered=False,
+            shield=shield,
+            agent=MagicMock(spec=Agent),
+            input="Test input",
+            output=ShieldResult(success=True, data="Test input"),
+        )
+    )
     return shield
 
 
 @pytest.fixture
 def mock_output_shield():
     shield = AsyncMock(spec=OutputShield)
-    shield.name = "test_output_shield"
-    shield.return_value = "shielded_output"
+    shield.name = "test_shield"
+    shield.run = AsyncMock(
+        return_value=OutputShieldResult(
+            tripwire_triggered=False,
+            shield=shield,
+            agent=MagicMock(spec=Agent),
+            agent_output="Test response",
+            output=ShieldResult(success=True, data="Test response"),
+        )
+    )
     return shield
 
 
@@ -158,27 +206,330 @@ def mock_model_client(monkeypatch):
     return mock_deepseek
 
 
-# Test cases
-@pytest.mark.asyncio
-async def test_run_basic(mock_agent, message_output, mock_model_client):
-    """Test basic agent run."""
-    # Create a mock result
-    mock_result = RunResult(
-        input="test input",
-        final_output="test output",
-        raw_responses=[],
-        new_items=[MessageOutputItem(agent=mock_agent, raw_item=message_output)],
-        input_shield_results=[],
-        output_shield_results=[],
-        _last_agent=mock_agent,
+@pytest.fixture
+def mock_model():
+    model = AsyncMock(spec=Model)
+    model.get_response.return_value = ModelResponse(
+        referenceable_id="test_id",
+        output=[
+            {
+                "type": "message",
+                "content": [{"type": "output_text", "text": "Test response"}],
+                "role": "assistant",
+            }
+        ],
+        usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+    )
+    return model
+
+
+@pytest.fixture
+def mock_run_config(mock_model):
+    return RunConfig(
+        model=mock_model,
+        model_provider=ModelProvider(),
+        model_settings=ModelSettings(),
+        orbs_input_filter=None,
+        input_shields=[],
+        output_shields=[],
+        max_turns=3,
     )
 
-    # Patch the Runner.run method to return our mock result
-    with patch("src.agents.run.Runner.run", return_value=mock_result):
-        result = await Runner.run(starting_agent=mock_agent, input="test input")
 
-        assert isinstance(result, RunResult)
-        assert result.final_output == "test output"
+# Test cases
+@pytest.mark.asyncio
+async def test_run_basic(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Run
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        run_config=mock_run_config,
+    )
+
+    # Assertions
+    assert isinstance(result, RunResult)
+    assert result.input == input_text
+    assert len(result.raw_responses) > 0
+    assert result.final_output == "Test response"
+
+
+@pytest.mark.asyncio
+async def test_run_with_input_shield(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Create a mock input shield
+    mock_shield = AsyncMock(spec=InputShield)
+    mock_shield.name = "test_shield"
+    shield_result = InputShieldResult(
+        tripwire_triggered=False,
+        shield=mock_shield,
+        agent=mock_agent,
+        input=input_text,
+        output=ShieldResult(success=True, data=input_text),
+    )
+    mock_shield.run.return_value = shield_result
+    mock_agent.input_shields = [mock_shield]
+
+    # Run
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        run_config=mock_run_config,
+    )
+
+    # Verify
+    assert result.final_output == "Test response"
+    assert mock_shield.run.called
+
+
+@pytest.mark.asyncio
+async def test_run_with_output_shield(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Create a mock output shield
+    mock_shield = AsyncMock(spec=OutputShield)
+    mock_shield.name = "test_shield"
+    shield_result = OutputShieldResult(
+        tripwire_triggered=False,
+        shield=mock_shield,
+        agent=mock_agent,
+        agent_output="Test response",
+        output=ShieldResult(success=True, data="Test response"),
+    )
+    mock_shield.run.return_value = shield_result
+    mock_agent.output_shields = [mock_shield]
+
+    # Run
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        run_config=mock_run_config,
+    )
+
+    # Verify
+    assert result.final_output == "Test response"
+    assert mock_shield.run.called
+
+
+@pytest.mark.asyncio
+async def test_run_with_max_turns(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+    mock_run_config = RunConfig(
+        model=mock_run_config.model,
+        model_provider=mock_run_config.model_provider,
+        model_settings=mock_run_config.model_settings,
+        max_turns=1,
+    )
+
+    # Mock the model to keep running by returning a response that indicates it should continue
+    mock_agent.model.get_response = AsyncMock(
+        side_effect=[
+            ModelResponse(
+                referenceable_id="test_id",
+                output=[
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "Test response"}],
+                        "role": "assistant",
+                    }
+                ],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+            ),
+            ModelResponse(
+                referenceable_id="test_id",
+                output=[
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "Test response 2"}],
+                        "role": "assistant",
+                    }
+                ],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+            ),
+        ]
+    )
+
+    # Mock the run_impl to return NextStepOrbs to force continuation
+    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
+        mock_run_turn.return_value = SingleStepResult(
+            model_response=ModelResponse(
+                referenceable_id="test_id",
+                output=[
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "Test response"}],
+                        "role": "assistant",
+                    }
+                ],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+            ),
+            original_input=input_text,
+            pre_step_items=[],
+            new_step_items=[],
+            next_step=NextStepOrbs(new_agent=mock_agent),
+        )
+
+        # Run and verify error
+        with pytest.raises(GenericError) as exc_info:
+            await Runner.run(
+                starting_agent=mock_agent,
+                input=input_text,
+                run_config=mock_run_config,
+            )
+        assert isinstance(exc_info.value.__cause__, MaxTurnsError)
+        assert "Max turns (1) exceeded" in str(exc_info.value.__cause__)
+
+
+@pytest.mark.asyncio
+async def test_run_with_input_shield_error(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Create a mock input shield that raises an error
+    mock_shield = AsyncMock(spec=InputShield)
+    mock_shield.name = "test_shield"
+    shield_result = InputShieldResult(
+        tripwire_triggered=True,
+        shield=mock_shield,
+        agent=mock_agent,
+        input=input_text,
+        output=ShieldResult(success=False, message="Invalid input"),
+    )
+    mock_shield.run.return_value = shield_result
+    mock_agent.input_shields = [mock_shield]
+
+    # Mock the run_impl to not be called since input shield should fail first
+    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
+        # Run and verify error
+        with pytest.raises(GenericError) as exc_info:
+            await Runner.run(
+                starting_agent=mock_agent,
+                input=input_text,
+                run_config=mock_run_config,
+            )
+        assert isinstance(exc_info.value.__cause__, InputShieldError)
+        assert "Invalid input" in str(exc_info.value.__cause__)
+        mock_run_turn.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_run_with_output_shield_error(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Create a mock output shield that raises an error
+    mock_shield = AsyncMock(spec=OutputShield)
+    mock_shield.name = "test_shield"
+    shield_result = OutputShieldResult(
+        tripwire_triggered=True,
+        shield=mock_shield,
+        agent=mock_agent,
+        agent_output="Test response",
+        output=ShieldResult(success=False, message="Invalid output"),
+    )
+    mock_shield.run.return_value = shield_result
+    mock_agent.output_shields = [mock_shield]
+
+    # Mock the run_impl to return a final output that will trigger the output shield
+    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
+        mock_run_turn.return_value = SingleStepResult(
+            model_response=ModelResponse(
+                referenceable_id="test_id",
+                output=[
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "Test response"}],
+                        "role": "assistant",
+                    }
+                ],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+            ),
+            original_input=input_text,
+            pre_step_items=[],
+            new_step_items=[],
+            next_step=NextStepFinalOutput(output="Test response"),
+        )
+
+        # Run and verify error
+        with pytest.raises(GenericError) as exc_info:
+            await Runner.run(
+                starting_agent=mock_agent,
+                input=input_text,
+                run_config=mock_run_config,
+            )
+        assert isinstance(exc_info.value.__cause__, OutputShieldError)
+        assert "Invalid output" in str(exc_info.value.__cause__)
+
+
+@pytest.mark.asyncio
+async def test_run_with_orbs(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Create a mock orb
+    mock_orb = MagicMock(spec=Orbs)
+    mock_orb.name = "test_orb"
+    mock_orb.sword_name = "test_sword"
+    mock_agent.orbs = [mock_orb]
+
+    # Run
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        run_config=mock_run_config,
+    )
+
+    # Assertions
+    assert isinstance(result, RunResult)
+    assert result.final_output == "Test response"
+
+
+@pytest.mark.asyncio
+async def test_run_with_charms(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+
+    # Create mock charms
+    charms = RunCharms()
+    charms.on_start = AsyncMock()
+    charms.on_start.return_value = None
+
+    # Run
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        charms=charms,
+        run_config=mock_run_config,
+    )
+
+    # Assertions
+    assert isinstance(result, RunResult)
+    charms.on_start.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_run_with_context(mock_agent, mock_run_config):
+    # Setup
+    input_text = "Test input"
+    context = {"test": "context"}
+
+    # Run
+    result = await Runner.run(
+        starting_agent=mock_agent,
+        input=input_text,
+        context=context,
+        run_config=mock_run_config,
+    )
+
+    # Assertions
+    assert isinstance(result, RunResult)
+    assert result.final_output == "Test response"
 
 
 @pytest.mark.asyncio
