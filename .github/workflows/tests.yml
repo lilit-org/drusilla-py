@@ -49,6 +49,8 @@ jobs:
             'SWORD_ERROR_MESSAGE',
             'RUNCONTEXT_ERROR_MESSAGE',
             'SHIELD_ERROR_MESSAGE'
+            'RUNNER_ERROR_MESSAGE',
+            'ORBS_ERROR_MESSAGE',
         }
         missing_vars = [var for var in required_vars if var not in os.environ]
         if missing_vars:
