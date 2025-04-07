@@ -148,7 +148,7 @@ class ErrorMessages:
         message=os.environ["SHIELD_ERROR_MESSAGE"],
         used_in="src/gear/shield.py",
     )
-    RUNNER_ERROR_MESSAGE: ErrorMessage = ErrorMessage(
+    RUNNER_ERROR: ErrorMessage = ErrorMessage(
         message=os.environ["RUNNER_ERROR_MESSAGE"],
         used_in="src/agents/run.py",
     )

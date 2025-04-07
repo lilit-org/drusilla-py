@@ -182,7 +182,7 @@ class Runner:
                         )
                     )
         except Exception as e:
-            if isinstance(e, GenericError):
+            if isinstance(e, GenericError | MaxTurnsError):
                 raise e
             raise GenericError(str(e)) from e
 

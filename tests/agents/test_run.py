@@ -23,7 +23,7 @@ from src.gear.shield import (
 from src.models.interface import Model
 from src.models.provider import ModelProvider
 from src.models.settings import ModelSettings
-from src.util._exceptions import GenericError, MaxTurnsError
+from src.util._exceptions import MaxTurnsError
 from src.util._items import MessageOutputItem, ModelResponse
 from src.util._result import RunResult, RunResultStreaming
 from src.util._types import RunContextWrapper, Usage
@@ -350,7 +350,16 @@ async def test_run_with_max_turns(mock_agent, mock_run_config):
     )
 
     # Mock the run_impl to return NextStepOrbs to force continuation
-    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
+    with (
+        patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn,
+        patch("src.agents.run.ERROR_MESSAGES") as mock_error_messages,
+    ):
+        # Create a mock message object with the message attribute
+        mock_message = MagicMock()
+        mock_message.message = "❌ Runner error: {error}"
+        # Set the RUNNER_ERROR_MESSAGE attribute on the mock
+        mock_error_messages.RUNNER_ERROR_MESSAGE = mock_message
+
         mock_run_turn.return_value = SingleStepResult(
             model_response=ModelResponse(
                 referenceable_id="test_id",
@@ -370,7 +379,7 @@ async def test_run_with_max_turns(mock_agent, mock_run_config):
         )
 
         # Run and verify error
-        with pytest.raises(GenericError) as exc_info:
+        with pytest.raises(MaxTurnsError) as exc_info:
             await Runner.run(
                 starting_agent=mock_agent,
                 input=input_text,
