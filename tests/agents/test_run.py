@@ -358,7 +358,7 @@ async def test_run_with_max_turns(mock_agent, mock_run_config):
         mock_message = MagicMock()
         mock_message.message = "❌ Runner error: {error}"
         # Set the RUNNER_ERROR_MESSAGE attribute on the mock
-        mock_error_messages.RUNNER_ERROR_MESSAGE = mock_message
+        mock_error_messages.RUNNER_ERROR = mock_message
 
         mock_run_turn.return_value = SingleStepResult(
             model_response=ModelResponse(

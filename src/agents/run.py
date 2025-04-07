@@ -132,7 +132,7 @@ class Runner:
                 current_turn += 1
                 if current_turn > run_config.max_turns:
                     raise MaxTurnsError(
-                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
                             error=f"Max turns ({max_turns}) exceeded"
                         )
                     )
@@ -151,7 +151,7 @@ class Runner:
                     )
                 except Exception as e:
                     raise MessageError(
-                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(error=str(e))
+                        ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))
                     ) from e
 
                 should_run_agent_start_charms = False
@@ -177,7 +177,7 @@ class Runner:
                     continue
                 else:
                     raise GenericError(
-                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
                             error=f"Unknown next step type: {type(turn_result.next_step)}"
                         )
                     )
@@ -386,7 +386,7 @@ class Runner:
                 if current_turn > max_turns:
                     await cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
                     raise MaxTurnsError(
-                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
                             error=f"Max turns ({max_turns}) exceeded"
                         )
                     )
@@ -526,7 +526,7 @@ class Runner:
                 result = await done
                 if result.output.tripwire_triggered:
                     raise GenericError(
-                        ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
                             error=str(InputShieldError(result))
                         )
                     )
@@ -627,7 +627,7 @@ class Runner:
             )
 
         raise ModelError(
-            ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
+            ERROR_MESSAGES.RUNNER_ERROR.message.format(
                 error="Model did not produce a final response!"
             )
         )
@@ -735,9 +735,7 @@ class Runner:
                     if not t.done():
                         t.cancel()
                 raise GenericError(
-                    ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
-                        error=str(InputShieldError(result))
-                    )
+                    ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(InputShieldError(result)))
                 )
             shield_results.append(result)
 
@@ -766,9 +764,7 @@ class Runner:
             result = await done
             if result.output.tripwire_triggered:
                 raise GenericError(
-                    ERROR_MESSAGES.RUNNER_ERROR_MESSAGE.message.format(
-                        error=str(OutputShieldError(result))
-                    )
+                    ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(OutputShieldError(result)))
                 )
             for t in shield_tasks:
                 if not t.done():
