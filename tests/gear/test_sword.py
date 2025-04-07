@@ -1,7 +1,7 @@
 """Tests for the sword module."""
 
 import inspect
-from typing import Any
+from typing import Any, get_type_hints
 
 import pytest
 from pydantic import BaseModel
@@ -9,10 +9,16 @@ from pydantic import BaseModel
 from src.gear.sword import (
     FuncSchema,
     Sword,
+    SwordResult,
+    _create_pydantic_fields,
+    _process_parameters,
+    function_schema,
     function_sword,
+    generate_func_documentation,
 )
 from src.util._constants import ERROR_MESSAGES
 from src.util._exceptions import ModelError, create_error_handler
+from src.util._items import SwordCallOutputItem
 from src.util._types import RunContextWrapper
 
 
@@ -388,3 +394,208 @@ class TestFunctionSword:
         with pytest.raises(ModelError) as exc_info:
             await test_sword.on_invoke_sword(mock_context, "")
         assert "Expecting value" in str(exc_info.value)
+
+
+class TestSwordResult:
+    """Test suite for SwordResult functionality."""
+
+    @pytest.mark.asyncio
+    async def test_sword_result_creation(self, mock_context: RunContextWrapper[Any]):
+        """Test creating a SwordResult instance."""
+
+        @function_sword
+        async def test_sword(message: str) -> str:
+            return message
+
+        input_json = '{"message": "test"}'
+        result = await test_sword.on_invoke_sword(mock_context, input_json)
+        run_item = SwordCallOutputItem(
+            output=result,
+            raw_item={
+                "type": "function_call_output",
+                "call_id": "test",
+                "output": result,
+                "input": input_json,
+            },
+            agent=None,
+        )
+        sword_result = SwordResult(sword=test_sword, output=result, run_item=run_item)
+
+        assert sword_result.sword == test_sword
+        assert sword_result.output == "test"
+        assert isinstance(sword_result.run_item, SwordCallOutputItem)
+        assert sword_result.run_item.output == "test"
+        assert sword_result.run_item.raw_item["output"] == "test"
+
+
+class TestProcessParameters:
+    """Test suite for _process_parameters functionality."""
+
+    def test_process_parameters_with_context(self):
+        """Test processing parameters with context parameter."""
+
+        def test_func(ctx: RunContextWrapper[Any], message: str) -> None:
+            pass
+
+        type_hints = get_type_hints(test_func)
+        sig = inspect.signature(test_func)
+        takes_context, params = _process_parameters(sig, type_hints)
+
+        assert takes_context is True
+        assert len(params) == 1
+        assert params[0][0] == "message"
+
+    def test_process_parameters_without_context(self):
+        """Test processing parameters without context parameter."""
+
+        def test_func(message: str) -> None:
+            pass
+
+        type_hints = get_type_hints(test_func)
+        sig = inspect.signature(test_func)
+        takes_context, params = _process_parameters(sig, type_hints)
+
+        assert takes_context is False
+        assert len(params) == 1
+        assert params[0][0] == "message"
+
+    def test_process_parameters_with_complex_types(self):
+        """Test processing parameters with complex type hints."""
+
+        def test_func(
+            message: str, items: list[int], config: dict[str, Any], optional: str | None = None
+        ) -> None:
+            pass
+
+        type_hints = get_type_hints(test_func)
+        sig = inspect.signature(test_func)
+        takes_context, params = _process_parameters(sig, type_hints)
+
+        assert takes_context is False
+        assert len(params) == 4
+        assert all(name in ["message", "items", "config", "optional"] for name, _ in params)
+
+
+class TestCreatePydanticFields:
+    """Test suite for _create_pydantic_fields functionality."""
+
+    def test_create_pydantic_fields_basic(self):
+        """Test creating basic Pydantic fields."""
+
+        def test_func(message: str, count: int = 1) -> None:
+            pass
+
+        sig = inspect.signature(test_func)
+        params = list(sig.parameters.items())
+        type_hints = get_type_hints(test_func)
+        param_descs = {"message": "The message to process"}
+
+        fields = _create_pydantic_fields(params, type_hints, param_descs)
+
+        assert "message" in fields
+        assert "count" in fields
+        assert fields["message"][1].description == "The message to process"
+        assert fields["count"][1].default == 1
+
+    def test_create_pydantic_fields_with_complex_types(self):
+        """Test creating Pydantic fields with complex types."""
+
+        def test_func(
+            items: list[int], config: dict[str, Any], optional: str | None = None
+        ) -> None:
+            pass
+
+        sig = inspect.signature(test_func)
+        params = list(sig.parameters.items())
+        type_hints = get_type_hints(test_func)
+        param_descs = {}
+
+        fields = _create_pydantic_fields(params, type_hints, param_descs)
+
+        assert "items" in fields
+        assert "config" in fields
+        assert "optional" in fields
+        assert fields["optional"][1].default is None
+
+
+class TestGenerateFuncDocumentation:
+    """Test suite for generate_func_documentation functionality."""
+
+    def test_generate_func_documentation_with_docstring(self):
+        """Test generating function documentation from docstring."""
+
+        def test_func(message: str) -> str:
+            """Test function with docstring.
+
+            message: The message to process
+            """
+            return message
+
+        doc_info = generate_func_documentation(test_func)
+
+        assert doc_info.name == "test_func"
+        assert doc_info.description == "Test function with docstring."
+        assert doc_info.param_descriptions == {"message": "The message to process"}
+
+    def test_generate_func_documentation_without_docstring(self):
+        """Test generating function documentation without docstring."""
+
+        def test_func(message: str) -> str:
+            return message
+
+        doc_info = generate_func_documentation(test_func)
+
+        assert doc_info.name == "test_func"
+        assert doc_info.description is None
+        assert doc_info.param_descriptions is None
+
+    def test_generate_func_documentation_with_partial_docstring(self):
+        """Test generating function documentation with partial docstring."""
+
+        def test_func(message: str) -> str:
+            """Test function with partial docstring."""
+            return message
+
+        doc_info = generate_func_documentation(test_func)
+
+        assert doc_info.name == "test_func"
+        assert doc_info.description == "Test function with partial docstring."
+        assert doc_info.param_descriptions is None
+
+
+class TestFunctionSchema:
+    """Test suite for function_schema functionality."""
+
+    def test_function_schema_with_invalid_function(self):
+        """Test function_schema with invalid function."""
+        with pytest.raises(AttributeError) as exc_info:
+            function_schema(None)
+        assert "'NoneType' object has no attribute '__name__'" in str(exc_info.value)
+
+    def test_function_schema_with_custom_name_and_description(self):
+        """Test function_schema with custom name and description."""
+
+        def test_func(message: str) -> str:
+            return message
+
+        schema = function_schema(
+            test_func,
+            name_override="custom_name",
+            description_override="Custom description",
+            use_docstring_info=False,
+        )
+
+        assert schema.name == "custom_name"
+        assert schema.description == "Custom description"
+
+    def test_function_schema_with_strict_mode(self):
+        """Test function_schema with strict mode enabled."""
+
+        def test_func(message: str) -> str:
+            return message
+
+        schema = function_schema(test_func, strict_json_schema=True)
+        assert schema.strict_json_schema is True
+
+        schema = function_schema(test_func, strict_json_schema=False)
+        assert schema.strict_json_schema is False

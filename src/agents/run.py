@@ -199,6 +199,7 @@ class Runner:
         should_run_agent_start_charms: bool,
         input: str | list[InputItem],
     ) -> SingleStepResult:
+
         if current_turn == 1:
             try:
                 shield_result = await cls._run_input_shields(
@@ -644,13 +645,6 @@ class Runner:
         run_config: RunConfig,
         should_run_agent_start_charms: bool,
     ) -> SingleStepResult:
-        if should_run_agent_start_charms:
-            await cls._run_agent_start_charms(
-                charms,
-                agent,
-                context_wrapper,
-            )
-
         system_prompt = await agent.get_system_prompt(context_wrapper)
         output_schema = cls._get_output_schema(agent)
         orbs = cls._get_orbs(agent)
