@@ -4,7 +4,7 @@ import inspect
 from typing import Any
 
 import pytest
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from src.gear.sword import (
     FuncSchema,
@@ -12,7 +12,7 @@ from src.gear.sword import (
     function_sword,
 )
 from src.util._constants import ERROR_MESSAGES
-from src.util._exceptions import create_error_handler
+from src.util._exceptions import ModelError, create_error_handler
 from src.util._types import RunContextWrapper
 
 
@@ -43,12 +43,28 @@ class TestSwordErrorHandling:
     async def test_function_sword_with_error_handling(self, mock_context: RunContextWrapper[Any]):
         """Test function sword with error handling."""
 
-        @function_sword(failure_error_function=None)
+        @function_sword
         async def test_sword(message: str) -> str:
             raise ValueError("Test error")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ModelError) as exc_info:
             await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        assert (
+            str(exc_info.value)
+            == "❌ Error while running a sword: ❌ Error while running a sword: Test error"
+        )
+
+    @pytest.mark.asyncio
+    async def test_function_sword_with_invalid_json(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with invalid JSON input."""
+
+        @function_sword
+        async def test_sword(message: str) -> str:
+            return message
+
+        with pytest.raises(ModelError) as exc_info:
+            await test_sword.on_invoke_sword(mock_context, "invalid json")
+        assert "Expecting value" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_function_sword_with_custom_error_handler(
@@ -63,8 +79,32 @@ class TestSwordErrorHandling:
         async def test_sword(message: str) -> str:
             raise ValueError("Test error")
 
-        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-        assert result == "Custom error: Test error"
+        with pytest.raises(ModelError) as exc_info:
+            await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        assert (
+            str(exc_info.value)
+            == "❌ Error while running a sword: ❌ Error while running a sword: Test error"
+        )
+
+    @pytest.mark.asyncio
+    async def test_function_sword_with_async_error_handler(
+        self, mock_context: RunContextWrapper[Any]
+    ):
+        """Test function sword with async error handler."""
+
+        async def custom_error_handler(ctx: RunContextWrapper[Any], error: Exception) -> str:
+            return f"Async error: {str(error)}"
+
+        @function_sword(failure_error_function=custom_error_handler)
+        async def test_sword(message: str) -> str:
+            raise ValueError("Test error")
+
+        with pytest.raises(ModelError) as exc_info:
+            await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        assert (
+            str(exc_info.value)
+            == "❌ Error while running a sword: ❌ Error while running a sword: Test error"
+        )
 
 
 class TestFuncSchema:
@@ -126,6 +166,58 @@ class TestFuncSchema:
 
         assert positional_args == ["test"]
         assert keyword_args == {}
+
+    def test_to_call_args_with_var_positional(self):
+        """Test converting Pydantic model with variable positional arguments."""
+
+        class TestModel(BaseModel):
+            args: list[int]
+
+        def test_func(*args: int) -> None:
+            pass
+
+        schema = FuncSchema(
+            name="test",
+            description="Test schema",
+            params_pydantic_model=TestModel,
+            params_json_schema=TestModel.model_json_schema(),
+            signature=inspect.signature(test_func),
+            on_invoke_sword=lambda ctx, input: None,
+            takes_context=False,
+            strict_json_schema=True,
+        )
+
+        data = TestModel(args=[1, 2, 3])
+        positional_args, keyword_args = schema.to_call_args(data)
+
+        assert positional_args == [1, 2, 3]
+        assert keyword_args == {}
+
+    def test_to_call_args_with_var_keyword(self):
+        """Test converting Pydantic model with variable keyword arguments."""
+
+        class TestModel(BaseModel):
+            kwargs: dict[str, Any]
+
+        def test_func(**kwargs: Any) -> None:
+            pass
+
+        schema = FuncSchema(
+            name="test",
+            description="Test schema",
+            params_pydantic_model=TestModel,
+            params_json_schema=TestModel.model_json_schema(),
+            signature=inspect.signature(test_func),
+            on_invoke_sword=lambda ctx, input: None,
+            takes_context=False,
+            strict_json_schema=True,
+        )
+
+        data = TestModel(kwargs={"a": 1, "b": 2})
+        positional_args, keyword_args = schema.to_call_args(data)
+
+        assert positional_args == []
+        assert keyword_args == {"a": 1, "b": 2}
 
 
 class TestFunctionSword:
@@ -228,7 +320,7 @@ class TestFunctionSword:
         assert result == "test"
 
         # Test with invalid input (extra field)
-        with pytest.raises(ValidationError):
+        with pytest.raises(ModelError):
             await test_sword.on_invoke_sword(mock_context, '{"message": "test", "extra": "field"}')
 
     @pytest.mark.asyncio
@@ -244,11 +336,64 @@ class TestFunctionSword:
         assert result == "test 1"
 
         # Test with invalid input (wrong type)
-        with pytest.raises(ValidationError):
+        with pytest.raises(ModelError):
             await test_sword.on_invoke_sword(
                 mock_context, '{"message": "test", "count": "not a number"}'
             )
 
         # Test with missing required parameter
-        with pytest.raises(ValidationError):
+        with pytest.raises(ModelError):
             await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+
+    @pytest.mark.asyncio
+    async def test_nested_models(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with nested Pydantic models."""
+
+        class NestedModel(BaseModel):
+            value: str
+
+        class TestModel(BaseModel):
+            nested: NestedModel
+
+        @function_sword
+        async def test_sword(nested: NestedModel) -> str:
+            return nested.value
+
+        result = await test_sword.on_invoke_sword(mock_context, '{"nested": {"value": "test"}}')
+        assert result == "test"
+
+    @pytest.mark.asyncio
+    async def test_optional_parameters(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with optional parameters."""
+
+        @function_sword
+        async def test_sword(message: str, optional: str | None = None) -> str:
+            return f"{message} {optional}" if optional else message
+
+        # Test without optional parameter
+        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        assert result == "test"
+
+        # Test with optional parameter
+        result = await test_sword.on_invoke_sword(
+            mock_context, '{"message": "test", "optional": "extra"}'
+        )
+        assert result == "test extra"
+
+    @pytest.mark.asyncio
+    async def test_invalid_json(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with invalid JSON input."""
+
+        # Create a sword with strict mode enabled and no error handler
+        @function_sword(strict_mode=True, failure_error_function=None)
+        async def test_sword(message: str) -> str:
+            return message
+
+        # Test with malformed JSON
+        with pytest.raises(ModelError):
+            await test_sword.on_invoke_sword(mock_context, "{invalid json")
+
+        # Test with empty string
+        with pytest.raises(ModelError) as exc_info:
+            await test_sword.on_invoke_sword(mock_context, "")
+        assert "Expecting value" in str(exc_info.value)

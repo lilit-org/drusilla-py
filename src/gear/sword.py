@@ -8,6 +8,7 @@ which are specialized tools that wrap Python functions with enhanced capabilitie
 from __future__ import annotations
 
 import inspect
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import (
@@ -18,11 +19,11 @@ from typing import (
     overload,
 )
 
-from pydantic import BaseModel, Field, ValidationError, create_model
+from pydantic import BaseModel, Field, create_model
 from typing_extensions import ParamSpec
 
 from ..util._constants import ERROR_MESSAGES
-from ..util._exceptions import UsageError, create_error_handler
+from ..util._exceptions import ModelError, UsageError, create_error_handler
 from ..util._items import RunItem
 from ..util._strict_schema import ensure_strict_json_schema
 from ..util._types import MaybeAwaitable, RunContextWrapper, SwordFuncAsync, SwordFuncSync
@@ -64,7 +65,7 @@ class SwordResult:
 
 
 ########################################################
-#     Create swod decorator factory
+#     Create sword decorator factory
 ########################################################
 
 
@@ -127,13 +128,8 @@ def create_sword_decorator(
             async def on_invoke(ctx: RunContextWrapper[Any], input: str) -> Any:
                 try:
                     return await schema.on_invoke_sword(ctx, input)
-                except ValidationError:
-                    raise  # Re-raise ValidationError directly
                 except Exception as e:
-                    if failure_error_function:
-                        msg = failure_error_function(ctx, e)
-                        return await msg if inspect.iscoroutine(msg) else msg
-                    raise
+                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
 
             return sword_class(
                 name=schema.name,
@@ -199,7 +195,6 @@ class FuncSchema:
             elif param.kind == param.POSITIONAL_ONLY:
                 positional_params.append(name)
             elif param.kind == param.POSITIONAL_OR_KEYWORD:
-                # Parameters with default values are treated as keyword args
                 if param.default == param.empty:
                     positional_params.append(name)
                 else:
@@ -301,7 +296,7 @@ def function_schema(
 
 
 ########################################################
-#        Methods for invocation and its processing
+#             Invocation Methods
 ########################################################
 
 
@@ -316,12 +311,7 @@ def _create_invocation_handler(
 
     async def on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
         try:
-            # Parse JSON first to catch any JSON parsing errors
-            import json
-
             json_data = json.loads(input)
-
-            # Validate against the model with strict mode
             data = dynamic_model.model_validate(json_data, strict=strict_json_schema)
 
             args, kwargs = FuncSchema(
@@ -341,14 +331,8 @@ def _create_invocation_handler(
             if inspect.iscoroutinefunction(func):
                 return await func(*args, **kwargs)
             return func(*args, **kwargs)
-        except json.JSONDecodeError as e:
-            raise ValidationError(
-                errors=[{"loc": (), "msg": f"Invalid JSON: {str(e)}", "type": "json_invalid"}]
-            ) from e
-        except ValidationError as e:
-            raise e
         except Exception as e:
-            raise e
+            raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
 
     return on_invoke_sword
 
@@ -389,7 +373,7 @@ def _process_parameters(
 
 
 ########################################################
-#   Data class and methods for FuncDocumentation
+#        FuncDocumentation Dataclass and methods
 ########################################################
 
 
@@ -440,7 +424,7 @@ def _create_pydantic_fields(
     type_hints: dict[str, Any],
     param_descs: dict[str, str],
 ) -> dict[str, tuple[Any, Field]]:
-    """Create Pydantic fields from function parameters."""
+
     fields: dict[str, tuple[Any, Field]] = {}
 
     for name, param in params:

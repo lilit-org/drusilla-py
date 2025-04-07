@@ -160,10 +160,7 @@ def create_sword_decorator(
                 try:
                     return await schema.on_invoke_sword(ctx, input)
                 except Exception as e:
-                    if failure_error_function:
-                        msg = failure_error_function(ctx, e)
-                        return await msg if inspect.iscoroutine(msg) else msg
-                    raise
+                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
 
             return sword_class(
                 name=schema.name,
@@ -231,7 +228,6 @@ class FuncSchema:
             elif param.kind == param.POSITIONAL_ONLY:
                 positional_params.append(name)
             elif param.kind == param.POSITIONAL_OR_KEYWORD:
-                # Parameters with default values are treated as keyword arguments
                 if param.default == param.empty:
                     positional_params.append(name)
                 else:
@@ -296,8 +292,17 @@ def function_schema(
     # Create Pydantic model fields
     fields = _create_pydantic_fields(filtered_params, type_hints, param_descs)
 
+    # Create base model with desired configuration
+    class DynamicBase(BaseModel):
+        model_config = {"extra": "forbid" if strict_json_schema else "allow", "strict": True}
+
     # Create dynamic model and schema
-    dynamic_model = create_model(f"{func_name}_args", __base__=BaseModel, **fields)
+    dynamic_model = create_model(
+        f"{func_name}_args",
+        __base__=DynamicBase,
+        **fields,
+    )
+
     json_schema = dynamic_model.model_json_schema()
     if strict_json_schema:
         json_schema = ensure_strict_json_schema(json_schema)
@@ -308,6 +313,7 @@ def function_schema(
         dynamic_model,
         sig,
         takes_context,
+        strict_json_schema,
     )
 
     return FuncSchema(
@@ -334,28 +340,35 @@ def _create_invocation_handler(
     dynamic_model: type[BaseModel],
     sig: inspect.Signature,
     takes_context: bool,
+    strict_json_schema: bool = True,
 ) -> Callable[[RunContextWrapper[Any], str], Awaitable[Any]]:
     """Create the sword invocation handler."""
 
     async def on_invoke_sword(ctx: RunContextWrapper[Any], input: str) -> Any:
-        data = dynamic_model.model_validate_json(input)
-        args, kwargs = FuncSchema(
-            name=func.__name__,
-            description=None,
-            params_pydantic_model=dynamic_model,
-            params_json_schema=dynamic_model.model_json_schema(),
-            signature=sig,
-            on_invoke_sword=lambda _, __: None,
-            takes_context=takes_context,
-            strict_json_schema=True,
-        ).to_call_args(data)
+        try:
 
-        if takes_context:
-            args.insert(0, ctx)
+            json_data = json.loads(input)
+            data = dynamic_model.model_validate(json_data, strict=strict_json_schema)
 
-        if inspect.iscoroutinefunction(func):
-            return await func(*args, **kwargs)
-        return func(*args, **kwargs)
+            args, kwargs = FuncSchema(
+                name=func.__name__,
+                description=None,
+                params_pydantic_model=dynamic_model,
+                params_json_schema=dynamic_model.model_json_schema(),
+                signature=sig,
+                on_invoke_sword=lambda _, __: None,
+                takes_context=takes_context,
+                strict_json_schema=strict_json_schema,
+            ).to_call_args(data)
+
+            if takes_context:
+                args.insert(0, ctx)
+
+            if inspect.iscoroutinefunction(func):
+                return await func(*args, **kwargs)
+            return func(*args, **kwargs)
+        except Exception as e:
+            raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
 
     return on_invoke_sword
 
@@ -449,7 +462,7 @@ def _create_pydantic_fields(
     type_hints: dict[str, Any],
     param_descs: dict[str, str],
 ) -> dict[str, tuple[Any, Field]]:
-    """Create Pydantic fields from function parameters."""
+
     fields: dict[str, tuple[Any, Field]] = {}
 
     for name, param in params:
@@ -462,11 +475,11 @@ def _create_pydantic_fields(
 
         if param.kind == param.VAR_POSITIONAL:
             # Handle *args - always use list[Any]
-            ann = list[Any]  # type: ignore
+            ann = list[Any]
             field = Field(default_factory=list, description=field_description)
         elif param.kind == param.VAR_KEYWORD:
             # Handle **kwargs - always use dict[str, Any]
-            ann = dict[str, Any]  # type: ignore
+            ann = dict[str, Any]
             field = Field(default_factory=dict, description=field_description)
         else:
             field = Field(
