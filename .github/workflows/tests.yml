@@ -6,13 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  SWORD_ERROR_MESSAGE: ${{ vars.SWORD_ERROR_MESSAGE }}
-  RUNCONTEXT_ERROR_MESSAGE: ${{ vars.RUNCONTEXT_ERROR_MESSAGE }}
-  SHIELD_ERROR_MESSAGE: ${{ vars.SHIELD_ERROR_MESSAGE }}
-  RUNNER_ERROR_MESSAGE: ${{ vars.RUNNER_ERROR_MESSAGE }}
-  ORBS_ERROR_MESSAGE: ${{ vars.ORBS_ERROR_MESSAGE }}
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,6 +16,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+
+      - name: Set environment variables from .env.example
+        run: |
+          while IFS='=' read -r key value; do
+            # Skip comments and empty lines
+            if [[ $key != \#* && -n $key ]]; then
+              # Remove quotes and trim whitespace
+              value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+              echo "$key=$value" >> $GITHUB_ENV
+            fi
+          done < .env.example
 
       - name: Clean cache
         run: |
