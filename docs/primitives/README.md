@@ -2,7 +2,7 @@
 
 <br>
 
-the noctira project has a minimal set of core primitives that allows the design of multi-agent systems:
+the drusilla project has a minimal set of core primitives that allows the design of multi-agent systems:
 
 <br>
 

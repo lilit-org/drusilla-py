@@ -1,5 +1,5 @@
 """
-The Runner class is the core orchestrator for executing agents in the Noctira system.
+The Runner class is the core orchestrator for executing agents in the Drusilla system.
 It provides both synchronous and asynchronous interfaces for running agents with various
 configurations and capabilities.
 
