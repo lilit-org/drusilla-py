@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.agents.output import AgentOutputSchema
+from src.agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from src.gear.orbs import Orbs
 from src.gear.sword import Sword
 from src.models.interface import Model, ModelProvider
 from src.models.settings import ModelSettings
-from src.util._items import ModelResponse
-from src.util._types import InputItem, ResponseStreamEvent, Usage
+from src.runners.items import ModelResponse
+from src.util.types import InputItem, ResponseStreamEvent, Usage
 
 if TYPE_CHECKING:
     pass

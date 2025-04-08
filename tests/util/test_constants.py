@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 def test_constants():
     """Test basic constants."""
-    from src.util._constants import FAKE_RESPONSES_ID, UNSET
+    from src.util.constants import FAKE_RESPONSES_ID, UNSET
 
     assert UNSET is not None
     assert FAKE_RESPONSES_ID == "fake_responses"
@@ -13,7 +13,7 @@ def test_constants():
 
 def test_supported_languages():
     """Test supported languages set."""
-    from src.util._constants import SUPPORTED_LANGUAGES
+    from src.util.constants import SUPPORTED_LANGUAGES
 
     assert isinstance(SUPPORTED_LANGUAGES, set)
     assert len(SUPPORTED_LANGUAGES) > 0
@@ -27,7 +27,7 @@ def test_supported_languages():
 
 def test_logging_config():
     """Test logging configuration."""
-    from src.util._constants import LOG_LEVEL
+    from src.util.constants import LOG_LEVEL
 
     assert LOG_LEVEL in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     logger = logging.getLogger("deepseek.agents")
@@ -38,7 +38,7 @@ def test_logging_config():
 
 def test_connection_constants():
     """Test connection-related constants."""
-    from src.util._constants import API_KEY, BASE_URL, MODEL
+    from src.util.constants import API_KEY, BASE_URL, MODEL
 
     assert isinstance(BASE_URL, str)
     assert BASE_URL.startswith(("http://", "https://"))
@@ -49,7 +49,7 @@ def test_connection_constants():
 
 def test_model_logic_constants():
     """Test model logic and optimization constants."""
-    from src.util._constants import (
+    from src.util.constants import (
         LRU_CACHE_SIZE,
         MAX_GUARDRAIL_QUEUE_SIZE,
         MAX_QUEUE_SIZE,
@@ -71,7 +71,7 @@ def test_model_logic_constants():
 
 def test_http_constants():
     """Test HTTP client configuration constants."""
-    from src.util._constants import (
+    from src.util.constants import (
         HTTP_MAX_CONNECTIONS,
         HTTP_MAX_KEEPALIVE_CONNECTIONS,
         HTTP_TIMEOUT_CONNECT,
@@ -93,7 +93,7 @@ def test_http_constants():
 
 def test_api_constants():
     """Test API configuration constants."""
-    from src.util._constants import CHAT_COMPLETIONS_ENDPOINT, HEADERS
+    from src.util.constants import CHAT_COMPLETIONS_ENDPOINT, HEADERS
 
     assert isinstance(HEADERS, dict)
     assert "User-Agent" in HEADERS
@@ -140,28 +140,28 @@ def test_environment_variables():
         # Import the module after setting environment variables
         import importlib
 
-        from src.util import _constants
+        from src.util import constants
 
-        importlib.reload(_constants)
+        importlib.reload(constants)
 
         # Patch load_dotenv to do nothing
-        with patch("src.util._constants.load_dotenv"):
+        with patch("src.util.constants.load_dotenv"):
             # Reload environment variables
-            _constants.load_environment()
+            constants.load_environment()
 
-            assert _constants.LOG_LEVEL == "DEBUG"
-            assert _constants.BASE_URL == "https://test.example.com"
-            assert _constants.API_KEY == "test_key"
-            assert _constants.MODEL == "test_model"
-            assert _constants.MAX_TURNS == 5
-            assert _constants.MAX_QUEUE_SIZE == 500
-            assert _constants.MAX_GUARDRAIL_QUEUE_SIZE == 50
-            assert _constants.LRU_CACHE_SIZE == 64
-            assert _constants.HTTP_TIMEOUT_TOTAL == 60.0
-            assert _constants.HTTP_TIMEOUT_CONNECT == 15.0
-            assert _constants.HTTP_TIMEOUT_READ == 45.0
-            assert _constants.HTTP_MAX_KEEPALIVE_CONNECTIONS == 3
-            assert _constants.HTTP_MAX_CONNECTIONS == 5
+            assert constants.LOG_LEVEL == "DEBUG"
+            assert constants.BASE_URL == "https://test.example.com"
+            assert constants.API_KEY == "test_key"
+            assert constants.MODEL == "test_model"
+            assert constants.MAX_TURNS == 5
+            assert constants.MAX_QUEUE_SIZE == 500
+            assert constants.MAX_GUARDRAIL_QUEUE_SIZE == 50
+            assert constants.LRU_CACHE_SIZE == 64
+            assert constants.HTTP_TIMEOUT_TOTAL == 60.0
+            assert constants.HTTP_TIMEOUT_CONNECT == 15.0
+            assert constants.HTTP_TIMEOUT_READ == 45.0
+            assert constants.HTTP_MAX_KEEPALIVE_CONNECTIONS == 3
+            assert constants.HTTP_MAX_CONNECTIONS == 5
 
     finally:
         # Restore original environment variables
@@ -176,11 +176,11 @@ def test_error_messages():
     """Test error message constants and environment variable overrides."""
     import importlib
 
-    from src.util import _constants
+    from src.util import constants
 
     # Test default error messages
-    assert _constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
-    assert _constants.ERROR_MESSAGES.RUNCONTEXT_ERROR.used_in == "src/gear/sword.py"
+    assert constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
+    assert constants.ERROR_MESSAGES.RUNCONTEXT_ERROR.used_in == "src/gear/sword.py"
 
     # Test environment variable overrides
     custom_sword_message = "Custom sword error: {error}"
@@ -193,6 +193,6 @@ def test_error_messages():
         },
     ):
         # Reload the module to pick up the new environment variables
-        importlib.reload(_constants)
-        assert _constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
-        assert _constants.ERROR_MESSAGES.RUNCONTEXT_ERROR.used_in == "src/gear/sword.py"
+        importlib.reload(constants)
+        assert constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
+        assert constants.ERROR_MESSAGES.RUNCONTEXT_ERROR.used_in == "src/gear/sword.py"

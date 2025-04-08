@@ -14,10 +14,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from ..agents.output import AgentOutputSchema
+from ..agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from ..gear.sword import Sword
-from ..util._items import ModelResponse
-from ..util._types import InputItem, ResponseStreamEvent
+from ..runners.items import ModelResponse
+from ..util.types import InputItem, ResponseStreamEvent
 from .settings import ModelSettings
 
 if TYPE_CHECKING:

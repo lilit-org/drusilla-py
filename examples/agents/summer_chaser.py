@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-This script demonstrates the agents-as-swords pattern where a frontline agent selects
-translation agents to handle user messages.
-"""
-
 import sys
 from pathlib import Path
 
@@ -12,13 +7,13 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from functools import lru_cache
 
-from src.agents.agent import Agent
-from src.agents.run import Runner
+from src.agents.agent_v1 import AgentV1 as Agent
 from src.gear.sword import function_sword
-from src.util._client import setup_client
-from src.util._constants import LRU_CACHE_SIZE
-from src.util._exceptions import AgentExecutionError, UsageError
-from src.util._print import pretty_print_result, pretty_print_result_stats
+from src.network.client import setup_client
+from src.runners.run import Runner
+from src.util.constants import LRU_CACHE_SIZE
+from src.util.exceptions import AgentExecutionError, UsageError
+from src.util.print import pretty_print_result, pretty_print_result_stats
 
 ########################################################
 #           Swords

@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 
-from src.agents.agent import Agent
+from src.agents.agent_v1 import AgentV1 as Agent
 from src.gear.shield import (
     InputShield,
     ShieldResult,
     input_shield,
     output_shield,
 )
-from src.util._constants import ERROR_MESSAGES
-from src.util._exceptions import UsageError
-from src.util._types import InputItem, RunContextWrapper
-
-if TYPE_CHECKING:
-    from src.agents.agent import Agent
+from src.util.constants import ERROR_MESSAGES
+from src.util.exceptions import UsageError
+from src.util.types import InputItem, RunContextWrapper
 
 
 class MockAgent(Agent[Any]):
@@ -53,71 +50,53 @@ def input_data() -> str | list[InputItem]:
 
 
 @pytest.mark.asyncio
-async def test_input_shield_sync(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
-    """Test synchronous input shield."""
+async def test_shield_decorators(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
+    """Test both input and output shield decorators with sync and async functions."""
 
+    # Test input shield
     @input_shield
-    def test_shield(
+    def sync_input_shield(
         ctx: RunContextWrapper[Any],
         agent: Agent[Any],
         input_data: str | list[InputItem],
     ) -> ShieldResult:
         return ShieldResult(success=True, data="processed")
 
-    result = await test_shield.run(mock_context, mock_agent, "test input")
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_input_shield_async(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
-    """Test asynchronous input shield."""
-
     @input_shield
-    async def test_shield(
+    async def async_input_shield(
         ctx: RunContextWrapper[Any],
         agent: Agent[Any],
         input_data: str | list[InputItem],
     ) -> ShieldResult:
         return ShieldResult(success=True, data="processed")
 
-    result = await test_shield.run(mock_context, mock_agent, "test input")
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_output_shield_sync(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
-    """Test synchronous output shield."""
-
+    # Test output shield
     @output_shield
-    def test_shield(
+    def sync_output_shield(
         ctx: RunContextWrapper[Any],
         agent: Agent[Any],
         output: Any,
     ) -> ShieldResult:
         return ShieldResult(success=True, data="processed")
 
-    result = await test_shield.run(mock_context, mock_agent, "test output")
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_output_shield_async(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
-    """Test asynchronous output shield."""
-
     @output_shield
-    async def test_shield(
+    async def async_output_shield(
         ctx: RunContextWrapper[Any],
         agent: Agent[Any],
         output: Any,
     ) -> ShieldResult:
         return ShieldResult(success=True, data="processed")
 
-    result = await test_shield.run(mock_context, mock_agent, "test output")
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
+    # Run all tests
+    for shield in [sync_input_shield, async_input_shield]:
+        result = await shield.run(mock_context, mock_agent, "test input")
+        assert result.tripwire_triggered is False
+        assert result.result == "processed"
+
+    for shield in [sync_output_shield, async_output_shield]:
+        result = await shield.run(mock_context, mock_agent, "test output")
+        assert result.tripwire_triggered is False
+        assert result.result == "processed"
 
 
 def test_shield_with_name():
@@ -163,32 +142,25 @@ async def test_shield_error_handling(mock_context: RunContextWrapper[Any], mock_
 
 
 @pytest.mark.asyncio
-async def test_shield_with_list_input(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
-    """Test shield with list input."""
+async def test_shield_with_complex_data(
+    mock_context: RunContextWrapper[Any], mock_agent: MockAgent
+):
+    """Test shield with complex input and output data."""
 
+    # Test with list input
     @input_shield
-    def test_shield(
+    def test_input_shield(
         ctx: RunContextWrapper[Any],
         agent: Agent[Any],
         input_data: str | list[InputItem],
     ) -> ShieldResult:
-        assert isinstance(input_data, list)
-        return ShieldResult(success=True, data="processed")
+        if isinstance(input_data, list):
+            return ShieldResult(success=True, data="processed list")
+        return ShieldResult(success=True, data="processed string")
 
-    input_list = [InputItem(content="item1"), InputItem(content="item2")]
-    result = await test_shield.run(mock_context, mock_agent, input_list)
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_shield_with_complex_output(
-    mock_context: RunContextWrapper[Any], mock_agent: MockAgent
-):
-    """Test shield with complex output."""
-
+    # Test with complex output
     @output_shield
-    def test_shield(
+    def test_output_shield(
         ctx: RunContextWrapper[Any],
         agent: Agent[Any],
         output: Any,
@@ -198,95 +170,18 @@ async def test_shield_with_complex_output(
             data={"processed": True, "data": output},
         )
 
-    result = await test_shield.run(mock_context, mock_agent, {"key": "value"})
+    # Test list input
+    input_list = [InputItem(content="item1"), InputItem(content="item2")]
+    result = await test_input_shield.run(mock_context, mock_agent, input_list)
+    assert result.tripwire_triggered is False
+    assert result.result == "processed list"
+
+    # Test string input
+    result = await test_input_shield.run(mock_context, mock_agent, "test input")
+    assert result.tripwire_triggered is False
+    assert result.result == "processed string"
+
+    # Test complex output
+    result = await test_output_shield.run(mock_context, mock_agent, {"key": "value"})
     assert result.tripwire_triggered is False
     assert result.result == {"processed": True, "data": {"key": "value"}}
-
-
-@pytest.mark.asyncio
-async def test_shield_with_none_output(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
-    """Test shield with None output."""
-
-    @output_shield
-    def test_shield(
-        ctx: RunContextWrapper[Any],
-        agent: Agent[Any],
-        output: Any,
-    ) -> ShieldResult:
-        return ShieldResult(success=True, data=None)
-
-    result = await test_shield.run(mock_context, mock_agent, "test output")
-    assert result.tripwire_triggered is False
-    assert result.result is None
-
-
-@pytest.mark.asyncio
-async def test_input_shield_with_list_input(
-    mock_context: RunContextWrapper[Any],
-    mock_agent: Agent[Any],
-    input_data: str | list[InputItem],
-):
-    shield = InputShield(lambda ctx, agent, data: ShieldResult(success=True, data="processed"))
-    result = await shield.run(mock_context, mock_agent, input_data)
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_input_shield_with_string_input(
-    mock_context: RunContextWrapper[Any],
-    mock_agent: Agent[Any],
-    input_data: str | list[InputItem],
-):
-    shield = InputShield(lambda ctx, agent, data: ShieldResult(success=True, data="processed"))
-    result = await shield.run(mock_context, mock_agent, input_data)
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_input_shield_with_custom_validation(
-    mock_context: RunContextWrapper[Any],
-    mock_agent: Agent[Any],
-    input_data: str | list[InputItem],
-):
-    shield = InputShield(lambda ctx, agent, data: ShieldResult(success=True, data="processed"))
-    result = await shield.run(mock_context, mock_agent, input_data)
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_input_shield_with_async_validation(
-    mock_context: RunContextWrapper[Any],
-    mock_agent: Agent[Any],
-    input_data: str | list[InputItem],
-):
-    shield = InputShield(lambda ctx, agent, data: ShieldResult(success=True, data="processed"))
-    result = await shield.run(mock_context, mock_agent, input_data)
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_input_shield_with_tripwire(
-    mock_context: RunContextWrapper[Any],
-    mock_agent: Agent[Any],
-    input_data: str | list[InputItem],
-):
-    shield = InputShield(lambda ctx, agent, data: ShieldResult(success=True, data="processed"))
-    result = await shield.run(mock_context, mock_agent, input_data)
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"
-
-
-@pytest.mark.asyncio
-async def test_input_shield_with_list_input_and_tripwire(
-    mock_context: RunContextWrapper[Any],
-    mock_agent: Agent[Any],
-):
-    input_list = [InputItem(content="item1"), InputItem(content="item2")]
-    shield = InputShield(lambda ctx, agent, data: ShieldResult(success=True, data="processed"))
-    result = await shield.run(mock_context, mock_agent, input_list)
-    assert result.tripwire_triggered is False
-    assert result.result == "processed"

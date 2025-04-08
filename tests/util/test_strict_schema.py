@@ -1,11 +1,15 @@
 import pytest
+from pydantic import BaseModel
 
-from src.util._strict_schema import (
+from src.util.schema import (
     EMPTY_JSON_SCHEMA,
     ModelError,
     UsageError,
     ensure_strict_json_schema,
+    get_type_adapter,
+    is_subclass_of_base_model_or_dict,
     resolve_schema_ref,
+    type_to_str,
 )
 
 
@@ -164,3 +168,39 @@ def test_invalid_ref_format():
 
     with pytest.raises(ModelError):
         resolve_schema_ref(root=schema, ref="invalid_ref")
+
+
+def test_is_subclass_of_base_model_or_dict():
+    """Test checking if a type is a subclass of BaseModel or dict."""
+
+    class TestModel(BaseModel):
+        pass
+
+    assert is_subclass_of_base_model_or_dict(TestModel) is True
+    assert is_subclass_of_base_model_or_dict(dict) is True
+    assert is_subclass_of_base_model_or_dict(str) is False
+    assert is_subclass_of_base_model_or_dict(None) is False
+    assert is_subclass_of_base_model_or_dict("not a type") is False
+
+
+def test_type_to_str():
+    """Test converting types to string representation."""
+    assert type_to_str(str) == "str"
+    assert type_to_str(int) == "int"
+    assert type_to_str(list[str]) == "list[str]"
+    assert type_to_str(dict[str, int]) == "dict[str, int]"
+    assert type_to_str(list[dict[str, int]]) == "list[dict[str, int]]"
+
+
+def test_get_type_adapter():
+    """Test getting type adapter with caching."""
+    adapter1 = get_type_adapter(str)
+    adapter2 = get_type_adapter(str)
+    assert adapter1 is adapter2  # Should be cached
+
+    adapter3 = get_type_adapter(int)
+    assert adapter3 is not adapter1
+
+    # Test with None
+    adapter4 = get_type_adapter(None)
+    assert adapter4 is not None

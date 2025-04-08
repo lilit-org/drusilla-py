@@ -4,9 +4,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.gear.shield import InputShieldResult, OutputShieldResult, ShieldResult
-from src.util._items import MessageOutputItem, ModelResponse
-from src.util._result import RunResult, RunResultStreaming
-from src.util._types import QueueCompleteSentinel, Usage
+from src.runners.items import MessageOutputItem, ModelResponse
+from src.runners.result import RunResult, RunResultStreaming
+from src.util.types import QueueCompleteSentinel, Usage
 
 
 @pytest.fixture

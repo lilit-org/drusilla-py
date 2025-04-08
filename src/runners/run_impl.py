@@ -18,6 +18,8 @@ from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
+from ..agents.agent_v1 import AgentV1 as Agent
+from ..agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from ..gear.charms import RunCharms
 from ..gear.orbs import Orbs, OrbsInputData
 from ..gear.shield import (
@@ -27,9 +29,18 @@ from ..gear.shield import (
     OutputShieldResult,
 )
 from ..gear.sword import Sword, SwordResult
-from ..util._constants import logger
-from ..util._exceptions import AgentError, ModelError, UsageError
-from ..util._items import (
+from ..runners.result import SwordsToFinalOutputResult
+from ..util.constants import MAX_TURNS, logger
+from ..util.exceptions import AgentError, GenericError, ModelError, UsageError
+from ..util.types import (
+    InputItem,
+    QueueCompleteSentinel,
+    ResponseFunctionSwordCall,
+    RunContextWrapper,
+    TContext,
+)
+from .config import RunConfig
+from .items import (
     ItemHelpers,
     MessageOutputItem,
     ModelResponse,
@@ -40,16 +51,7 @@ from ..util._items import (
     SwordCallItem,
     SwordCallOutputItem,
 )
-from ..util._stream_events import RunItemStreamEvent, StreamEvent
-from ..util._types import (
-    InputItem,
-    QueueCompleteSentinel,
-    ResponseFunctionSwordCall,
-    RunContextWrapper,
-    TContext,
-)
-from .agent import Agent, SwordsToFinalOutputResult
-from .output import AgentOutputSchema
+from .stream_events import RunItemStreamEvent, StreamEvent
 
 if TYPE_CHECKING:
     from .run import RunConfig
@@ -562,3 +564,105 @@ class RunImpl:
 
         logger.error(f"Invalid sword_use_behavior: {agent.sword_use_behavior}")
         raise UsageError(f"Invalid sword_use_behavior: {agent.sword_use_behavior}")
+
+    @classmethod
+    async def run(
+        cls,
+        agent: Agent[TContext],
+        input: str | list[InputItem],
+        *,
+        context: TContext | None = None,
+        max_turns: int = MAX_TURNS,
+        charms: RunCharms[TContext] | None = None,
+        run_config: RunConfig | None = None,
+    ) -> Any:
+        """Run an agent with the given input and configuration.
+
+        Args:
+            agent: The agent to run
+            input: The input to process
+            context: Optional context for the run
+            max_turns: Maximum number of turns to run
+            charms: Optional charms for customizing behavior
+            run_config: Optional run configuration
+
+        Returns:
+            The final output from the agent
+        """
+        context_wrapper = RunContextWrapper(context or {})
+        charms = charms or RunCharms()
+        run_config = run_config or RunConfig(max_turns=max_turns)
+
+        current_agent = agent
+        current_input = input
+        pre_step_items: list[RunItem] = []
+        turn_count = 0
+        last_output = None
+
+        while turn_count < max_turns:
+            # Get model response
+            try:
+                response = await current_agent.model.get_response(
+                    agent=current_agent,
+                    input=current_input,
+                    context=context_wrapper,
+                )
+            except Exception as e:
+                raise ModelError(f"Failed to get model response: {e}") from e
+
+            # Process response and execute swords/side effects
+            processed_response = cls.process_model_response(
+                agent=current_agent,
+                response=response,
+                output_schema=(
+                    AgentOutputSchema(current_agent.output_type)
+                    if current_agent.output_type
+                    else None
+                ),
+                orbs=current_agent.orbs,
+            )
+
+            step_result = await cls.execute_swords_and_side_effects(
+                agent=current_agent,
+                original_input=current_input,
+                pre_step_items=pre_step_items,
+                new_response=response,
+                processed_response=processed_response,
+                output_schema=(
+                    AgentOutputSchema(current_agent.output_type)
+                    if current_agent.output_type
+                    else None
+                ),
+                charms=charms,
+                context_wrapper=context_wrapper,
+                run_config=run_config,
+            )
+
+            # Update state for next turn
+            pre_step_items = step_result.generated_items
+            turn_count += 1
+
+            # Store the last output if we have one
+            if isinstance(step_result.next_step, NextStepFinalOutput):
+                last_output = step_result.next_step.output
+            elif isinstance(step_result.next_step, NextStepOrbs):
+                current_agent = step_result.next_step.new_agent
+                current_input = step_result.original_input
+            elif isinstance(step_result.next_step, NextStepRunAgain):
+                current_input = step_result.original_input
+            else:
+                raise GenericError(f"Unexpected next step type: {type(step_result.next_step)}")
+
+            # If we've reached max_turns, return the last output
+            if turn_count >= max_turns:
+                if last_output is not None:
+                    return last_output
+                # If we don't have a final output, return the last message
+                message_items = [
+                    item for item in pre_step_items if isinstance(item, MessageOutputItem)
+                ]
+                if message_items:
+                    return ItemHelpers.extract_last_text(message_items[-1].raw_item)
+                return ""
+
+        raise GenericError(f"Maximum turns ({max_turns}) exceeded")

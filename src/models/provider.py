@@ -16,10 +16,10 @@ Key features:
 
 from __future__ import annotations
 
-from src.util._client import DeepSeekClient
-from src.util._constants import BASE_URL, MODEL
-from src.util._http import DefaultAsyncHttpxClient
-from src.util._types import AsyncDeepSeek
+from src.network.client import DeepSeekClient
+from src.network.http import DefaultAsyncHttpxClient
+from src.util.constants import BASE_URL, MODEL
+from src.util.types import AsyncDeepSeek
 
 from .chat import ModelChatCompletionsModel
 from .interface import Model

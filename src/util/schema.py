@@ -17,10 +17,12 @@ maintaining consistent data structures.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Final, TypeAlias, cast
+from typing import Any, Final, TypeAlias, cast, get_args, get_origin
 
-from ._constants import LRU_CACHE_SIZE, UNSET
-from ._exceptions import ModelError, UsageError
+from pydantic import BaseModel, TypeAdapter
+
+from .constants import LRU_CACHE_SIZE, UNSET
+from .exceptions import ModelError, UsageError
 
 ########################################################
 #             Type Aliases and Constants                #
@@ -152,6 +154,35 @@ def _enforce_strict_schema_rules(
             schema = _enforce_strict_schema_rules(schema, path=path, root=root)
 
     return schema
+
+
+@lru_cache(maxsize=CACHE_SIZE)
+def is_subclass_of_base_model_or_dict(t: Any) -> bool:
+    """Check if a type is a subclass of BaseModel or dict."""
+    if not isinstance(t, type):
+        return False
+    origin = get_origin(t)
+    return issubclass(origin or t, BaseModel | dict)
+
+
+@lru_cache(maxsize=CACHE_SIZE)
+def type_to_str(t: type[Any]) -> str:
+    """Convert a type to its string representation."""
+    origin = get_origin(t)
+    args = get_args(t)
+
+    if origin is None:
+        return t.__name__
+    args_str = ", ".join(type_to_str(arg) for arg in args)
+    return f"{origin.__name__}[{args_str}]" if args else str(t)
+
+
+@lru_cache(maxsize=CACHE_SIZE)
+def get_type_adapter(output_type: type[Any]) -> TypeAdapter[Any]:
+    """Get or create a type adapter with caching."""
+    if output_type is None or output_type is str:
+        return TypeAdapter(output_type)
+    return TypeAdapter(output_type)
 
 
 ########################################################

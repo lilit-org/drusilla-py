@@ -19,11 +19,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
-from ._items import RunItem
-from ._types import ResponseStreamEvent
+from ..util.types import ResponseStreamEvent
+from .items import RunItem
 
 if TYPE_CHECKING:
-    from ..agents.agent import Agent
+    from ..agents.agent_v1 import Agent
 
 ########################################################
 #               Type Aliases                           #

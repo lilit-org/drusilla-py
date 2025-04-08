@@ -253,5 +253,11 @@ poetry run pytest tests/gear/test_orbs.py -v
 
 <br>
 
+#### simple orbs by an agent
+
 * [agent world traveler](../../examples/agents/world_traveler.py)
+
+
+#### advanced orbs by an agent
+
 * [agent friend with benefit](../../examples/agents/friend_with_benefits.py)

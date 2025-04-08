@@ -11,7 +11,7 @@ from src.models.shared import (
     set_default_model_key,
     set_use_responses_by_default,
 )
-from src.util._types import AsyncDeepSeek
+from src.util.types import AsyncDeepSeek
 
 
 @pytest.fixture

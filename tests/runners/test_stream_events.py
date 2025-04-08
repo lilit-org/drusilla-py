@@ -3,15 +3,15 @@ from typing import Any
 
 import pytest
 
-from src.util._items import RunItemBase
-from src.util._stream_events import (
+from src.runners.items import RunItemBase
+from src.runners.stream_events import (
     AgentUpdatedStreamEvent,
     RawResponsesStreamEvent,
     RunItemStreamEvent,
     RunItemStreamEventName,
     StreamEvent,
 )
-from src.util._types import ResponseStreamEvent
+from src.util.types import ResponseStreamEvent
 
 
 # Mock classes for testing

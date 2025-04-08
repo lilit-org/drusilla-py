@@ -1,7 +1,7 @@
 """
-The Runner class is the core orchestrator for executing agents in the Noctira system.
-It provides both synchronous and asynchronous interfaces for running agents with various
-configurations and capabilities.
+The Runner class is the core orchestrator for executing agents in the
+Drusilla system. It provides both synchronous and asynchronous interfaces
+for running agents with various configurations and capabilities.
 
 Key features:
 - Supports both synchronous (run_sync) and asynchronous (run) execution
@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
-from dataclasses import dataclass, field
 from typing import Any, cast
 
+from ..agents.agent_v1 import AgentV1 as Agent
+from ..agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from ..gear.charms import RunCharms
-from ..gear.orbs import Orbs, OrbsInputFilter, orbs
+from ..gear.orbs import Orbs, orbs
 from ..gear.shield import (
     InputShield,
     InputShieldResult,
@@ -29,23 +30,19 @@ from ..gear.shield import (
     OutputShieldResult,
 )
 from ..models.interface import Model
-from ..models.provider import ModelProvider
-from ..models.settings import ModelSettings
-from ..util._constants import ERROR_MESSAGES, MAX_TURNS
-from ..util._exceptions import (
-    GenericError,
+from ..util.constants import ERROR_MESSAGES, MAX_TURNS
+from ..util.exceptions import (
     InputShieldError,
     MaxTurnsError,
     MessageError,
     ModelError,
     OutputShieldError,
+    RunnerError,
 )
-from ..util._items import ItemHelpers, ModelResponse, RunItem
-from ..util._result import RunResult, RunResultStreaming
-from ..util._stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
-from ..util._types import InputItem, ResponseEvent, RunContextWrapper, TContext, Usage
-from .agent import Agent
-from .output import AgentOutputSchema
+from ..util.types import InputItem, ResponseEvent, RunContextWrapper, TContext, Usage
+from .config import RunConfig
+from .items import ItemHelpers, ModelResponse, RunItem
+from .result import RunResult, RunResultStreaming
 from .run_impl import (
     NextStepFinalOutput,
     NextStepOrbs,
@@ -54,22 +51,7 @@ from .run_impl import (
     RunImpl,
     SingleStepResult,
 )
-
-########################################################
-#               Data class for Run Config
-########################################################
-
-
-@dataclass(frozen=True)
-class RunConfig:
-    model: str | Model | None = None
-    model_provider: ModelProvider = field(default_factory=ModelProvider)
-    model_settings: ModelSettings | None = None
-    orbs_input_filter: OrbsInputFilter | None = None
-    input_shields: list[InputShield[TContext]] = field(default_factory=list)
-    output_shields: list[OutputShield[TContext]] = field(default_factory=list)
-    max_turns: int = MAX_TURNS
-
+from .stream_events import AgentUpdatedStreamEvent, RawResponsesStreamEvent
 
 ########################################################
 #               Main Class: Runner
@@ -81,7 +63,7 @@ class Runner:
     async def _initialize_run(
         cls,
         starting_agent: Agent[TContext],
-        input: str | list[InputItem],
+        input: str | list[InputItem] | None,
         context: TContext | None,
         max_turns: int,
         charms: RunCharms[TContext] | None,
@@ -93,17 +75,32 @@ class Runner:
         str | list[InputItem],
         AgentOutputSchema | None,
     ]:
+        if input is None:
+            raise RunnerError(
+                ERROR_MESSAGES.RUNNER_ERROR.message.format(
+                    error="Invalid input: input cannot be None"
+                )
+            )
+        if max_turns <= 0:
+            raise RunnerError(
+                ERROR_MESSAGES.RUNNER_ERROR.message.format(error="Max turns must be positive")
+            )
+
         charms = charms or RunCharms[Any]()
         run_config = run_config or RunConfig()
         config_dict = {k: v for k, v in run_config.__dict__.items() if k != "max_turns"}
+        _output_schema = cls._get_output_schema(starting_agent)
         return (
             charms,
             RunConfig(**config_dict, max_turns=max_turns),
             RunContextWrapper(context=context),
             input,
-            cls._get_output_schema(starting_agent),
+            _output_schema,
         )
 
+    ########################################################
+    #                       RUN()
+    ########################################################
     @classmethod
     async def run(
         cls,
@@ -176,15 +173,153 @@ class Runner:
                 elif isinstance(turn_result.next_step, NextStepRunAgain):
                     continue
                 else:
-                    raise GenericError(
+                    raise RunnerError(
                         ERROR_MESSAGES.RUNNER_ERROR.message.format(
                             error=f"Unknown next step type: {type(turn_result.next_step)}"
                         )
                     )
         except Exception as e:
-            if isinstance(e, GenericError | MaxTurnsError):
-                raise e
-            raise GenericError(str(e)) from e
+            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
+
+    ########################################################
+    #                     RUN_SYNC()
+    ########################################################
+    @classmethod
+    def run_sync(
+        cls,
+        starting_agent: Agent[TContext],
+        input: str | list[InputItem],
+        *,
+        context: TContext | None = None,
+        max_turns: int = MAX_TURNS,
+        charms: RunCharms[TContext] | None = None,
+        run_config: RunConfig | None = None,
+        timeout: float | None = None,
+    ) -> RunResult:
+        """Synchronous wrapper for run()."""
+        return asyncio.get_event_loop().run_until_complete(
+            asyncio.wait_for(
+                cls.run(
+                    starting_agent,
+                    input,
+                    context=context,
+                    max_turns=max_turns,
+                    charms=charms,
+                    run_config=run_config,
+                ),
+                timeout=timeout,
+            )
+        )
+
+    ########################################################
+    #                   RUN_STREAMED()
+    ########################################################
+    @classmethod
+    async def run_streamed(
+        cls,
+        starting_agent: Agent[TContext],
+        input: str | list[InputItem],
+        context: TContext | None = None,
+        max_turns: int = MAX_TURNS,
+        charms: RunCharms[TContext] | None = None,
+        run_config: RunConfig | None = None,
+    ) -> RunResultStreaming:
+        charms, run_config, context_wrapper, input, __output_schema = await cls._initialize_run(
+            starting_agent, input, context, max_turns, charms, run_config
+        )
+
+        streamed_result = cls._create_streamed_result(
+            input=input,
+            starting_agent=starting_agent,
+            max_turns=run_config.max_turns,
+        )
+
+        streamed_result._run_impl_task = asyncio.create_task(
+            cls._run_streamed_impl(
+                starting_input=input,
+                streamed_result=streamed_result,
+                starting_agent=starting_agent,
+                max_turns=max_turns,
+                charms=charms,
+                context_wrapper=context_wrapper,
+                run_config=run_config,
+            )
+        )
+        return streamed_result
+
+    ########################################################
+    #               Private Methods
+    ########################################################
+    @classmethod
+    async def _execute_turn(
+        cls,
+        *,
+        agent: Agent[TContext],
+        original_input: str | list[InputItem],
+        generated_items: list[RunItem],
+        charms: RunCharms[TContext],
+        context_wrapper: RunContextWrapper[TContext],
+        run_config: RunConfig,
+        should_run_agent_start_charms: bool,
+        current_turn: int = 1,
+        input: str | list[InputItem] | None = None,
+    ) -> SingleStepResult:
+        """Common implementation for executing a single turn."""
+        if should_run_agent_start_charms:
+            await cls._run_agent_start_charms(charms, agent, context_wrapper)
+
+        if current_turn == 1 and input is not None:
+            shield_result = await cls._run_input_shields(
+                agent=agent,
+                input=input,
+                context=context_wrapper,
+                shields=agent.input_shields + run_config.input_shields,
+            )
+            for result in shield_result:
+                if result.output.tripwire_triggered:
+                    raise RunnerError(
+                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
+                            error=str(InputShieldError(result))
+                        )
+                    )
+
+        system_prompt = await agent.get_system_prompt(context_wrapper)
+        output_schema = cls._get_output_schema(agent)
+        orbs = cls._get_orbs(agent)
+        model = cls._get_model(agent, run_config)
+        model_settings = agent.model_settings.resolve(run_config.model_settings)
+
+        input_list = ItemHelpers.input_to_new_input_list(original_input)
+        input_list.extend([generated_item.to_input_item() for generated_item in generated_items])
+
+        new_response = await model.get_response(
+            system_instructions=system_prompt,
+            input=input_list,
+            model_settings=model_settings,
+            swords=agent.swords,
+            output_schema=output_schema,
+            orbs=orbs,
+        )
+        context_wrapper.usage.add(new_response.usage)
+
+        processed_response = RunImpl.process_model_response(
+            agent=agent,
+            response=new_response,
+            output_schema=output_schema,
+            orbs=orbs,
+        )
+
+        return await RunImpl.execute_swords_and_side_effects(
+            agent=agent,
+            original_input=original_input,
+            pre_step_items=generated_items,
+            new_response=new_response,
+            processed_response=processed_response,
+            output_schema=output_schema,
+            charms=charms,
+            context_wrapper=context_wrapper,
+            run_config=run_config,
+        )
 
     @classmethod
     async def _run_turn(
@@ -199,35 +334,9 @@ class Runner:
         should_run_agent_start_charms: bool,
         input: str | list[InputItem],
     ) -> SingleStepResult:
-        if current_turn == 1:
-            try:
-                shield_result = await cls._run_input_shields(
-                    agent=current_agent,
-                    input=input,
-                    context=context_wrapper,
-                    shields=current_agent.input_shields + run_config.input_shields,
-                )
-                # Check shield results for errors
-                for result in shield_result:
-                    if result.output.tripwire_triggered:
-                        shield_error = InputShieldError(result)
-                        raise GenericError(str(shield_error)) from shield_error
-
-                turn_result = await cls._run_single_turn(
-                    agent=current_agent,
-                    original_input=original_input,
-                    generated_items=generated_items,
-                    charms=charms,
-                    context_wrapper=context_wrapper,
-                    run_config=run_config,
-                    should_run_agent_start_charms=should_run_agent_start_charms,
-                )
-            except Exception as e:
-                if isinstance(e, GenericError):
-                    raise e
-                raise GenericError(str(e)) from e
-        else:
-            turn_result = await cls._run_single_turn(
+        """Run a single turn."""
+        try:
+            return await cls._execute_turn(
                 agent=current_agent,
                 original_input=original_input,
                 generated_items=generated_items,
@@ -235,8 +344,11 @@ class Runner:
                 context_wrapper=context_wrapper,
                 run_config=run_config,
                 should_run_agent_start_charms=should_run_agent_start_charms,
+                current_turn=current_turn,
+                input=input,
             )
-        return turn_result
+        except Exception as e:
+            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
 
     @classmethod
     async def _handle_final_output(
@@ -260,8 +372,8 @@ class Runner:
             # Check output shield results for errors
             for result in output_shield_results:
                 if result.output.tripwire_triggered:
-                    shield_error = OutputShieldError(result)
-                    raise GenericError(str(shield_error)) from shield_error
+                    e = OutputShieldError(result)
+                    raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e)))
 
             return RunResult(
                 input=original_input,
@@ -273,66 +385,7 @@ class Runner:
                 output_shield_results=output_shield_results,
             )
         except Exception as e:
-            if isinstance(e, GenericError):
-                raise e
-            raise GenericError(str(e)) from e
-
-    @classmethod
-    def run_sync(
-        cls,
-        starting_agent: Agent[TContext],
-        input: str | list[InputItem],
-        *,
-        context: TContext | None = None,
-        max_turns: int = MAX_TURNS,
-        charms: RunCharms[TContext] | None = None,
-        run_config: RunConfig | None = None,
-    ) -> RunResult:
-        """Synchronous wrapper for run()."""
-        return asyncio.get_event_loop().run_until_complete(
-            cls.run(
-                starting_agent,
-                input,
-                context=context,
-                max_turns=max_turns,
-                charms=charms,
-                run_config=run_config,
-            )
-        )
-
-    @classmethod
-    async def run_streamed(
-        cls,
-        starting_agent: Agent[TContext],
-        input: str | list[InputItem],
-        context: TContext | None = None,
-        max_turns: int = MAX_TURNS,
-        charms: RunCharms[TContext] | None = None,
-        run_config: RunConfig | None = None,
-    ) -> RunResultStreaming:
-        charms, run_config, context_wrapper, input, output_schema = await cls._initialize_run(
-            starting_agent, input, context, max_turns, charms, run_config
-        )
-
-        streamed_result = cls._create_streamed_result(
-            input=input,
-            starting_agent=starting_agent,
-            max_turns=run_config.max_turns,
-            output_schema=output_schema,
-        )
-
-        streamed_result._run_impl_task = asyncio.create_task(
-            cls._run_streamed_impl(
-                starting_input=input,
-                streamed_result=streamed_result,
-                starting_agent=starting_agent,
-                max_turns=max_turns,
-                charms=charms,
-                context_wrapper=context_wrapper,
-                run_config=run_config,
-            )
-        )
-        return streamed_result
+            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
 
     @classmethod
     def _create_streamed_result(
@@ -340,7 +393,6 @@ class Runner:
         input: str | list[InputItem],
         starting_agent: Agent[TContext],
         max_turns: int,
-        output_schema: AgentOutputSchema | None,
     ) -> RunResultStreaming:
         return RunResultStreaming(
             input=input if isinstance(input, str) else input.copy(),
@@ -354,6 +406,135 @@ class Runner:
             input_shield_results=[],
             output_shield_results=[],
         )
+
+    @classmethod
+    async def _handle_error(cls, error: Exception, message: str | None = None) -> None:
+        """Common error handling implementation."""
+        if message is None:
+            message = str(error)
+        raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=message)) from error
+
+    @classmethod
+    async def _handle_shield_error(
+        cls,
+        result: InputShieldResult | OutputShieldResult,
+        is_input: bool,
+    ) -> None:
+        """Handle shield tripwire errors."""
+        error_class = InputShieldError if is_input else OutputShieldError
+        await cls._handle_error(error_class(result))
+
+    @classmethod
+    async def _process_shields(
+        cls,
+        agent: Agent[TContext],
+        input_or_output: Any,
+        context: RunContextWrapper[TContext],
+        shields: list[InputShield[TContext] | OutputShield[TContext]],
+        is_input: bool = True,
+        queue: asyncio.Queue | None = None,
+    ) -> list[InputShieldResult | OutputShieldResult]:
+        """Common implementation for running input and output shields."""
+        if not shields:
+            return []
+
+        shield_tasks = [
+            asyncio.create_task(
+                RunImpl.run_single_input_shield(agent, shield, input_or_output, context)
+                if is_input
+                else RunImpl.run_single_output_shield(shield, agent, input_or_output, context)
+            )
+            for shield in shields
+        ]
+
+        shield_results = []
+        try:
+            for done in asyncio.as_completed(shield_tasks):
+                result = await done
+                if result.output.tripwire_triggered:
+                    # Cancel remaining tasks before raising error
+                    for t in shield_tasks:
+                        if not t.done():
+                            t.cancel()
+                    await cls._handle_shield_error(result, is_input)
+                if queue is not None:
+                    queue.put_nowait(result)
+                shield_results.append(result)
+        except Exception as e:
+            # Ensure all tasks are cancelled on error
+            for t in shield_tasks:
+                if not t.done():
+                    t.cancel()
+            await cls._handle_error(e)
+
+        return shield_results
+
+    @classmethod
+    async def _run_input_shields(
+        cls,
+        agent: Agent[TContext],
+        input: str | list[InputItem],
+        context: RunContextWrapper[TContext],
+        shields: list[InputShield[TContext]],
+    ) -> list[InputShieldResult]:
+        """Run input shields."""
+        return await cls._process_shields(agent, input, context, shields, is_input=True)
+
+    @classmethod
+    async def _run_output_shields(
+        cls,
+        agent: Agent[TContext],
+        agent_output: Any,
+        context: RunContextWrapper[TContext],
+        shields: list[OutputShield[TContext]],
+    ) -> list[OutputShieldResult]:
+        """Run output shields."""
+        return await cls._process_shields(agent, agent_output, context, shields, is_input=False)
+
+    @classmethod
+    def _get_output_schema(cls, agent: Agent[Any]) -> AgentOutputSchema | None:
+        if agent.output_type is None or agent.output_type is str:
+            return None
+        return AgentOutputSchema(agent.output_type)
+
+    @classmethod
+    def _get_orbs(cls, agent: Agent[Any]) -> list[Orbs]:
+        return [
+            orbs_item if isinstance(orbs_item, Orbs) else orbs(orbs_item)
+            for orbs_item in agent.orbs
+            if orbs_item is not None  # Skip None values
+        ]
+
+    @classmethod
+    def _get_model(cls, agent: Agent[Any], run_config: RunConfig) -> Model:
+        # Check run_config.model first since it takes precedence
+        if run_config.model is not None:
+            if isinstance(run_config.model, Model):
+                return run_config.model
+            if isinstance(run_config.model, str):
+                return run_config.model_provider.get_model(run_config.model)
+
+        # Fall back to agent.model
+        if isinstance(agent.model, Model):
+            return agent.model
+        return run_config.model_provider.get_model(agent.model)
+
+    @classmethod
+    async def _run_agent_start_charms(
+        cls,
+        charms: RunCharms[TContext],
+        agent: Agent[TContext],
+        context_wrapper: RunContextWrapper[TContext],
+    ) -> None:
+        # Only create tasks for non-None charms
+        charm_tasks = []
+        if charms:
+            charm_tasks.append(charms.on_start(context_wrapper, agent))
+        if agent.charms:
+            charm_tasks.append(agent.charms.on_start(context_wrapper, agent))
+
+        if charm_tasks:
+            await asyncio.gather(*charm_tasks)
 
     @classmethod
     async def _run_streamed_impl(
@@ -385,11 +566,7 @@ class Runner:
 
                 if current_turn > max_turns:
                     await cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
-                    raise MaxTurnsError(
-                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
-                            error=f"Max turns ({max_turns}) exceeded"
-                        )
-                    )
+                    await cls._handle_error(MaxTurnsError(f"Max turns ({max_turns}) exceeded"))
 
                 if current_turn == 1:
                     streamed_result._input_shields_task = asyncio.create_task(
@@ -418,15 +595,10 @@ class Runner:
                     if isinstance(turn_result.next_step, NextStepOrbs):
                         current_agent = turn_result.next_step.new_agent
                         should_run_agent_start_charms = True
-                        try:
-                            await asyncio.wait_for(
-                                streamed_result._event_queue.put(
-                                    AgentUpdatedStreamEvent(new_agent=current_agent)
-                                ),
-                                timeout=1.0,
-                            )
-                        except (asyncio.TimeoutError, asyncio.QueueFull):
-                            pass
+                        await cls._queue_event(
+                            streamed_result._event_queue,
+                            AgentUpdatedStreamEvent(new_agent=current_agent),
+                        )
                     elif isinstance(turn_result.next_step, NextStepFinalOutput):
                         await cls._handle_streamed_final_output(
                             current_agent,
@@ -436,35 +608,35 @@ class Runner:
                             run_config,
                         )
                         streamed_result.is_complete = True
-                        try:
-                            await asyncio.wait_for(
-                                streamed_result._event_queue.put(QueueCompleteSentinel()),
-                                timeout=1.0,
-                            )
-                        except (asyncio.TimeoutError, asyncio.QueueFull):
-                            pass
+                        await cls._queue_event(
+                            streamed_result._event_queue,
+                            QueueCompleteSentinel(),
+                        )
                     elif isinstance(turn_result.next_step, NextStepRunAgain):
                         continue
                 except Exception as e:
                     cls._handle_streamed_error(streamed_result)
-                    raise GenericError(e) from e
+                    await cls._handle_error(e)
 
             streamed_result.is_complete = True
         except Exception as e:
             streamed_result.is_complete = True
-            raise GenericError(e) from e
+            await cls._handle_error(e)
 
     @classmethod
     async def _queue_event(cls, queue: asyncio.Queue, event: Any) -> None:
+        """Safely queue an event with timeout handling."""
         try:
             await asyncio.wait_for(queue.put(event), timeout=1.0)
         except (asyncio.TimeoutError, asyncio.QueueFull):
+            # Silently drop events if queue is full or timeout occurs
             pass
 
     @classmethod
     def _update_streamed_result(
         cls, streamed_result: RunResultStreaming, turn_result: SingleStepResult
     ) -> None:
+        """Update streamed result with new turn data."""
         streamed_result.raw_responses.append(turn_result.model_response)
         streamed_result.input = turn_result.original_input
         streamed_result.new_items = turn_result.generated_items
@@ -478,25 +650,24 @@ class Runner:
         context_wrapper: RunContextWrapper[TContext],
         run_config: RunConfig,
     ) -> None:
-        streamed_result._output_shields_task = asyncio.create_task(
-            cls._run_output_shields(
+        """Handle final output in streaming mode."""
+        try:
+            output_shield_results = await cls._run_output_shields(
                 current_agent,
                 turn_result.next_step.output,
                 context_wrapper,
                 current_agent.output_shields + run_config.output_shields,
             )
-        )
-
-        try:
-            output_shield_results = await streamed_result._output_shields_task
+            streamed_result.output_shield_results = output_shield_results
+            streamed_result.final_output = turn_result.next_step.output
         except Exception:
-            output_shield_results = []
-
-        streamed_result.output_shield_results = output_shield_results
-        streamed_result.final_output = turn_result.next_step.output
+            # Log error but don't fail the stream
+            streamed_result.output_shield_results = []
+            streamed_result.final_output = turn_result.next_step.output
 
     @classmethod
     def _handle_streamed_error(cls, streamed_result: RunResultStreaming) -> None:
+        """Handle errors in streaming mode."""
         streamed_result.is_complete = True
         asyncio.create_task(cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel()))
 
@@ -508,37 +679,20 @@ class Runner:
         context: RunContextWrapper[TContext],
         shields: list[InputShield[TContext]],
         streamed_result: RunResultStreaming,
-    ):
+    ) -> None:
+        """Run input shields with queue for streaming."""
         if not shields:
             return
         input_list = ItemHelpers.input_to_new_input_list(input)
         input_to_use = deepcopy(input_list) if len(shields) > 1 else input_list
-
-        shield_tasks = [
-            asyncio.create_task(
-                RunImpl.run_single_input_shield(agent, shield, input_to_use, context)
-            )
-            for shield in shields
-        ]
-        shield_results = []
-        try:
-            for done in asyncio.as_completed(shield_tasks):
-                result = await done
-                if result.output.tripwire_triggered:
-                    raise GenericError(
-                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
-                            error=str(InputShieldError(result))
-                        )
-                    )
-                streamed_result._input_shield_queue.put_nowait(result)
-                shield_results.append(result)
-        except Exception as e:
-            for t in shield_tasks:
-                t.cancel()
-            if isinstance(e, GenericError):
-                raise e
-            raise GenericError(e) from e
-
+        shield_results = await cls._run_shields(
+            agent=agent,
+            input_or_output=input_to_use,
+            context=context,
+            shields=shields,
+            is_input=True,
+            queue=streamed_result._input_shield_queue,
+        )
         streamed_result.input_shield_results = shield_results
 
     @classmethod
@@ -551,24 +705,19 @@ class Runner:
         run_config: RunConfig,
         should_run_agent_start_charms: bool,
     ) -> SingleStepResult:
+        """Run a single turn with streaming."""
         if should_run_agent_start_charms:
-            await cls._run_agent_start_charms(
-                charms,
-                agent,
-                context_wrapper,
-            )
+            await cls._run_agent_start_charms(charms, agent, context_wrapper)
 
         system_prompt = await agent.get_system_prompt(context_wrapper)
-        input = streamed_result.input
         output_schema = cls._get_output_schema(agent)
         orbs = cls._get_orbs(agent)
         model = cls._get_model(agent, run_config)
         model_settings = agent.model_settings.resolve(run_config.model_settings)
 
-        # Stream the output events and collect the final response
         async for event in model.stream_response(
             system_prompt,
-            input,
+            streamed_result.input,
             model_settings,
             agent.swords,
             output_schema,
@@ -595,7 +744,7 @@ class Runner:
                     usage=usage,
                     referenceable_id=event.response.id,
                 )
-                # Process the response immediately when we get it
+
                 processed_response = RunImpl.process_model_response(
                     agent=agent,
                     response=final_response,
@@ -615,13 +764,11 @@ class Runner:
                     run_config=run_config,
                 )
 
-                # Queue the step result events
                 await RunImpl.stream_step_result_to_queue(
                     single_step_result, streamed_result._event_queue
                 )
                 return single_step_result
 
-            # Queue raw response events
             await cls._queue_event(
                 streamed_result._event_queue, RawResponsesStreamEvent(data=event)
             )
@@ -633,201 +780,49 @@ class Runner:
         )
 
     @classmethod
-    async def _run_single_turn(
-        cls,
-        *,
-        agent: Agent[TContext],
-        original_input: str | list[InputItem],
-        generated_items: list[RunItem],
-        charms: RunCharms[TContext],
-        context_wrapper: RunContextWrapper[TContext],
-        run_config: RunConfig,
-        should_run_agent_start_charms: bool,
-    ) -> SingleStepResult:
-        if should_run_agent_start_charms:
-            await cls._run_agent_start_charms(
-                charms,
-                agent,
-                context_wrapper,
-            )
-
-        system_prompt = await agent.get_system_prompt(context_wrapper)
-        output_schema = cls._get_output_schema(agent)
-        orbs = cls._get_orbs(agent)
-        input = ItemHelpers.input_to_new_input_list(original_input)
-        input.extend([generated_item.to_input_item() for generated_item in generated_items])
-        new_response = await cls._get_new_response(
-            agent,
-            system_prompt,
-            input,
-            output_schema,
-            orbs,
-            context_wrapper,
-            run_config,
-        )
-
-        return await cls._get_single_step_result_from_response(
-            agent=agent,
-            original_input=original_input,
-            pre_step_items=generated_items,
-            new_response=new_response,
-            output_schema=output_schema,
-            orbs=orbs,
-            charms=charms,
-            context_wrapper=context_wrapper,
-            run_config=run_config,
-        )
-
-    @classmethod
-    async def _get_single_step_result_from_response(
-        cls,
-        *,
-        agent: Agent[TContext],
-        original_input: str | list[InputItem],
-        pre_step_items: list[RunItem],
-        new_response: ModelResponse,
-        output_schema: AgentOutputSchema | None,
-        orbs: list[Orbs],
-        charms: RunCharms[TContext],
-        context_wrapper: RunContextWrapper[TContext],
-        run_config: RunConfig,
-    ) -> SingleStepResult:
-        processed_response = RunImpl.process_model_response(
-            agent=agent,
-            response=new_response,
-            output_schema=output_schema,
-            orbs=orbs,
-        )
-        return await RunImpl.execute_swords_and_side_effects(
-            agent=agent,
-            original_input=original_input,
-            pre_step_items=pre_step_items,
-            new_response=new_response,
-            processed_response=processed_response,
-            output_schema=output_schema,
-            charms=charms,
-            context_wrapper=context_wrapper,
-            run_config=run_config,
-        )
-
-    @classmethod
-    async def _run_input_shields(
+    async def _run_shields(
         cls,
         agent: Agent[TContext],
-        input: str | list[InputItem],
+        input_or_output: Any,
         context: RunContextWrapper[TContext],
-        shields: list[InputShield[TContext]],
-    ) -> list[InputShieldResult]:
-        if not shields:
-            return []
-
-        shield_tasks = [
-            asyncio.create_task(RunImpl.run_single_input_shield(agent, shield, input, context))
-            for shield in shields
-        ]
-
-        shield_results = []
-        for done in asyncio.as_completed(shield_tasks):
-            result = await done
-            if result.output.tripwire_triggered:
-                # Cancel all shield tasks if a tripwire is triggered.
-                for t in shield_tasks:
-                    if not t.done():
-                        t.cancel()
-                raise GenericError(
-                    ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(InputShieldError(result)))
-                )
-            shield_results.append(result)
-
-        return shield_results
-
-    @classmethod
-    async def _run_output_shields(
-        cls,
-        agent: Agent[TContext],
-        agent_output: Any,
-        context: RunContextWrapper[TContext],
-        shields: list[OutputShield[TContext]],
-    ) -> list[OutputShieldResult]:
+        shields: list[InputShield[TContext] | OutputShield[TContext]],
+        is_input: bool = True,
+        queue: asyncio.Queue | None = None,
+    ) -> list[InputShieldResult | OutputShieldResult]:
+        """Common implementation for running input and output shields."""
         if not shields:
             return []
 
         shield_tasks = [
             asyncio.create_task(
-                RunImpl.run_single_output_shield(shield, agent, agent_output, context)
+                RunImpl.run_single_input_shield(agent, shield, input_or_output, context)
+                if is_input
+                else RunImpl.run_single_output_shield(shield, agent, input_or_output, context)
             )
             for shield in shields
         ]
 
         shield_results = []
-        for done in asyncio.as_completed(shield_tasks):
-            result = await done
-            if result.output.tripwire_triggered:
-                raise GenericError(
-                    ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(OutputShieldError(result)))
-                )
+        try:
+            for done in asyncio.as_completed(shield_tasks):
+                result = await done
+                if result.output.tripwire_triggered:
+                    # Cancel remaining tasks before raising error
+                    for t in shield_tasks:
+                        if not t.done():
+                            t.cancel()
+                    error_class = InputShieldError if is_input else OutputShieldError
+                    raise RunnerError(
+                        ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(error_class(result)))
+                    )
+                if queue is not None:
+                    queue.put_nowait(result)
+                shield_results.append(result)
+        except Exception as e:
+            # Ensure all tasks are cancelled on error
             for t in shield_tasks:
                 if not t.done():
                     t.cancel()
-            shield_results.append(result)
+            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
+
         return shield_results
-
-    @classmethod
-    async def _get_new_response(
-        cls,
-        agent: Agent[TContext],
-        system_prompt: str | None,
-        input: list[InputItem],
-        output_schema: AgentOutputSchema | None,
-        orbs: list[Orbs],
-        context_wrapper: RunContextWrapper[TContext],
-        run_config: RunConfig,
-    ) -> ModelResponse:
-        model = cls._get_model(agent, run_config)
-        model_settings = agent.model_settings.resolve(run_config.model_settings)
-        new_response = await model.get_response(
-            system_instructions=system_prompt,
-            input=input,
-            model_settings=model_settings,
-            swords=agent.swords,
-            output_schema=output_schema,
-            orbs=orbs,
-        )
-        context_wrapper.usage.add(new_response.usage)
-        return new_response
-
-    @classmethod
-    def _get_output_schema(cls, agent: Agent[Any]) -> AgentOutputSchema | None:
-        if agent.output_type is None or agent.output_type is str:
-            return None
-        return AgentOutputSchema(agent.output_type)
-
-    @classmethod
-    def _get_orbs(cls, agent: Agent[Any]) -> list[Orbs]:
-        return [
-            orbs_item if isinstance(orbs_item, Orbs) else orbs(orbs_item)
-            for orbs_item in agent.orbs
-        ]
-
-    @classmethod
-    def _get_model(cls, agent: Agent[Any], run_config: RunConfig) -> Model:
-        if isinstance(run_config.model, Model):
-            return run_config.model
-        if isinstance(run_config.model, str):
-            return run_config.model_provider.get_model(run_config.model)
-        if isinstance(agent.model, Model):
-            return agent.model
-        return run_config.model_provider.get_model(agent.model)
-
-    @classmethod
-    async def _run_agent_start_charms(
-        cls,
-        charms: RunCharms[TContext],
-        agent: Agent[TContext],
-        context_wrapper: RunContextWrapper[TContext],
-    ) -> None:
-        charm_tasks = [
-            charms.on_start(context_wrapper, agent),
-            agent.charms.on_start(context_wrapper, agent) if agent.charms else None,
-        ]
-        await asyncio.gather(*[t for t in charm_tasks if t is not None])

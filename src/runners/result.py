@@ -16,6 +16,8 @@ Key Components:
    - Turn tracking and completion status
    - Internal task management for shields and execution
    - Exception handling and cleanup
+
+4. SwordsToFinalOutputResult: Result indicating whether a sword execution produced a final output
 """
 
 from __future__ import annotations
@@ -26,17 +28,34 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from ..util.types import QueueCompleteSentinel
+
 if TYPE_CHECKING:
-    from ..agents.agent import Agent
-from ..gear.shield import InputShieldResult, OutputShieldResult
-from ._constants import MAX_SHIELD_QUEUE_SIZE, logger
-from ._items import ModelResponse, RunItem
-from ._stream_events import StreamEvent
-from ._types import InputItem, QueueCompleteSentinel
+    from ..agents.agent_v1 import Agent
+    from ..gear.shield import InputShieldResult, OutputShieldResult
+    from ..util.types import (
+        InputItem,
+        RunResult,
+        RunResultBase,
+        RunResultStreaming,
+        SwordsToFinalOutputResult,
+    )
+    from .items import ModelResponse, RunItem
+    from .stream_events import StreamEvent
+
+from ..util.constants import MAX_SHIELD_QUEUE_SIZE, logger
 
 ########################################################
 #               Data Classes for Results
 ########################################################
+
+
+@dataclass(frozen=True)
+class SwordsToFinalOutputResult:
+    """Result indicating whether a sword execution produced a final output."""
+
+    is_final_output: bool
+    final_output: Any | None
 
 
 @dataclass(frozen=True)

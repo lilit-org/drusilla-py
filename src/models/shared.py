@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar
 
-from ..util._types import AsyncDeepSeek
+from ..util.types import AsyncDeepSeek
 
 #######################################################
 #              Data class for Shared Config

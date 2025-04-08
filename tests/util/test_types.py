@@ -3,7 +3,7 @@ from datetime import datetime
 
 import pytest
 
-from src.util._types import (
+from src.util.types import (
     AsyncStream,
     ChatCompletionMessage,
     ChatCompletionMessageParam,

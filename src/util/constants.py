@@ -150,11 +150,15 @@ class ErrorMessages:
     )
     RUNNER_ERROR: ErrorMessage = ErrorMessage(
         message=os.environ["RUNNER_ERROR_MESSAGE"],
-        used_in="src/agents/run.py",
+        used_in="src/runners/run.py",
     )
     ORBS_ERROR: ErrorMessage = ErrorMessage(
         message=os.environ["ORBS_ERROR_MESSAGE"],
         used_in="src/gear/orbs.py",
+    )
+    AGENT_EXEC_ERROR: ErrorMessage = ErrorMessage(
+        message=os.environ["AGENT_EXEC_ERROR_MESSAGE"],
+        used_in="src/agents/agent.py",
     )
 
 
@@ -166,6 +170,7 @@ def validate_required_env_vars() -> None:
         "SHIELD_ERROR_MESSAGE",
         "RUNNER_ERROR_MESSAGE",
         "ORBS_ERROR_MESSAGE",
+        "AGENT_EXEC_ERROR_MESSAGE",
     }
 
     missing_vars = [var for var in required_vars if var not in os.environ]

@@ -5,12 +5,12 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from src.agents.agent import Agent
+from src.agents.agent_v1 import AgentV1 as Agent
 from src.gear.orbs import Orbs, OrbsInputData, orbs
-from src.util._constants import ERROR_MESSAGES
-from src.util._exceptions import UsageError
-from src.util._items import MessageOutputItem
-from src.util._types import ResponseInputItemParam, RunContextWrapper
+from src.runners.items import MessageOutputItem
+from src.util.constants import ERROR_MESSAGES
+from src.util.exceptions import UsageError
+from src.util.types import ResponseInputItemParam, RunContextWrapper
 
 
 class OrbsTestInput(BaseModel):
@@ -177,63 +177,61 @@ def test_orbs_validation_errors(mock_agent):
 
 
 @pytest.mark.asyncio
-async def test_orbs_decorator_with_input(
+async def test_orbs_decorator_functionality(
     mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
 ):
-    """Test the orbs decorator with input handling."""
+    """Test the orbs decorator with various function types and inputs."""
 
+    # Test with async function and input
     @orbs(mock_agent)
-    async def test_orbs(ctx: RunContextWrapper[Any], input_data: OrbsTestInput) -> None:
+    async def test_orbs_async_with_input(
+        ctx: RunContextWrapper[Any], input_data: OrbsTestInput
+    ) -> None:
         assert ctx == mock_context
         assert input_data.message == "test message"
 
-    # Add input_type to the function
-    test_orbs.input_type = OrbsTestInput
-
-    result = await test_orbs.on_invoke_orbs(mock_context, '{"message": "test message"}')
+    test_orbs_async_with_input.input_type = OrbsTestInput
+    result = await test_orbs_async_with_input.on_invoke_orbs(
+        mock_context, '{"message": "test message"}'
+    )
     assert result == mock_agent
 
-
-@pytest.mark.asyncio
-async def test_orbs_decorator_without_input(
-    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
-):
-    """Test the orbs decorator without input."""
-
+    # Test with async function without input
     @orbs(mock_agent)
-    async def test_orbs(ctx: RunContextWrapper[Any]) -> None:
+    async def test_orbs_async_no_input(ctx: RunContextWrapper[Any]) -> None:
         assert ctx == mock_context
 
-    result = await test_orbs.on_invoke_orbs(mock_context)
+    result = await test_orbs_async_no_input.on_invoke_orbs(mock_context)
     assert result == mock_agent
 
-
-@pytest.mark.asyncio
-async def test_orbs_decorator_sync_function(
-    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
-):
-    """Test the orbs decorator with a synchronous function."""
-
+    # Test with sync function
     @orbs(mock_agent)
-    def test_orbs(ctx: RunContextWrapper[Any]) -> None:
+    def test_orbs_sync(ctx: RunContextWrapper[Any]) -> None:
         assert ctx == mock_context
 
-    result = await test_orbs.on_invoke_orbs(mock_context)
+    result = await test_orbs_sync.on_invoke_orbs(mock_context)
     assert result == mock_agent
 
+    # Test validation errors
+    class InvalidInput(BaseModel):
+        """Invalid input class for testing validation errors."""
 
-@pytest.mark.asyncio
-async def test_orbs_decorator_invalid_json(
-    mock_agent: MockAgent, mock_context: RunContextWrapper[Any]
-):
-    """Test the orbs decorator with invalid JSON input."""
+        required_field: str  # This field is required but won't be provided in the test
 
     @orbs(mock_agent)
-    async def test_orbs(ctx: RunContextWrapper[Any], input_data: OrbsTestInput) -> None:
+    async def test_orbs_invalid(ctx: RunContextWrapper[Any], input_data: InvalidInput) -> None:
         pass
 
-    # Add input_type to the function
-    test_orbs.input_type = OrbsTestInput
+    test_orbs_invalid.input_type = InvalidInput
 
+    with pytest.raises(
+        UsageError,
+        match=ERROR_MESSAGES.ORBS_ERROR.message.format(
+            error="Invalid input JSON: 1 validation error for InvalidInput"
+        ),
+    ):
+        await test_orbs_invalid.on_invoke_orbs(mock_context, '{"message": "test message"}')
+
+    # Test invalid JSON input
     with pytest.raises(UsageError):
-        await test_orbs.on_invoke_orbs(mock_context, '{"invalid": "json"}')
+        await test_orbs_async_with_input.on_invoke_orbs(mock_context, '{"invalid": "json"}')

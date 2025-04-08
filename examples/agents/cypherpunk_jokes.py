@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
 
-"""
-This script demonstrates the streaming functionality of the agent framework,
-showing how to handle different types of stream events in real-time.
-"""
-
 import asyncio
 import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from src.agents.agent import Agent
-from src.agents.run import Runner
-from src.util._client import setup_client
-from src.util._exceptions import AgentExecutionError
-from src.util._print import pretty_print_result_stats, pretty_print_result_stream
+from src.agents.agent_v1 import AgentV1 as Agent
+from src.network.client import setup_client
+from src.runners.run import Runner
+from src.util.exceptions import AgentExecutionError
+from src.util.print import pretty_print_result_stats, pretty_print_result_stream
 
 ########################################################
 #           Agent Creation                             #

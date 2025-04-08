@@ -31,19 +31,19 @@ from typing import (
 
 from pydantic import BaseModel
 
-from ._types import (
+from ..util.types import (
     FunctionCallOutput,
     ResponseFunctionSwordCall,
     ResponseInputItemParam,
     ResponseReasoningItem,
     Usage,
 )
-from ._types import (
+from ..util.types import (
     ResponseOutput as TResponseOutputItem,
 )
 
 if TYPE_CHECKING:
-    from ..agents.agent import Agent
+    from ..agents.agent_v1 import Agent
 
 
 ########################################################
@@ -260,7 +260,7 @@ class ItemHelpers:
 
     @staticmethod
     def text_message_outputs(items: list[RunItem]) -> str:
-        return "".join(
+        return " ".join(
             item.text_content if isinstance(item, MessageOutputItem) else "" for item in items
         ).strip()
 
@@ -344,28 +344,34 @@ class ItemHelpers:
         if not lines:
             return ""
 
-        formatted_lines = []
-        current_section = []
+        # If there's only one think section, return just the content
+        if len(lines) == 1 and lines[0].startswith(THINK_START) and lines[0].endswith(THINK_END):
+            return lines[0][len(THINK_START) : -len(THINK_END)]
 
-        def format_section(section: list[str]) -> list[str]:
-            if not section:
-                return []
-            width = max(len(line) for line in section)
-            border = "+" + "-" * (width + 2) + "+"
-            return [border, *[f"| {line:<{width}} |" for line in section], border]
+        # If there are no special lines, just return the content as is
+        if not any(line.startswith(ItemHelpers.SPECIAL_LINES) for line in lines):
+            return " ".join(lines)
 
+        # For multiple think sections, extract content between think tags
+        result = []
         for line in lines:
-            if line.startswith(ItemHelpers.SPECIAL_LINES):
-                if current_section:
-                    formatted_lines.extend(format_section(current_section))
-                    current_section = []
-                formatted_lines.append(line)
-            elif line.endswith(THINK_END):
-                formatted_lines.append(line)
-            else:
-                current_section.append(line)
+            if line.startswith(THINK_START) and line.endswith(THINK_END):
+                result.append(line[len(THINK_START) : -len(THINK_END)])
+            elif not line.startswith(ItemHelpers.SPECIAL_LINES):
+                result.append(line)
 
-        if current_section:
-            formatted_lines.extend(format_section(current_section))
+        return "\n".join(result)
 
-        return "\n".join(formatted_lines)
+
+__all__ = [
+    "ItemHelpers",
+    "MessageOutputItem",
+    "ModelResponse",
+    "OrbsCallItem",
+    "OrbsOutputItem",
+    "SwordCallItem",
+    "SwordCallOutputItem",
+    "ReasoningItem",
+    "THINK_START",
+    "THINK_END",
+]

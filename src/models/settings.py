@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from ..util._exceptions import UsageError
+from ..util.exceptions import UsageError
 
 ########################################################
 #            Data class for settings                   #

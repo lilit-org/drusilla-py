@@ -2,14 +2,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from src.agents.output import AgentOutputSchema
+from src.agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from src.gear.orbs import Orbs
 from src.gear.sword import Sword
 from src.models.chat import ModelChatCompletionsModel, SwordConverter, _Converter, _StreamingState
 from src.models.settings import ModelSettings
-from src.util._exceptions import AgentError, UsageError
-from src.util._items import ModelResponse
-from src.util._types import ResponseStreamEvent
+from src.runners.items import ModelResponse
+from src.util.exceptions import AgentError, UsageError
+from src.util.types import ResponseStreamEvent
 
 
 @pytest.fixture

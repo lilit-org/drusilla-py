@@ -15,8 +15,8 @@ from __future__ import annotations
 from abc import ABC
 from typing import Any, Generic
 
-from ..agents.agent import Agent
-from ..util._types import RunContextWrapper, TContext
+from ..agents.agent_v1 import AgentV1 as Agent
+from ..util.types import RunContextWrapper, TContext
 from .sword import Sword
 
 ########################################################
