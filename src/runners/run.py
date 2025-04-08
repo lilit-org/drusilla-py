@@ -32,10 +32,9 @@ from ..gear.shield import (
 from ..models.interface import Model
 from ..util.constants import ERROR_MESSAGES, MAX_TURNS
 from ..util.exceptions import (
+    AgentError,
     InputShieldError,
     MaxTurnsError,
-    MessageError,
-    ModelError,
     OutputShieldError,
     RunnerError,
 )
@@ -147,9 +146,8 @@ class Runner:
                         input,
                     )
                 except Exception as e:
-                    raise MessageError(
-                        ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))
-                    ) from e
+                    error_message = ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))
+                    raise AgentError(error_message) from e
 
                 should_run_agent_start_charms = False
                 model_responses.append(turn_result.model_response)
@@ -773,7 +771,7 @@ class Runner:
                 streamed_result._event_queue, RawResponsesStreamEvent(data=event)
             )
 
-        raise ModelError(
+        raise AgentError(
             ERROR_MESSAGES.RUNNER_ERROR.message.format(
                 error="Model did not produce a final response!"
             )
