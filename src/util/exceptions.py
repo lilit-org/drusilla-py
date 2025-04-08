@@ -30,27 +30,35 @@ class GenericError(AgentError):
     """Raised when an unexpected error occurs during agent execution."""
 
 
-class MessageError(AgentError):
-    """Raised for exceptions with a message attribute."""
-
-
 class ConnectionError(AgentError):
     """Raised for exceptions related to network connections."""
 
 
-class RunnerError(MessageError):
-    """Raised for exceptions with a message attribute."""
+class RunnerError(AgentError):
+    """Raised when an error occurs during runner execution."""
 
 
-class ModelError(MessageError):
+class ModelError(AgentError):
     """Raised when model acts unexpectedly (e.g. invalid sword calls or malformed JSON)."""
 
 
-class MaxTurnsError(MessageError):
+class MaxTurnsError(AgentError):
     """Raised when max turns limit is reached."""
 
 
-class UsageError(MessageError):
+class CharmError(AgentError):
+    """Raised for charm errors."""
+
+
+class OrbsError(AgentError):
+    """Raised for orbs errors."""
+
+
+class ShieldError(AgentError):
+    """Raised for shield errors."""
+
+
+class UsageError(AgentError):
     """Raised for usage errors."""
 
 
@@ -78,19 +86,28 @@ class OutputShieldError(AgentError):
 
 
 def format_error_message(error: Exception, message_template: str, context: Any = None) -> str:
-    """Format an error message using a template string."""
+    """Format an error message using a template string.
 
+    Args:
+        error: The exception to format
+        message_template: Template string with {error} and optional {context} placeholders
+        context: Optional context object to include in the message
+
+    Returns:
+        Formatted error message string
+    """
     if context is None:
-        template = message_template.replace("{context}", "None")
-        return template.format(error=str(error))
-
+        return message_template.format(error=str(error))
     return message_template.format(error=str(error), context=context)
 
 
 def create_error_handler(message_template: str) -> Callable[[Any, Exception], str]:
-    """Create a context-aware error handler function."""
+    """Create a context-aware error handler function.
 
-    def error_handler(context: Any, error: Exception) -> str:
-        return format_error_message(error, message_template, context)
+    Args:
+        message_template: Template string with {error} and optional {context} placeholders
 
-    return error_handler
+    Returns:
+        A function that takes context and error parameters and returns a formatted message
+    """
+    return lambda context, error: format_error_message(error, message_template, context)

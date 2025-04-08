@@ -18,6 +18,8 @@ from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
+from src.util.constants import ERROR_MESSAGES, THINK_TAGS
+
 from ..runners.items import ModelResponse, Usage
 from ..runners.result import RunResult, RunResultStreaming
 from .exceptions import ModelError
@@ -35,35 +37,53 @@ FUNCTION_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9]")
 
 
 def _indent(text: str, indent_level: int) -> str:
+    """Indent each line of text by the specified number of spaces."""
     return "\n".join("  " * indent_level + line for line in text.splitlines())
 
 
 def _format_final_output(raw_response: ModelResponse) -> tuple[str, str]:
+    """Format the model response into reasoning and result components."""
     if not raw_response.output:
         return "", ""
 
-    output_text = str(raw_response.output[0].get("text", raw_response.output[0]))
-    output_text = output_text.strip("'").strip().encode().decode("unicode-escape")
+    try:
+        if not isinstance(raw_response.output, list):
+            raise ModelError(
+                ERROR_MESSAGES.MODEL_ERROR.message.format(error="Output is not a list")
+            )
 
-    if "<think>" not in output_text or "</think>" not in output_text:
-        return "", f"\n\n✅ RESULT:\n\n{output_text}\n"
+        if not raw_response.output:
+            return "", ""
 
-    start = output_text.find("<think>") + len("<think>")
-    end = output_text.find("</think>")
-    reasoning = output_text[start:end].strip()
-    result = output_text[end + len("</think>") :].strip()
-    result = re.sub(r"^Here are the jokes?:", "", result, flags=re.IGNORECASE).strip()
+        output_text = str(raw_response.output[0].get("text", raw_response.output[0]))
+        output_text = output_text.strip("'").strip().encode().decode("unicode-escape")
 
-    return (f"\n\n✅ REASONING:\n\n{reasoning}", f"\n\n✅ RESULT:\n\n{result}\n")
+        if THINK_TAGS[0] not in output_text or THINK_TAGS[1] not in output_text:
+            return "", f"\n\n✅ RESULT:\n\n{output_text}\n"
+
+        start = output_text.find(THINK_TAGS[0]) + len(THINK_TAGS[0])
+        end = output_text.find(THINK_TAGS[1])
+        reasoning = output_text[start:end].strip()
+        result = output_text[end + len(THINK_TAGS[1]) :].strip()
+        return (f"\n\n✅ REASONING:\n\n{reasoning}", f"\n\n✅ RESULT:\n\n{result}\n")
+    except (IndexError, AttributeError, UnicodeDecodeError) as e:
+        raise ModelError(
+            ERROR_MESSAGES.MODEL_ERROR.message.format(
+                error=f"Failed to format model output: {str(e)}"
+            )
+        ) from e
 
 
 def _format_result(result: Any, show_reasoning: bool = True) -> str:
+    """Format the result with optional reasoning display."""
     res_reasoning, res_result = _format_final_output(result)
     return (res_reasoning + res_result) if show_reasoning else res_result
 
 
 def _format_agent_info(result: Any) -> str:
-    info: list[str] = ["\n👾 Agent Info:"]
+    """Format agent information into a readable string."""
+    info = ["\n👾 Agent Info:"]
+
     if isinstance(result, RunResultStreaming):
         info.extend(
             [
@@ -73,18 +93,16 @@ def _format_agent_info(result: Any) -> str:
             ]
         )
     else:
-        info.extend(
-            [
-                f"      Last Agent → {result.last_agent.name}",
-            ]
-        )
+        info.append(f"      Last Agent → {result.last_agent.name}")
         if hasattr(result, "current_turn") and hasattr(result, "max_turns"):
             info.append(f"      Turn       → {result.current_turn}/{result.max_turns}")
         info.append(f"      Status     → {'✔️ Complete' if result.is_complete else '🟡 Running'}")
+
     return "\n" + "\n".join(_indent(line, 1) for line in info)
 
 
 def _format_stats(result: Any) -> str:
+    """Format statistics into a readable string."""
     stats = [
         "\n📊 Statistics:",
         f"      Items     → {len(result.new_items)}",
@@ -96,6 +114,8 @@ def _format_stats(result: Any) -> str:
 
 
 def _format_stream_info(stream: bool, result: Any) -> str:
+    """Format streaming information into a readable string."""
+
     def format_obj(x: Any) -> str:
         if x is None or x is object():
             return "None"
@@ -132,7 +152,17 @@ def pretty_print_result_stats(result: RunResult) -> str:
 
 
 def pretty_print_result(result: RunResult, show_reasoning: bool = True) -> str:
-    return _format_result(result.raw_responses[0], show_reasoning)
+    """Format and print the result of a run with optional reasoning display."""
+    if not result.raw_responses:
+        raise ModelError(
+            ERROR_MESSAGES.MODEL_ERROR.message.format(error="No raw responses found in result")
+        )
+    try:
+        return _format_result(result.raw_responses[0], show_reasoning)
+    except (IndexError, AttributeError) as e:
+        raise ModelError(
+            ERROR_MESSAGES.MODEL_ERROR.message.format(error=f"Invalid result format: {str(e)}")
+        ) from e
 
 
 def pretty_print_result_stream(result: RunResultStreaming, show_reasoning: bool = True) -> str:
@@ -147,7 +177,7 @@ def validate_json(json_str: str, type_adapter: TypeAdapter[T], partial: bool = F
     try:
         return type_adapter.validate_json(json_str, experimental_allow_partial=partial)
     except ValidationError as e:
-        raise ModelError(f"Invalid JSON: {e}") from e
+        raise ModelError(ERROR_MESSAGES.MODEL_ERROR.message.format(error=str(e))) from e
 
 
 def transform_string_function_style(name: str) -> str:

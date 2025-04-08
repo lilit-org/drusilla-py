@@ -2,13 +2,19 @@ import logging
 import os
 from unittest.mock import patch
 
+import pytest
+
 
 def test_constants():
     """Test basic constants."""
-    from src.util.constants import FAKE_RESPONSES_ID, UNSET
+    from src.util.constants import FAKE_RESPONSES_ID, THINK_TAGS, UNSET
 
     assert UNSET is not None
     assert FAKE_RESPONSES_ID == "fake_responses"
+    assert isinstance(THINK_TAGS, tuple)
+    assert len(THINK_TAGS) == 2
+    assert THINK_TAGS[0] == "<think>"
+    assert THINK_TAGS[1] == "</think>"
 
 
 def test_supported_languages():
@@ -102,97 +108,250 @@ def test_api_constants():
     assert CHAT_COMPLETIONS_ENDPOINT.startswith("/")
 
 
-def test_environment_variables():
-    """Test that environment variables are properly loaded."""
-    # Save original environment variables
-    original_env = {
-        "LOG_LEVEL": os.environ.get("LOG_LEVEL"),
-        "BASE_URL": os.environ.get("BASE_URL"),
-        "API_KEY": os.environ.get("API_KEY"),
-        "MODEL": os.environ.get("MODEL"),
-        "MAX_TURNS": os.environ.get("MAX_TURNS"),
-        "MAX_QUEUE_SIZE": os.environ.get("MAX_QUEUE_SIZE"),
-        "MAX_GUARDRAIL_QUEUE_SIZE": os.environ.get("MAX_GUARDRAIL_QUEUE_SIZE"),
-        "LRU_CACHE_SIZE": os.environ.get("LRU_CACHE_SIZE"),
-        "HTTP_TIMEOUT_TOTAL": os.environ.get("HTTP_TIMEOUT_TOTAL"),
-        "HTTP_TIMEOUT_CONNECT": os.environ.get("HTTP_TIMEOUT_CONNECT"),
-        "HTTP_TIMEOUT_READ": os.environ.get("HTTP_TIMEOUT_READ"),
-        "HTTP_MAX_KEEPALIVE_CONNECTIONS": os.environ.get("HTTP_MAX_KEEPALIVE_CONNECTIONS"),
-        "HTTP_MAX_CONNECTIONS": os.environ.get("HTTP_MAX_CONNECTIONS"),
-    }
+def test_get_env_var():
+    """Test the get_env_var helper function."""
+    from src.util.constants import get_env_var
 
-    try:
-        # Set test environment variables
-        os.environ["LOG_LEVEL"] = "DEBUG"
-        os.environ["BASE_URL"] = "https://test.example.com"
-        os.environ["API_KEY"] = "test_key"
-        os.environ["MODEL"] = "test_model"
-        os.environ["MAX_TURNS"] = "5"
-        os.environ["MAX_QUEUE_SIZE"] = "500"
-        os.environ["MAX_GUARDRAIL_QUEUE_SIZE"] = "50"
-        os.environ["LRU_CACHE_SIZE"] = "64"
-        os.environ["HTTP_TIMEOUT_TOTAL"] = "60.0"
-        os.environ["HTTP_TIMEOUT_CONNECT"] = "15.0"
-        os.environ["HTTP_TIMEOUT_READ"] = "45.0"
-        os.environ["HTTP_MAX_KEEPALIVE_CONNECTIONS"] = "3"
-        os.environ["HTTP_MAX_CONNECTIONS"] = "5"
+    # Test with string default
+    assert get_env_var("NONEXISTENT", "default") == "default"
 
-        # Import the module after setting environment variables
-        import importlib
+    # Test with int default
+    assert get_env_var("NONEXISTENT", 42, int) == 42
 
-        from src.util import constants
+    # Test with float default
+    assert get_env_var("NONEXISTENT", 3.14, float) == 3.14
 
-        importlib.reload(constants)
-
-        # Patch load_dotenv to do nothing
-        with patch("src.util.constants.load_dotenv"):
-            # Reload environment variables
-            constants.load_environment()
-
-            assert constants.LOG_LEVEL == "DEBUG"
-            assert constants.BASE_URL == "https://test.example.com"
-            assert constants.API_KEY == "test_key"
-            assert constants.MODEL == "test_model"
-            assert constants.MAX_TURNS == 5
-            assert constants.MAX_QUEUE_SIZE == 500
-            assert constants.MAX_GUARDRAIL_QUEUE_SIZE == 50
-            assert constants.LRU_CACHE_SIZE == 64
-            assert constants.HTTP_TIMEOUT_TOTAL == 60.0
-            assert constants.HTTP_TIMEOUT_CONNECT == 15.0
-            assert constants.HTTP_TIMEOUT_READ == 45.0
-            assert constants.HTTP_MAX_KEEPALIVE_CONNECTIONS == 3
-            assert constants.HTTP_MAX_CONNECTIONS == 5
-
-    finally:
-        # Restore original environment variables
-        for key, value in original_env.items():
-            if value is None:
-                os.environ.pop(key, None)
-            else:
-                os.environ[key] = value
+    # Test with environment variable
+    with patch.dict(os.environ, {"TEST_VAR": "test_value"}):
+        assert get_env_var("TEST_VAR", "default") == "test_value"
 
 
-def test_error_messages():
-    """Test error message constants and environment variable overrides."""
-    import importlib
+def test_config_class():
+    """Test the Config class functionality."""
+    from src.util.constants import Config
 
-    from src.util import constants
+    config = Config()
 
-    # Test default error messages
-    assert constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
-    assert constants.ERROR_MESSAGES.RUNCONTEXT_ERROR.used_in == "src/gear/sword.py"
+    # Test default values
+    assert isinstance(config.LOG_LEVEL, str)
+    assert isinstance(config.BASE_URL, str)
+    assert isinstance(config.API_KEY, str)
+    assert isinstance(config.MODEL, str)
+    assert isinstance(config.MAX_TURNS, int)
+    assert isinstance(config.MAX_QUEUE_SIZE, int)
+    assert isinstance(config.MAX_GUARDRAIL_QUEUE_SIZE, int)
+    assert isinstance(config.MAX_SHIELD_QUEUE_SIZE, int)
+    assert isinstance(config.LRU_CACHE_SIZE, int)
+    assert isinstance(config.HTTP_TIMEOUT_TOTAL, float)
+    assert isinstance(config.HTTP_TIMEOUT_CONNECT, float)
+    assert isinstance(config.HTTP_TIMEOUT_READ, float)
+    assert isinstance(config.HTTP_MAX_KEEPALIVE_CONNECTIONS, int)
+    assert isinstance(config.HTTP_MAX_CONNECTIONS, int)
 
-    # Test environment variable overrides
-    custom_sword_message = "Custom sword error: {error}"
-    custom_context_message = "Custom context error: {error}"
+    # Test update_from_env
     with patch.dict(
         os.environ,
         {
-            "SWORD_ERROR_MESSAGE": custom_sword_message,
-            "RUNCONTEXT_ERROR_MESSAGE": custom_context_message,
+            "LOG_LEVEL": "INFO",
+            "BASE_URL": "https://test.example.com",
+            "API_KEY": "test_key",
+            "MODEL": "test_model",
+            "MAX_TURNS": "5",
+            "MAX_QUEUE_SIZE": "500",
+            "MAX_GUARDRAIL_QUEUE_SIZE": "50",
+            "MAX_SHIELD_QUEUE_SIZE": "100",
+            "LRU_CACHE_SIZE": "64",
+            "HTTP_TIMEOUT_TOTAL": "60.0",
+            "HTTP_TIMEOUT_CONNECT": "15.0",
+            "HTTP_TIMEOUT_READ": "45.0",
+            "HTTP_MAX_KEEPALIVE_CONNECTIONS": "3",
+            "HTTP_MAX_CONNECTIONS": "5",
         },
     ):
-        # Reload the module to pick up the new environment variables
-        importlib.reload(constants)
-        assert constants.ERROR_MESSAGES.SWORD_ERROR.used_in == "src/gear/sword.py"
-        assert constants.ERROR_MESSAGES.RUNCONTEXT_ERROR.used_in == "src/gear/sword.py"
+        config.update_from_env()
+        assert config.LOG_LEVEL == "INFO"
+        assert config.BASE_URL == "https://test.example.com"
+        assert config.API_KEY == "test_key"
+        assert config.MODEL == "test_model"
+        assert config.MAX_TURNS == 5
+        assert config.MAX_QUEUE_SIZE == 500
+        assert config.MAX_GUARDRAIL_QUEUE_SIZE == 50
+        assert config.MAX_SHIELD_QUEUE_SIZE == 100
+        assert config.LRU_CACHE_SIZE == 64
+        assert config.HTTP_TIMEOUT_TOTAL == 60.0
+        assert config.HTTP_TIMEOUT_CONNECT == 15.0
+        assert config.HTTP_TIMEOUT_READ == 45.0
+        assert config.HTTP_MAX_KEEPALIVE_CONNECTIONS == 3
+        assert config.HTTP_MAX_CONNECTIONS == 5
+
+
+def test_error_message_class():
+    """Test the ErrorMessage class."""
+    from src.util.constants import ErrorMessage
+
+    error = ErrorMessage(message="Test error", used_in="test.py")
+    assert error.message == "Test error"
+    assert error.used_in == "test.py"
+
+
+def test_error_messages_class():
+    """Test the ErrorMessages class."""
+    from src.util.constants import ErrorMessage, ErrorMessages
+
+    # Clear any existing error messages
+    ErrorMessages._error_messages.clear()
+
+    # Test with no environment variables
+    with patch.dict(os.environ, {}, clear=True):
+        error_messages = ErrorMessages()
+        assert error_messages._error_messages == {}
+
+    # Test with environment variables
+    with patch.dict(
+        os.environ,
+        {
+            "SWORD_ERROR_MESSAGE": "Sword error",
+            "RUNCONTEXT_ERROR_MESSAGE": "Context error",
+            "SHIELD_ERROR_MESSAGE": "Shield error",
+            "RUNNER_ERROR_MESSAGE": "Runner error",
+            "ORBS_ERROR_MESSAGE": "Orbs error",
+            "AGENT_EXEC_ERROR_MESSAGE": "Agent error",
+            "MODEL_ERROR_MESSAGE": "Model error",
+            "TYPES_ERROR_MESSAGE": "Type error",
+            "OBJECT_ADDITIONAL_PROPERTIES_ERROR": "Object additional properties error",
+        },
+    ):
+        error_messages = ErrorMessages()
+        assert isinstance(error_messages.SWORD_ERROR, ErrorMessage)
+        assert error_messages.SWORD_ERROR.message == "Sword error"
+        assert error_messages.SWORD_ERROR.used_in == "src/gear/sword.py"
+        assert isinstance(error_messages.TYPES_ERROR, ErrorMessage)
+        assert error_messages.TYPES_ERROR.message == "Type error"
+        assert error_messages.TYPES_ERROR.used_in == "src/util/types.py"
+        assert isinstance(error_messages.OBJECT_ADDITIONAL_PROPERTIES_ERROR, ErrorMessage)
+        assert (
+            error_messages.OBJECT_ADDITIONAL_PROPERTIES_ERROR.message
+            == "Object additional properties error"
+        )
+        assert error_messages.OBJECT_ADDITIONAL_PROPERTIES_ERROR.used_in == "src/util/schema.py"
+
+        # Test __getattr__ with non-existent error
+        with pytest.raises(AttributeError) as exc_info:
+            _ = error_messages.NONEXISTENT_ERROR
+        assert "NONEXISTENT_ERROR" in str(exc_info.value)
+
+
+def test_validate_required_env_vars():
+    """Test the validate_required_env_vars function."""
+    from src.util.constants import validate_required_env_vars
+
+    # Test with all required variables
+    with patch.dict(
+        os.environ,
+        {
+            "SWORD_ERROR_MESSAGE": "Sword error",
+            "RUNCONTEXT_ERROR_MESSAGE": "Context error",
+            "SHIELD_ERROR_MESSAGE": "Shield error",
+            "RUNNER_ERROR_MESSAGE": "Runner error",
+            "ORBS_ERROR_MESSAGE": "Orbs error",
+            "AGENT_EXEC_ERROR_MESSAGE": "Agent error",
+            "MODEL_ERROR_MESSAGE": "Model error",
+            "TYPES_ERROR_MESSAGE": "Type error",
+            "OBJECT_ADDITIONAL_PROPERTIES_ERROR": "Object additional properties error",
+        },
+    ):
+        validate_required_env_vars()  # Should not raise
+
+    # Test with missing variables
+    with patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(ValueError) as exc_info:
+            validate_required_env_vars()
+        error_msg = str(exc_info.value)
+        assert "SWORD_ERROR_MESSAGE" in error_msg
+        assert "RUNCONTEXT_ERROR_MESSAGE" in error_msg
+        assert "SHIELD_ERROR_MESSAGE" in error_msg
+        assert "RUNNER_ERROR_MESSAGE" in error_msg
+        assert "ORBS_ERROR_MESSAGE" in error_msg
+        assert "AGENT_EXEC_ERROR_MESSAGE" in error_msg
+        assert "MODEL_ERROR_MESSAGE" in error_msg
+        assert "TYPES_ERROR_MESSAGE" in error_msg
+        assert "OBJECT_ADDITIONAL_PROPERTIES_ERROR" in error_msg
+
+
+def test_load_environment():
+    """Test the load_environment function."""
+    from src.util.constants import load_environment, logger
+
+    # Save original environment
+    original_env = dict(os.environ)
+
+    try:
+        # Set test environment variables
+        with patch.dict(
+            os.environ,
+            {
+                "LOG_LEVEL": "INFO",
+                "BASE_URL": "https://test.example.com",
+                "API_KEY": "test_key",
+                "MODEL": "test_model",
+                "MAX_TURNS": "5",
+                "MAX_QUEUE_SIZE": "500",
+                "MAX_GUARDRAIL_QUEUE_SIZE": "50",
+                "MAX_SHIELD_QUEUE_SIZE": "100",
+                "LRU_CACHE_SIZE": "64",
+                "HTTP_TIMEOUT_TOTAL": "60.0",
+                "HTTP_TIMEOUT_CONNECT": "15.0",
+                "HTTP_TIMEOUT_READ": "45.0",
+                "HTTP_MAX_KEEPALIVE_CONNECTIONS": "3",
+                "HTTP_MAX_CONNECTIONS": "5",
+                "SWORD_ERROR_MESSAGE": "Sword error",
+                "RUNCONTEXT_ERROR_MESSAGE": "Context error",
+                "SHIELD_ERROR_MESSAGE": "Shield error",
+                "RUNNER_ERROR_MESSAGE": "Runner error",
+                "ORBS_ERROR_MESSAGE": "Orbs error",
+                "AGENT_EXEC_ERROR_MESSAGE": "Agent error",
+            },
+        ):
+            # Patch load_dotenv to do nothing
+            with patch("src.util.constants.load_dotenv"):
+                load_environment()
+
+                # Verify logger configuration
+                assert logger.level == logging.INFO
+
+                # Verify global variables
+                from src.util.constants import (
+                    API_KEY,
+                    BASE_URL,
+                    HTTP_MAX_CONNECTIONS,
+                    HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                    HTTP_TIMEOUT_CONNECT,
+                    HTTP_TIMEOUT_READ,
+                    HTTP_TIMEOUT_TOTAL,
+                    LOG_LEVEL,
+                    LRU_CACHE_SIZE,
+                    MAX_GUARDRAIL_QUEUE_SIZE,
+                    MAX_QUEUE_SIZE,
+                    MAX_SHIELD_QUEUE_SIZE,
+                    MAX_TURNS,
+                    MODEL,
+                )
+
+                assert LOG_LEVEL == "INFO"
+                assert BASE_URL == "https://test.example.com"
+                assert API_KEY == "test_key"
+                assert MODEL == "test_model"
+                assert MAX_TURNS == 5
+                assert MAX_QUEUE_SIZE == 500
+                assert MAX_GUARDRAIL_QUEUE_SIZE == 50
+                assert MAX_SHIELD_QUEUE_SIZE == 100
+                assert LRU_CACHE_SIZE == 64
+                assert HTTP_TIMEOUT_TOTAL == 60.0
+                assert HTTP_TIMEOUT_CONNECT == 15.0
+                assert HTTP_TIMEOUT_READ == 45.0
+                assert HTTP_MAX_KEEPALIVE_CONNECTIONS == 3
+                assert HTTP_MAX_CONNECTIONS == 5
+    finally:
+        # Restore original environment
+        os.environ.clear()
+        os.environ.update(original_env)

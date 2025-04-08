@@ -63,6 +63,9 @@ jobs:
               'RUNNER_ERROR_MESSAGE',
               'ORBS_ERROR_MESSAGE',
               'AGENT_EXEC_ERROR_MESSAGE',
+              'MODEL_ERROR_MESSAGE',
+              'TYPES_ERROR_MESSAGE',
+              'OBJECT_ADDITIONAL_PROPERTIES_ERROR',
           }
           missing_vars = [var for var in required_vars if not os.getenv(var)]
           if missing_vars:

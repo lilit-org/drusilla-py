@@ -1,6 +1,6 @@
 """
-Constants used throughout the deepseek agentic framework.
-This module contains API configurations, environment settings, and default values.
+This module contains API configurations, environment settings,
+and default values.
 """
 
 from __future__ import annotations
@@ -8,29 +8,20 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import ClassVar
 
 from dotenv import find_dotenv, load_dotenv
+
+from .types import T
 
 __all__ = (
     "HEADERS",
     "UNSET",
     "FAKE_RESPONSES_ID",
-    "LOG_LEVEL",
-    "BASE_URL",
-    "API_KEY",
-    "MODEL",
-    "MAX_TURNS",
-    "MAX_QUEUE_SIZE",
-    "MAX_GUARDRAIL_QUEUE_SIZE",
-    "MAX_SHIELD_QUEUE_SIZE",
-    "LRU_CACHE_SIZE",
+    "THINK_TAGS",
+    "Config",
     "CHAT_COMPLETIONS_ENDPOINT",
-    "HTTP_TIMEOUT_TOTAL",
-    "HTTP_TIMEOUT_CONNECT",
-    "HTTP_TIMEOUT_READ",
-    "HTTP_MAX_KEEPALIVE_CONNECTIONS",
-    "HTTP_MAX_CONNECTIONS",
     "SUPPORTED_LANGUAGES",
     "load_environment",
     "logger",
@@ -40,25 +31,10 @@ __all__ = (
 # Load .env file
 load_dotenv(find_dotenv())
 
-# Constants
+# Core Constants
 UNSET = object()
 FAKE_RESPONSES_ID = "fake_responses"
-
-# Initialize variables with default values
-LOG_LEVEL = "DEBUG"
-BASE_URL = "http://localhost:11434"
-API_KEY = ""
-MODEL = "deepseek-r1"
-MAX_TURNS = 10
-MAX_QUEUE_SIZE = 1000
-MAX_GUARDRAIL_QUEUE_SIZE = 100
-MAX_SHIELD_QUEUE_SIZE = 1000
-LRU_CACHE_SIZE = 128
-HTTP_TIMEOUT_TOTAL = 120.0
-HTTP_TIMEOUT_CONNECT = 30.0
-HTTP_TIMEOUT_READ = 90.0
-HTTP_MAX_KEEPALIVE_CONNECTIONS = 5
-HTTP_MAX_CONNECTIONS = 10
+THINK_TAGS = ("<think>", "</think>")
 
 # API Configuration
 _USER_AGENT = "Agents/Python"
@@ -88,44 +64,63 @@ SUPPORTED_LANGUAGES: set[str] = {
 
 # Initialize logger
 logger = logging.getLogger("deepseek.agents")
-logger.setLevel(logging.DEBUG)  # Default level
+logger.setLevel(logging.DEBUG)
 logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def load_environment() -> None:
-    """Load environment variables and configure logging."""
-    global LOG_LEVEL, BASE_URL, API_KEY, MODEL, MAX_TURNS, MAX_QUEUE_SIZE
-    global MAX_GUARDRAIL_QUEUE_SIZE, LRU_CACHE_SIZE, HTTP_TIMEOUT_TOTAL
-    global HTTP_TIMEOUT_CONNECT, HTTP_TIMEOUT_READ, HTTP_MAX_KEEPALIVE_CONNECTIONS
-    global HTTP_MAX_CONNECTIONS, ERROR_MESSAGES
+def get_env_var(name: str, default: T, type_func: type = str) -> T:
+    """Helper function to get and type cast environment variables."""
+    value = os.getenv(name, default)
+    return type_func(value) if value is not None else default
 
-    # Load environment variables from .env file
-    load_dotenv()
 
-    # Logging
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
-    logger.setLevel(getattr(logging, LOG_LEVEL))
+@dataclass
+class Config:
+    """Configuration class to manage environment variables and their defaults."""
 
-    # Connection
-    BASE_URL = os.getenv("BASE_URL", "http://localhost:11434")
-    API_KEY = os.getenv("API_KEY", "NONE")
-    MODEL = os.getenv("MODEL", "deepseek-r1")
+    LOG_LEVEL: str = field(default_factory=lambda: get_env_var("DEFAULT_LOG_LEVEL", "DEBUG"))
+    BASE_URL: str = field(
+        default_factory=lambda: get_env_var("DEFAULT_BASE_URL", "http://localhost:11434")
+    )
+    API_KEY: str = field(default_factory=lambda: get_env_var("DEFAULT_API_KEY", ""))
+    MODEL: str = field(default_factory=lambda: get_env_var("DEFAULT_MODEL", "deepseek-r1"))
+    MAX_TURNS: int = field(default_factory=lambda: get_env_var("DEFAULT_MAX_TURNS", 10, int))
+    MAX_QUEUE_SIZE: int = field(
+        default_factory=lambda: get_env_var("DEFAULT_MAX_QUEUE_SIZE", 1000, int)
+    )
+    MAX_GUARDRAIL_QUEUE_SIZE: int = field(
+        default_factory=lambda: get_env_var("DEFAULT_MAX_GUARDRAIL_QUEUE_SIZE", 100, int)
+    )
+    MAX_SHIELD_QUEUE_SIZE: int = field(
+        default_factory=lambda: get_env_var("DEFAULT_MAX_SHIELD_QUEUE_SIZE", 1000, int)
+    )
+    LRU_CACHE_SIZE: int = field(
+        default_factory=lambda: get_env_var("DEFAULT_LRU_CACHE_SIZE", 128, int)
+    )
+    HTTP_TIMEOUT_TOTAL: float = field(
+        default_factory=lambda: get_env_var("DEFAULT_HTTP_TIMEOUT_TOTAL", 120.0, float)
+    )
+    HTTP_TIMEOUT_CONNECT: float = field(
+        default_factory=lambda: get_env_var("DEFAULT_HTTP_TIMEOUT_CONNECT", 30.0, float)
+    )
+    HTTP_TIMEOUT_READ: float = field(
+        default_factory=lambda: get_env_var("DEFAULT_HTTP_TIMEOUT_READ", 90.0, float)
+    )
+    HTTP_MAX_KEEPALIVE_CONNECTIONS: int = field(
+        default_factory=lambda: get_env_var("DEFAULT_HTTP_MAX_KEEPALIVE_CONNECTIONS", 5, int)
+    )
+    HTTP_MAX_CONNECTIONS: int = field(
+        default_factory=lambda: get_env_var("DEFAULT_HTTP_MAX_CONNECTIONS", 10, int)
+    )
 
-    # Model logic and Optimizations
-    MAX_TURNS = int(os.getenv("MAX_TURNS", str(10)))
-    MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", "1000"))
-    MAX_GUARDRAIL_QUEUE_SIZE = int(os.getenv("MAX_GUARDRAIL_QUEUE_SIZE", "100"))
-    LRU_CACHE_SIZE = int(os.getenv("LRU_CACHE_SIZE", "128"))
-
-    # HTTP Client Configuration
-    HTTP_TIMEOUT_TOTAL = float(os.getenv("HTTP_TIMEOUT_TOTAL", "120.0"))
-    HTTP_TIMEOUT_CONNECT = float(os.getenv("HTTP_TIMEOUT_CONNECT", "30.0"))
-    HTTP_TIMEOUT_READ = float(os.getenv("HTTP_TIMEOUT_READ", "90.0"))
-    HTTP_MAX_KEEPALIVE_CONNECTIONS = int(os.getenv("HTTP_MAX_KEEPALIVE_CONNECTIONS", "5"))
-    HTTP_MAX_CONNECTIONS = int(os.getenv("HTTP_MAX_CONNECTIONS", "10"))
-
-    # Error Messages
-    ERROR_MESSAGES = ErrorMessages()
+    def update_from_env(self) -> None:
+        """Update configuration values from environment variables."""
+        for field_name in self.__dataclass_fields__:
+            env_key = field_name
+            if hasattr(self, field_name):
+                current_value = getattr(self, field_name)
+                new_value = get_env_var(env_key, current_value, type(current_value))
+                setattr(self, field_name, new_value)
 
 
 @dataclass(frozen=True)
@@ -136,30 +131,38 @@ class ErrorMessage:
 
 @dataclass(frozen=True)
 class ErrorMessages:
-    SWORD_ERROR: ErrorMessage = ErrorMessage(
-        message=os.environ["SWORD_ERROR_MESSAGE"],
-        used_in="src/gear/sword.py",
-    )
-    RUNCONTEXT_ERROR: ErrorMessage = ErrorMessage(
-        message=os.environ["RUNCONTEXT_ERROR_MESSAGE"],
-        used_in="src/gear/sword.py",
-    )
-    SHIELD_ERROR: ErrorMessage = ErrorMessage(
-        message=os.environ["SHIELD_ERROR_MESSAGE"],
-        used_in="src/gear/shield.py",
-    )
-    RUNNER_ERROR: ErrorMessage = ErrorMessage(
-        message=os.environ["RUNNER_ERROR_MESSAGE"],
-        used_in="src/runners/run.py",
-    )
-    ORBS_ERROR: ErrorMessage = ErrorMessage(
-        message=os.environ["ORBS_ERROR_MESSAGE"],
-        used_in="src/gear/orbs.py",
-    )
-    AGENT_EXEC_ERROR: ErrorMessage = ErrorMessage(
-        message=os.environ["AGENT_EXEC_ERROR_MESSAGE"],
-        used_in="src/agents/agent.py",
-    )
+    """Collection of error messages used throughout the application."""
+
+    _error_messages: ClassVar[dict[str, ErrorMessage]] = {}
+
+    def __post_init__(self):
+        """Initialize error messages from environment variables."""
+        error_vars = {
+            "SWORD_ERROR": ("SWORD_ERROR_MESSAGE", "src/gear/sword.py"),
+            "RUNCONTEXT_ERROR": ("RUNCONTEXT_ERROR_MESSAGE", "src/gear/sword.py"),
+            "SHIELD_ERROR": ("SHIELD_ERROR_MESSAGE", "src/gear/shield.py"),
+            "RUNNER_ERROR": ("RUNNER_ERROR_MESSAGE", "src/runners/run.py"),
+            "ORBS_ERROR": ("ORBS_ERROR_MESSAGE", "src/gear/orbs.py"),
+            "AGENT_EXEC_ERROR": ("AGENT_EXEC_ERROR_MESSAGE", "src/agents/agent.py"),
+            "MODEL_ERROR": ("MODEL_ERROR_MESSAGE", "src/util/print.py"),
+            "TYPES_ERROR": ("TYPES_ERROR_MESSAGE", "src/util/types.py"),
+            "OBJECT_ADDITIONAL_PROPERTIES_ERROR": (
+                "OBJECT_ADDITIONAL_PROPERTIES_ERROR",
+                "src/util/schema.py",
+            ),
+        }
+
+        for name, (env_var, used_in) in error_vars.items():
+            if env_var in os.environ:
+                self._error_messages[name] = ErrorMessage(
+                    message=os.environ[env_var], used_in=used_in
+                )
+
+    def __getattr__(self, name: str) -> ErrorMessage:
+        """Get error message by name."""
+        if name in self._error_messages:
+            return self._error_messages[name]
+        raise AttributeError(f"No error message defined for {name}")
 
 
 def validate_required_env_vars() -> None:
@@ -171,6 +174,9 @@ def validate_required_env_vars() -> None:
         "RUNNER_ERROR_MESSAGE",
         "ORBS_ERROR_MESSAGE",
         "AGENT_EXEC_ERROR_MESSAGE",
+        "MODEL_ERROR_MESSAGE",
+        "TYPES_ERROR_MESSAGE",
+        "OBJECT_ADDITIONAL_PROPERTIES_ERROR",
     }
 
     missing_vars = [var for var in required_vars if var not in os.environ]
@@ -181,5 +187,23 @@ def validate_required_env_vars() -> None:
         )
 
 
+def load_environment() -> None:
+    """Load environment variables and configure logging."""
+    # Load environment variables from .env file
+    load_dotenv()
+
+    # Initialize configuration
+    config = Config()
+    config.update_from_env()
+
+    # Update global variables
+    globals().update(dict(config.__dict__.items()))
+
+    # Configure logging
+    logger.setLevel(getattr(logging, config.LOG_LEVEL))
+
+
+# Initialize environment and validate required variables
 validate_required_env_vars()
 ERROR_MESSAGES = ErrorMessages()
+load_environment()

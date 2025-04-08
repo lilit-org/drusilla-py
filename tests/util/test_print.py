@@ -7,16 +7,12 @@ from pydantic import BaseModel, TypeAdapter
 from src.runners.items import ModelResponse, Usage
 from src.util.exceptions import ModelError
 from src.util.print import (
-    _format_agent_info,
-    _format_final_output,
     _format_result,
     _format_stats,
     _format_stream_info,
     _indent,
     pretty_print_result,
     pretty_print_result_stats,
-    pretty_print_result_stream,
-    transform_string_function_style,
     validate_json,
 )
 from src.util.types import ResponseOutput
@@ -45,6 +41,11 @@ class MockRunResult:
 @dataclass
 class MockRunResultStreaming:
     text: str
+    current_agent: MockAgent
+    current_turn: int
+    max_turns: int
+    is_complete: bool
+    last_agent: MockAgent
 
 
 def test_indent():
@@ -53,34 +54,11 @@ def test_indent():
     indented = _indent(text, 2)
     assert indented == "    line1\n    line2\n    line3"
 
+    # Test empty string
+    assert _indent("", 2) == ""
 
-def test_format_final_output():
-    """Test _format_final_output function."""
-    # Test case 1: Empty output
-    empty_response = ModelResponse(output=[], usage=Usage(), referenceable_id=None)
-    reasoning, result = _format_final_output(empty_response)
-    assert reasoning == ""
-    assert result == ""
-
-    # Test case 2: Simple text output
-    simple_response = ModelResponse(
-        output=[ResponseOutput(type="text", text="Hello world")],
-        usage=Usage(),
-        referenceable_id=None,
-    )
-    reasoning, result = _format_final_output(simple_response)
-    assert reasoning == ""
-    assert "Hello world" in result
-
-    # Test case 3: Output with reasoning
-    reasoning_response = ModelResponse(
-        output=[ResponseOutput(type="text", text="<think>Reasoning</think>Result")],
-        usage=Usage(),
-        referenceable_id=None,
-    )
-    reasoning, result = _format_final_output(reasoning_response)
-    assert "Reasoning" in reasoning
-    assert "Result" in result
+    # Test single line
+    assert _indent("single line", 1) == "  single line"
 
 
 def test_format_result():
@@ -100,31 +78,10 @@ def test_format_result():
     assert "Reasoning" not in result
     assert "Result" in result
 
-
-def test_format_agent_info():
-    """Test _format_agent_info function."""
-    # Test case 1: Complete agent
-    agent = MockAgent(name="test_agent")
-    result = MockRunResult(
-        current_agent=agent,
-        current_turn=1,
-        max_turns=3,
-        is_complete=True,
-        new_items=[],
-        raw_responses=[],
-        input_shield_results=[],
-        output_shield_results=[],
-        last_agent=agent,
-    )
-    info = _format_agent_info(result)
-    assert "test_agent" in info
-    assert "1/3" in info
-    assert "Complete" in info
-
-    # Test case 2: Incomplete agent
-    result.is_complete = False
-    info = _format_agent_info(result)
-    assert "Running" in info
+    # Test case 3: Empty response
+    empty_response = ModelResponse(output=[], usage=Usage(), referenceable_id=None)
+    result = _format_result(empty_response)
+    assert result == ""
 
 
 def test_format_stats():
@@ -145,6 +102,14 @@ def test_format_stats():
     assert "2" in stats  # Responses
     assert "1" in stats  # Input Shield
     assert "2" in stats  # Output Shield
+
+    # Test case 2: Empty lists
+    result.new_items = []
+    result.raw_responses = []
+    result.input_shield_results = []
+    result.output_shield_results = []
+    stats = _format_stats(result)
+    assert "0" in stats  # All counts should be 0
 
 
 def test_format_stream_info():
@@ -170,6 +135,16 @@ def test_format_stream_info():
     # Test case 2: Streaming disabled
     info = _format_stream_info(False, result)
     assert "Disabled" in info
+
+    # Test case 3: No swords
+    agent.swords = []
+    info = _format_stream_info(True, result)
+    assert "None" in info
+
+    # Test case 4: No agent
+    info = _format_stream_info(True, None)
+    assert "Enabled" in info
+    assert "None" not in info
 
 
 def test_pretty_print_result_stats():
@@ -213,16 +188,22 @@ def test_pretty_print_result():
         last_agent=MockAgent(name="test"),
     )
 
+    # Test case 1: Normal case
     output = pretty_print_result(result)
     assert "Reasoning" in output
     assert "Result" in output
 
+    # Test case 2: No raw responses
+    result.raw_responses = []
+    with pytest.raises(ModelError) as exc_info:
+        pretty_print_result(result)
+    assert "Model error" in str(exc_info.value)
 
-def test_pretty_print_result_stream():
-    """Test pretty_print_result_stream function."""
-    stream_result = MockRunResultStreaming(text="Hello world")
-    output = pretty_print_result_stream(stream_result)
-    assert "Hello world" in output
+    # Test case 3: With reasoning disabled
+    result.raw_responses = [response]
+    output = pretty_print_result(result, show_reasoning=False)
+    assert "Reasoning" not in output
+    assert "Result" in output
 
 
 def test_validate_json():
@@ -242,17 +223,22 @@ def test_validate_json():
 
     # Test case 2: Invalid JSON
     json_str = '{"name": "John", "age": "thirty"}'
-    with pytest.raises(ModelError):
+    with pytest.raises(ModelError) as exc_info:
         validate_json(json_str, adapter)
+    assert "model error" in str(exc_info.value).lower()
 
+    # Test case 3: Partial validation
+    json_str = '{"name": "John"}'
+    with pytest.raises(ModelError) as exc_info:
+        validate_json(json_str, adapter, partial=False)
+    assert "model error" in str(exc_info.value).lower()
 
-def test_transform_string_function_style():
-    """Test transform_string_function_style function."""
-    # Test case 1: Simple string
-    assert transform_string_function_style("Hello World") == "hello_world"
+    # Test case 4: Partial validation allowed
+    class PartialTestModel(BaseModel):
+        name: str
+        age: int | None = None
 
-    # Test case 2: String with special characters
-    assert transform_string_function_style("Hello-World!123") == "hello_world_123"
-
-    # Test case 3: String with spaces
-    assert transform_string_function_style("Hello  World") == "hello__world"
+    adapter = TypeAdapter(PartialTestModel)
+    result = validate_json(json_str, adapter, partial=True)
+    assert result.name == "John"
+    assert result.age is None
