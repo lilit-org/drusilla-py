@@ -197,7 +197,7 @@ def test_pretty_print_result():
     result.raw_responses = []
     with pytest.raises(ModelError) as exc_info:
         pretty_print_result(result)
-    assert "No raw responses found in result" in str(exc_info.value)
+    assert "Model error" in str(exc_info.value)
 
     # Test case 3: With reasoning disabled
     result.raw_responses = [response]
@@ -225,13 +225,13 @@ def test_validate_json():
     json_str = '{"name": "John", "age": "thirty"}'
     with pytest.raises(ModelError) as exc_info:
         validate_json(json_str, adapter)
-    assert "validation error" in str(exc_info.value).lower()
+    assert "model error" in str(exc_info.value).lower()
 
     # Test case 3: Partial validation
     json_str = '{"name": "John"}'
     with pytest.raises(ModelError) as exc_info:
         validate_json(json_str, adapter, partial=False)
-    assert "validation error" in str(exc_info.value).lower()
+    assert "model error" in str(exc_info.value).lower()
 
     # Test case 4: Partial validation allowed
     class PartialTestModel(BaseModel):

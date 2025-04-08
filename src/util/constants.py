@@ -145,6 +145,11 @@ class ErrorMessages:
             "ORBS_ERROR": ("ORBS_ERROR_MESSAGE", "src/gear/orbs.py"),
             "AGENT_EXEC_ERROR": ("AGENT_EXEC_ERROR_MESSAGE", "src/agents/agent.py"),
             "MODEL_ERROR": ("MODEL_ERROR_MESSAGE", "src/util/print.py"),
+            "TYPES_ERROR": ("TYPES_ERROR_MESSAGE", "src/util/types.py"),
+            "OBJECT_ADDITIONAL_PROPERTIES_ERROR": (
+                "OBJECT_ADDITIONAL_PROPERTIES_ERROR",
+                "src/util/schema.py",
+            ),
         }
 
         for name, (env_var, used_in) in error_vars.items():
@@ -169,6 +174,9 @@ def validate_required_env_vars() -> None:
         "RUNNER_ERROR_MESSAGE",
         "ORBS_ERROR_MESSAGE",
         "AGENT_EXEC_ERROR_MESSAGE",
+        "MODEL_ERROR_MESSAGE",
+        "TYPES_ERROR_MESSAGE",
+        "OBJECT_ADDITIONAL_PROPERTIES_ERROR",
     }
 
     missing_vars = [var for var in required_vars if var not in os.environ]

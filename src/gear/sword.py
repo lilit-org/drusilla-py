@@ -28,8 +28,6 @@ from ..util.schema import ensure_strict_json_schema
 from ..util.types import (
     MaybeAwaitable,
     RunContextWrapper,
-    SwordFuncAsync,
-    SwordFuncSync,
 )
 
 #############################################################
@@ -122,6 +120,9 @@ def create_sword_decorator(
 
 
 # Type aliases for sword functions
+SwordFuncSync = Callable[[RunContextWrapper[Any], str], Any]
+SwordFuncAsync = Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
+
 function_sword = create_sword_decorator(
     Sword,
     SwordFuncSync,

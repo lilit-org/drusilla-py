@@ -47,9 +47,6 @@ def _format_final_output(raw_response: ModelResponse) -> tuple[str, str]:
         return "", ""
 
     try:
-        if raw_response.output is None:
-            raise ModelError(ERROR_MESSAGES.MODEL_ERROR.message.format(error="Output is None"))
-
         if not isinstance(raw_response.output, list):
             raise ModelError(
                 ERROR_MESSAGES.MODEL_ERROR.message.format(error="Output is not a list")

@@ -216,12 +216,24 @@ def test_error_messages_class():
             "RUNNER_ERROR_MESSAGE": "Runner error",
             "ORBS_ERROR_MESSAGE": "Orbs error",
             "AGENT_EXEC_ERROR_MESSAGE": "Agent error",
+            "MODEL_ERROR_MESSAGE": "Model error",
+            "TYPES_ERROR_MESSAGE": "Type error",
+            "OBJECT_ADDITIONAL_PROPERTIES_ERROR": "Object additional properties error",
         },
     ):
         error_messages = ErrorMessages()
         assert isinstance(error_messages.SWORD_ERROR, ErrorMessage)
         assert error_messages.SWORD_ERROR.message == "Sword error"
         assert error_messages.SWORD_ERROR.used_in == "src/gear/sword.py"
+        assert isinstance(error_messages.TYPES_ERROR, ErrorMessage)
+        assert error_messages.TYPES_ERROR.message == "Type error"
+        assert error_messages.TYPES_ERROR.used_in == "src/util/types.py"
+        assert isinstance(error_messages.OBJECT_ADDITIONAL_PROPERTIES_ERROR, ErrorMessage)
+        assert (
+            error_messages.OBJECT_ADDITIONAL_PROPERTIES_ERROR.message
+            == "Object additional properties error"
+        )
+        assert error_messages.OBJECT_ADDITIONAL_PROPERTIES_ERROR.used_in == "src/util/schema.py"
 
         # Test __getattr__ with non-existent error
         with pytest.raises(AttributeError) as exc_info:
@@ -243,6 +255,9 @@ def test_validate_required_env_vars():
             "RUNNER_ERROR_MESSAGE": "Runner error",
             "ORBS_ERROR_MESSAGE": "Orbs error",
             "AGENT_EXEC_ERROR_MESSAGE": "Agent error",
+            "MODEL_ERROR_MESSAGE": "Model error",
+            "TYPES_ERROR_MESSAGE": "Type error",
+            "OBJECT_ADDITIONAL_PROPERTIES_ERROR": "Object additional properties error",
         },
     ):
         validate_required_env_vars()  # Should not raise
@@ -251,17 +266,16 @@ def test_validate_required_env_vars():
     with patch.dict(os.environ, {}, clear=True):
         with pytest.raises(ValueError) as exc_info:
             validate_required_env_vars()
-        assert "Missing required environment variables" in str(exc_info.value)
-        missing_vars = [
-            "SWORD_ERROR_MESSAGE",
-            "RUNCONTEXT_ERROR_MESSAGE",
-            "SHIELD_ERROR_MESSAGE",
-            "RUNNER_ERROR_MESSAGE",
-            "ORBS_ERROR_MESSAGE",
-            "AGENT_EXEC_ERROR_MESSAGE",
-        ]
-        for var in missing_vars:
-            assert var in str(exc_info.value)
+        error_msg = str(exc_info.value)
+        assert "SWORD_ERROR_MESSAGE" in error_msg
+        assert "RUNCONTEXT_ERROR_MESSAGE" in error_msg
+        assert "SHIELD_ERROR_MESSAGE" in error_msg
+        assert "RUNNER_ERROR_MESSAGE" in error_msg
+        assert "ORBS_ERROR_MESSAGE" in error_msg
+        assert "AGENT_EXEC_ERROR_MESSAGE" in error_msg
+        assert "MODEL_ERROR_MESSAGE" in error_msg
+        assert "TYPES_ERROR_MESSAGE" in error_msg
+        assert "OBJECT_ADDITIONAL_PROPERTIES_ERROR" in error_msg
 
 
 def test_load_environment():

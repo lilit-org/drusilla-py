@@ -13,6 +13,7 @@ It includes:
 
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -24,13 +25,11 @@ from typing_extensions import NotRequired, TypeVar
 #              Type Variables
 ########################################################
 
-TContext = TypeVar("TContext", default=Any)
 T = TypeVar("T")
+TContext = TypeVar("TContext", bound=Any)
 TContext_co = TypeVar("TContext_co", covariant=True)
-TOrbsInput = TypeVar("TOrbsInput", default=Any)
 MaybeAwaitable = Awaitable[T] | T
 TResponseInputItem: TypeAlias = "ResponseInputItemParam"
-"""Type alias for response input items."""
 
 ########################################################
 #              Decorator Factory
@@ -44,7 +43,7 @@ def create_decorator_factory(
     *,
     constructor_params: dict[str, Any] | None = None,
     pre_init_hook: Callable[[Any, dict[str, Any]], dict[str, Any]] | None = None,
-):
+) -> Callable:
     """Create a decorator factory for classes that wrap functions.
 
     Args:
@@ -61,13 +60,7 @@ def create_decorator_factory(
     def decorator(
         func: sync_func_type | async_func_type | None = None,
         **kwargs: Any,
-    ) -> (
-        base_class
-        | Callable[
-            [sync_func_type | async_func_type],
-            base_class,
-        ]
-    ):
+    ) -> base_class | Callable[[sync_func_type | async_func_type], base_class]:
         def create_instance(
             f: sync_func_type | async_func_type,
         ) -> base_class:
@@ -115,6 +108,7 @@ class Usage:
     """Total tokens used."""
 
     def add(self, other: Usage) -> Usage:
+        """Add another Usage instance to this one."""
         return Usage(
             requests=self.requests + (other.requests or 0),
             input_tokens=self.input_tokens + (other.input_tokens or 0),
@@ -139,8 +133,7 @@ class RunContextWrapper(Generic[TContext]):
 
 
 # Sword function type aliases
-SwordFuncSync = Callable[[RunContextWrapper[Any], str], Any]
-SwordFuncAsync = Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
+
 
 ########################################################
 #            Queue Sentinel Types
@@ -408,6 +401,16 @@ class AsyncStream(AsyncIterator[ChatCompletionChunk]):
     def __init__(self, stream: AsyncIterator[str | dict]):
         self._stream = stream
 
+    def _create_fallback_chunk(self, data: Any, content: str = "") -> ChatCompletionChunk:
+        """Create a fallback chat completion chunk with default values."""
+        return {
+            "id": "fallback-id" if not isinstance(data, dict) else data.get("id", "fallback-id"),
+            "object": "chat.completion.chunk",
+            "created": int(time.time()),
+            "model": "unknown" if not isinstance(data, dict) else data.get("model", "unknown"),
+            "choices": [{"index": 0, "delta": {"content": content or str(data)}}],
+        }
+
     async def __anext__(self) -> ChatCompletionChunk:
         try:
             line = await anext(self._stream)
@@ -420,38 +423,26 @@ class AsyncStream(AsyncIterator[ChatCompletionChunk]):
                 line = line[6:]
             if line == "[DONE]":
                 raise StopAsyncIteration
-            import json
 
             data = json.loads(line)
 
             # Handle Ollama's specific response format
             if "message" in data:
                 content = data["message"].get("content", "")
-                data = {
-                    "id": data.get("id", "ollama-" + str(hash(content))),
+                return {
+                    "id": data.get("id", f"ollama-{hash(content)}"),
                     "object": "chat.completion.chunk",
                     "created": data.get("created", int(time.time())),
                     "model": data.get("model", "unknown"),
                     "choices": [{"index": 0, "delta": {"content": content}}],
                 }
-            # If the response doesn't match the expected structure, create a valid chunk
-            elif not isinstance(data, dict):
-                data = {
-                    "id": "fallback-id",
-                    "object": "chat.completion.chunk",
-                    "created": int(time.time()),
-                    "model": "unknown",
-                    "choices": [{"index": 0, "delta": {"content": str(data)}}],
-                }
-            elif "choices" not in data:
-                data = {
-                    "id": data.get("id", "fallback-id"),
-                    "object": "chat.completion.chunk",
-                    "created": data.get("created", int(time.time())),
-                    "model": data.get("model", "unknown"),
-                    "choices": [{"index": 0, "delta": {"content": str(data)}}],
-                }
-            elif not data["choices"]:
+
+            # Handle invalid or incomplete response structures
+            if not isinstance(data, dict) or "choices" not in data:
+                return self._create_fallback_chunk(data)
+
+            # Ensure choices array is not empty and has delta
+            if not data["choices"]:
                 data["choices"] = [{"index": 0, "delta": {"content": ""}}]
             elif "delta" not in data["choices"][0]:
                 data["choices"][0]["delta"] = {"content": str(data["choices"][0])}
@@ -459,8 +450,10 @@ class AsyncStream(AsyncIterator[ChatCompletionChunk]):
             return data
         except StopAsyncIteration:
             raise
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Failed to parse JSON from stream: {e}") from e
         except Exception as e:
-            raise RuntimeError(f"Error parsing stream chunk: {e}") from e
+            raise RuntimeError(f"Error processing stream chunk: {e}") from e
 
 
 class AsyncDeepSeek:

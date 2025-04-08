@@ -30,8 +30,8 @@ test:
 lint:
 	poetry install --with dev --no-root
 	poetry run ruff check src --fix --unsafe-fixes --preview
-	poetry run autoflake -r --in-place --remove-unused-variables src/ examples/
-	poetry run black src/ examples/
+	poetry run autoflake -r --in-place --remove-unused-variables src/ examples/ tests/
+	poetry run black src/ examples/ tests/
 
 .PHONY: cypherpunk-love
 cypherpunk-love:
