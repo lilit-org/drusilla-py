@@ -17,12 +17,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from ..agents.agent import Agent
-from ..util._constants import ERROR_MESSAGES
-from ..util._exceptions import UsageError
-from ..util._items import RunItem
-from ..util._print import transform_string_function_style
-from ..util._types import (
+from ..agents.agent_v1 import AgentV1 as Agent
+from ..runners.items import RunItem
+from ..util.constants import ERROR_MESSAGES
+from ..util.exceptions import UsageError
+from ..util.print import transform_string_function_style
+from ..util.types import (
     InputItem,
     RunContextWrapper,
     T,

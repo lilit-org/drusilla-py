@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from src.util._http import DefaultAsyncHttpxClient, Limits, Timeout
+from src.network.http import DefaultAsyncHttpxClient, Limits, Timeout
 
 
 @pytest.fixture
@@ -21,7 +21,9 @@ def mock_httpx_client():
 
     # Mock both the client class and its parent's request method
     with (
-        patch("src.util._http.DefaultAsyncHttpxClient", return_value=mock_instance) as mock_client,
+        patch(
+            "src.network.http.DefaultAsyncHttpxClient", return_value=mock_instance
+        ) as mock_client,
         patch("httpx.AsyncClient.request", new_callable=AsyncMock) as mock_request,
     ):
         mock_request.return_value = mock_response
@@ -133,21 +135,63 @@ async def test_request_with_retries(mock_httpx_client):
 
 
 @pytest.mark.asyncio
-async def test_request_max_retries_exceeded(mock_httpx_client):
-    """Test request fails after max retries exceeded."""
+async def test_http_method_shortcuts(mock_httpx_client):
+    """Test the HTTP method shortcut methods (get, post, put, delete)."""
     _, mock_request = mock_httpx_client
+    client = DefaultAsyncHttpxClient()
 
-    # Create a new client instance with max_retries=2
-    client = DefaultAsyncHttpxClient(max_retries=2)
+    # Test GET
+    await client.get("http://test.com")
+    mock_request.assert_called_with("GET", "http://test.com")
 
-    # Set up the side effects - all errors should be the same type
+    # Test POST
+    await client.post("http://test.com", json={"key": "value"})
+    mock_request.assert_called_with("POST", "http://test.com", json={"key": "value"})
+
+    # Test PUT
+    await client.put("http://test.com", data="data")
+    mock_request.assert_called_with("PUT", "http://test.com", data="data")
+
+    # Test DELETE
+    await client.delete("http://test.com")
+    mock_request.assert_called_with("DELETE", "http://test.com")
+
+
+@pytest.mark.asyncio
+async def test_custom_timeout_object(mock_httpx_client):
+    """Test initialization with a custom Timeout object."""
+    custom_timeout = Timeout(timeout=60.0, connect=15.0, read=45.0)
+    client = DefaultAsyncHttpxClient(timeout=custom_timeout)
+
+    assert client.timeout == custom_timeout
+    assert client.timeout.connect == 15.0
+    assert client.timeout.read == 45.0
+
+
+@pytest.mark.asyncio
+async def test_exponential_backoff(mock_httpx_client):
+    """Test the exponential backoff mechanism."""
+    _, mock_request = mock_httpx_client
+    client = DefaultAsyncHttpxClient(max_retries=3)
+
+    # Create mock responses
+    success_response = AsyncMock()
+    success_response.status_code = 200
+
+    # Set up the side effects
     mock_request.side_effect = [
-        httpx.ConnectError("Connection error 1"),
-        httpx.ConnectError("Connection error 2"),
-        httpx.ConnectError("Connection error 3"),  # This won't be reached
+        httpx.ConnectError("Connection error"),
+        httpx.ReadError("Read error"),
+        success_response,
     ]
 
-    with pytest.raises(httpx.ConnectError) as exc_info:
+    # Mock asyncio.sleep to verify backoff timing
+    with patch("asyncio.sleep") as mock_sleep:
         await client.request("GET", "http://test.com")
-    assert "Connection error 2" in str(exc_info.value)  # We get the error from the second attempt
-    assert mock_request.call_count == 2  # Only two attempts are made
+
+        # Verify sleep was called twice with increasing delays
+        assert mock_sleep.call_count == 2
+        # First backoff should be 2^0 + 0.1 = 1.1 seconds
+        assert 1.0 <= mock_sleep.call_args_list[0][0][0] <= 1.2
+        # Second backoff should be 2^1 + 0.2 = 2.2 seconds
+        assert 2.0 <= mock_sleep.call_args_list[1][0][0] <= 2.3

@@ -612,4 +612,13 @@ poetry run pytest tests/gear/test_sword.py -v
 
 <br>
 
+#### agent as a sword
+
 * [agent world traveler](../../examples/agents/world_traveler.py)
+
+<br>
+
+#### `@function_sword` decorator
+
+* [agent summer chaser](../../examples/agents/summer_chaser.py)
+* [agent friend with benefit](../../examples/agents/friend_with_benefits.py)

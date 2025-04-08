@@ -1,7 +1,7 @@
 import pytest
 
 from src.models.settings import ModelSettings
-from src.util._exceptions import UsageError
+from src.util.exceptions import UsageError
 
 
 def test_model_settings_initialization():

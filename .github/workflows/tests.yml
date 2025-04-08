@@ -62,6 +62,7 @@ jobs:
               'SHIELD_ERROR_MESSAGE',
               'RUNNER_ERROR_MESSAGE',
               'ORBS_ERROR_MESSAGE',
+              'AGENT_EXEC_ERROR_MESSAGE',
           }
           missing_vars = [var for var in required_vars if not os.getenv(var)]
           if missing_vars:

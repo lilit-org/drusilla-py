@@ -18,10 +18,10 @@ from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
-from ._exceptions import ModelError
-from ._items import ModelResponse, Usage
-from ._result import RunResult, RunResultStreaming
-from ._types import T
+from ..runners.items import ModelResponse, Usage
+from ..runners.result import RunResult, RunResultStreaming
+from .exceptions import ModelError
+from .types import T
 
 ########################################################
 #              Constants

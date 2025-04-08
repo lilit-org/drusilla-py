@@ -17,9 +17,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic
 
-from ..util._constants import ERROR_MESSAGES
-from ..util._exceptions import UsageError
-from ..util._types import (
+from ..util.constants import ERROR_MESSAGES
+from ..util.exceptions import UsageError
+from ..util.types import (
     InputItem,
     MaybeAwaitable,
     ResponseInputItemParam,
@@ -31,7 +31,7 @@ from ..util._types import (
 )
 
 if TYPE_CHECKING:
-    from ..agents.agent import Agent
+    from ..agent.agent import Agent
 
 
 ########################################################

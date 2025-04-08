@@ -1,22 +1,9 @@
 """
 Client Implementation
 
-This module provides a Python client implementation for interacting with the DeepSeek API.
-It offers an asynchronous interface using httpx for making HTTP requests to the DeepSeek service.
-
-The client supports:
-- Chat completions with customizable parameters
-- Streaming responses
-- Sword-based completions
-- Custom HTTP client configuration
-- Environment-based configuration
-
-Key Features:
-- Async-first design using httpx
-- Configurable timeouts and connection limits
-- Support for organization and project headers
-- Flexible message formatting
-- Stream handling capabilities
+This module provides a Python client implementation for interacting with the
+DeepSeek API. It offers an asynchronous interface using httpx for making HTTP
+requests to the DeepSeek service.
 """
 
 from __future__ import annotations
@@ -27,7 +14,7 @@ from typing import Any
 import httpx
 
 from ..models.shared import set_default_model_client
-from ._constants import (
+from ..util.constants import (
     BASE_URL,
     CHAT_COMPLETIONS_ENDPOINT,
     HEADERS,
@@ -37,7 +24,7 @@ from ._constants import (
     HTTP_TIMEOUT_READ,
     HTTP_TIMEOUT_TOTAL,
 )
-from ._types import (
+from ..util.types import (
     AsyncDeepSeek,
     AsyncStream,
     ChatCompletion,
@@ -68,8 +55,20 @@ class DeepSeekClient(AsyncDeepSeek):
         self.base_url = base_url or BASE_URL
         self.organization = organization
         self.project = project
-        self.http_client = http_client or httpx.AsyncClient()
+        self.http_client = http_client or self._create_http_client()
         self.chat = self.Chat(self)
+
+    def _create_http_client(self) -> httpx.AsyncClient:
+        """Create and configure an HTTP client with optimal settings."""
+        return httpx.AsyncClient(
+            timeout=httpx.Timeout(
+                HTTP_TIMEOUT_TOTAL, connect=HTTP_TIMEOUT_CONNECT, read=HTTP_TIMEOUT_READ
+            ),
+            limits=httpx.Limits(
+                max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                max_connections=HTTP_MAX_CONNECTIONS,
+            ),
+        )
 
     class Chat:
         def __init__(self, client: DeepSeekClient) -> None:
@@ -111,22 +110,17 @@ class DeepSeekClient(AsyncDeepSeek):
                     "stream": stream,
                 }
 
-                if temperature is not None:
-                    data["temperature"] = temperature
-                if top_p is not None:
-                    data["top_p"] = top_p
-                if max_tokens is not None:
-                    data["max_tokens"] = max_tokens
-                if swords is not None:
-                    data["swords"] = swords
-                if sword_choice is not None:
-                    data["sword_choice"] = sword_choice
-                if response_format is not None:
-                    data["response_format"] = response_format
-                if parallel_sword_calls is not None:
-                    data["parallel_sword_calls"] = parallel_sword_calls
-                if stream_options is not None:
-                    data["stream_options"] = stream_options
+                optional_params = {
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "max_tokens": max_tokens,
+                    "swords": swords,
+                    "sword_choice": sword_choice,
+                    "response_format": response_format,
+                    "parallel_sword_calls": parallel_sword_calls,
+                    "stream_options": stream_options,
+                }
+                data.update({k: v for k, v in optional_params.items() if v is not None})
 
                 endpoint = os.getenv("CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT)
                 url = f"{client.base_url}{endpoint}"
@@ -141,10 +135,14 @@ class DeepSeekClient(AsyncDeepSeek):
                 if stream:
                     return AsyncStream(response.aiter_lines())
 
-                # Handle both Ollama and standard chat completion formats
                 response_data = response.json()
+                default_usage = {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                }
 
-                # Check if this is an Ollama response
+                # Handle Ollama response format
                 if "message" in response_data:
                     message = response_data.get("message", {}).get("content", "")
                     return ChatCompletion(
@@ -159,11 +157,7 @@ class DeepSeekClient(AsyncDeepSeek):
                                 "finish_reason": "stop",
                             }
                         ],
-                        usage={
-                            "prompt_tokens": 0,
-                            "completion_tokens": 0,
-                            "total_tokens": 0,
-                        },
+                        usage=default_usage,
                     )
 
                 # Handle standard chat completion format
@@ -173,14 +167,7 @@ class DeepSeekClient(AsyncDeepSeek):
                     created=response_data.get("created", 0),
                     model=model,
                     choices=response_data.get("choices", []),
-                    usage=response_data.get(
-                        "usage",
-                        {
-                            "prompt_tokens": 0,
-                            "completion_tokens": 0,
-                            "total_tokens": 0,
-                        },
-                    ),
+                    usage=response_data.get("usage", default_usage),
                 )
 
 
@@ -191,16 +178,6 @@ class DeepSeekClient(AsyncDeepSeek):
 
 def setup_client() -> DeepSeekClient:
     """Set up and configure the DeepSeek client with optimal settings."""
-    client = DeepSeekClient(
-        http_client=httpx.AsyncClient(
-            timeout=httpx.Timeout(
-                HTTP_TIMEOUT_TOTAL, connect=HTTP_TIMEOUT_CONNECT, read=HTTP_TIMEOUT_READ
-            ),
-            limits=httpx.Limits(
-                max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
-                max_connections=HTTP_MAX_CONNECTIONS,
-            ),
-        )
-    )
+    client = DeepSeekClient()
     set_default_model_client(client)
     return client

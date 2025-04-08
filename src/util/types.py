@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypedDict
 from typing_extensions import NotRequired, TypeVar
 
 if TYPE_CHECKING:
-    from src.util._items import ResponseInputItemParam
+    from src.runner.items import ResponseInputItemParam
 
 ########################################################
 #              Type Variables

@@ -31,19 +31,19 @@ from typing import (
 
 from pydantic import BaseModel
 
-from ._types import (
+from ..util.types import (
     FunctionCallOutput,
     ResponseFunctionSwordCall,
     ResponseInputItemParam,
     ResponseReasoningItem,
     Usage,
 )
-from ._types import (
+from ..util.types import (
     ResponseOutput as TResponseOutputItem,
 )
 
 if TYPE_CHECKING:
-    from ..agents.agent import Agent
+    from ..agents.agent_v1 import Agent
 
 
 ########################################################

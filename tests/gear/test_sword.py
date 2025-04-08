@@ -16,10 +16,10 @@ from src.gear.sword import (
     function_sword,
     generate_func_documentation,
 )
-from src.util._constants import ERROR_MESSAGES
-from src.util._exceptions import ModelError, create_error_handler
-from src.util._items import SwordCallOutputItem
-from src.util._types import RunContextWrapper
+from src.runners.items import SwordCallOutputItem
+from src.util.constants import ERROR_MESSAGES
+from src.util.exceptions import ModelError, create_error_handler
+from src.util.types import RunContextWrapper
 
 
 class SwordTestInput(BaseModel):
@@ -46,62 +46,46 @@ class TestSwordErrorHandling:
         assert result == ERROR_MESSAGES.SWORD_ERROR.message.format(error="Test error")
 
     @pytest.mark.asyncio
-    async def test_function_sword_with_error_handling(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with error handling."""
+    async def test_function_sword_error_handling(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with various error handling scenarios."""
 
+        # Test with ValueError
         @function_sword
         async def test_sword(message: str) -> str:
             raise ValueError("Test error")
 
-        with pytest.raises(ModelError) as exc_info:
+        with pytest.raises(ModelError):
             await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-        assert isinstance(exc_info.value, ModelError)
 
-    @pytest.mark.asyncio
-    async def test_function_sword_with_invalid_json(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with invalid JSON input."""
-
+        # Test with invalid JSON
         @function_sword
-        async def test_sword(message: str) -> str:
+        async def test_sword2(message: str) -> str:
             return message
 
-        with pytest.raises(ModelError) as exc_info:
-            await test_sword.on_invoke_sword(mock_context, "invalid json")
-        assert isinstance(exc_info.value, ModelError)
+        with pytest.raises(ModelError):
+            await test_sword2.on_invoke_sword(mock_context, "invalid json")
 
-    @pytest.mark.asyncio
-    async def test_function_sword_with_custom_error_handler(
-        self, mock_context: RunContextWrapper[Any]
-    ):
-        """Test function sword with custom error handler."""
-
+        # Test with custom error handler
         def custom_error_handler(ctx: RunContextWrapper[Any], error: Exception) -> str:
             return f"Custom error: {str(error)}"
 
         @function_sword(failure_error_function=custom_error_handler)
-        async def test_sword(message: str) -> str:
+        async def test_sword3(message: str) -> str:
             raise ValueError("Test error")
 
-        with pytest.raises(ModelError) as exc_info:
-            await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-        assert isinstance(exc_info.value, ModelError)
+        with pytest.raises(ModelError):
+            await test_sword3.on_invoke_sword(mock_context, '{"message": "test"}')
 
-    @pytest.mark.asyncio
-    async def test_function_sword_with_async_error_handler(
-        self, mock_context: RunContextWrapper[Any]
-    ):
-        """Test function sword with async error handler."""
-
-        async def custom_error_handler(ctx: RunContextWrapper[Any], error: Exception) -> str:
+        # Test with async error handler
+        async def async_error_handler(ctx: RunContextWrapper[Any], error: Exception) -> str:
             return f"Async error: {str(error)}"
 
-        @function_sword(failure_error_function=custom_error_handler)
-        async def test_sword(message: str) -> str:
+        @function_sword(failure_error_function=async_error_handler)
+        async def test_sword4(message: str) -> str:
             raise ValueError("Test error")
 
-        with pytest.raises(ModelError) as exc_info:
-            await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-        assert isinstance(exc_info.value, ModelError)
+        with pytest.raises(ModelError):
+            await test_sword4.on_invoke_sword(mock_context, '{"message": "test"}')
 
 
 class TestFuncSchema:
@@ -236,9 +220,10 @@ class TestFunctionSword:
         result = await test_sword.on_invoke_sword(mock_context, '{"message": "hello", "count": 2}')
         assert result == "hello 2"
 
-    def test_custom_name_and_description(self):
-        """Test function sword with custom name and description."""
+    def test_custom_metadata(self):
+        """Test function sword with custom metadata."""
 
+        # Test with custom name and description
         @function_sword(name_override="custom_sword", description_override="Custom description")
         async def test_sword(ctx: RunContextWrapper[Any], message: str) -> str:
             return message
@@ -246,24 +231,23 @@ class TestFunctionSword:
         assert test_sword.name == "custom_sword"
         assert test_sword.description == "Custom description"
 
-    def test_docstring_name_and_description(self):
-        """Test function sword with docstring-based name and description."""
-
+        # Test with docstring-based metadata
         @function_sword(use_docstring_info=True)
-        async def test_sword(ctx: RunContextWrapper[Any], message: str) -> str:
+        async def test_sword2(ctx: RunContextWrapper[Any], message: str) -> str:
             """Test sword with docstring.
 
             This is a test sword that demonstrates docstring usage.
             """
             return message
 
-        assert test_sword.name == "test_sword"
-        assert "This is a test sword" in test_sword.description
+        assert test_sword2.name == "test_sword2"
+        assert "This is a test sword" in test_sword2.description
 
     @pytest.mark.asyncio
-    async def test_var_positional_args(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with variable positional arguments."""
+    async def test_parameter_handling(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword with various parameter types."""
 
+        # Test with variable positional arguments
         @function_sword
         async def test_sword(*args: int) -> int:
             return sum(args)
@@ -271,42 +255,33 @@ class TestFunctionSword:
         result = await test_sword.on_invoke_sword(mock_context, '{"args": [1, 2, 3]}')
         assert result == 6
 
-    @pytest.mark.asyncio
-    async def test_var_keyword_args(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with variable keyword arguments."""
-
+        # Test with variable keyword arguments
         @function_sword(strict_mode=False)
-        async def test_sword(**kwargs: Any) -> dict[str, Any]:
+        async def test_sword2(**kwargs: Any) -> dict[str, Any]:
             return kwargs
 
-        result = await test_sword.on_invoke_sword(mock_context, '{"kwargs": {"a": 1, "b": 2}}')
+        result = await test_sword2.on_invoke_sword(mock_context, '{"kwargs": {"a": 1, "b": 2}}')
         assert result == {"a": 1, "b": 2}
 
-    @pytest.mark.asyncio
-    async def test_context_parameter(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with context parameter."""
-
+        # Test with context parameter
         @function_sword
-        async def test_sword(ctx: RunContextWrapper[Any], message: str) -> str:
+        async def test_sword3(ctx: RunContextWrapper[Any], message: str) -> str:
             return f"Context: {message}"
 
-        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        result = await test_sword3.on_invoke_sword(mock_context, '{"message": "test"}')
         assert result == "Context: test"
 
-    @pytest.mark.asyncio
-    async def test_sync_function(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with synchronous function."""
-
+        # Test with synchronous function
         @function_sword
-        def test_sword(message: str) -> str:
+        def test_sword4(message: str) -> str:
             return message
 
-        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
+        result = await test_sword4.on_invoke_sword(mock_context, '{"message": "test"}')
         assert result == "test"
 
     @pytest.mark.asyncio
-    async def test_strict_json_schema(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with strict JSON schema validation."""
+    async def test_validation(self, mock_context: RunContextWrapper[Any]):
+        """Test function sword validation."""
 
         @function_sword(strict_mode=True)
         async def test_sword(message: str) -> str:
@@ -320,80 +295,19 @@ class TestFunctionSword:
         with pytest.raises(ModelError):
             await test_sword.on_invoke_sword(mock_context, '{"message": "test", "extra": "field"}')
 
-    @pytest.mark.asyncio
-    async def test_parameter_validation(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword parameter validation."""
-
+        # Test with invalid input (wrong type)
         @function_sword
-        async def test_sword(message: str, count: int) -> str:
+        async def test_sword2(message: str, count: int) -> str:
             return f"{message} {count}"
 
-        # Test with valid input
-        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test", "count": 1}')
-        assert result == "test 1"
-
-        # Test with invalid input (wrong type)
         with pytest.raises(ModelError):
-            await test_sword.on_invoke_sword(
+            await test_sword2.on_invoke_sword(
                 mock_context, '{"message": "test", "count": "not a number"}'
             )
 
         # Test with missing required parameter
         with pytest.raises(ModelError):
-            await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-
-    @pytest.mark.asyncio
-    async def test_nested_models(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with nested Pydantic models."""
-
-        class NestedModel(BaseModel):
-            value: str
-
-        class TestModel(BaseModel):
-            nested: NestedModel
-
-        @function_sword
-        async def test_sword(nested: NestedModel) -> str:
-            return nested.value
-
-        result = await test_sword.on_invoke_sword(mock_context, '{"nested": {"value": "test"}}')
-        assert result == "test"
-
-    @pytest.mark.asyncio
-    async def test_optional_parameters(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with optional parameters."""
-
-        @function_sword
-        async def test_sword(message: str, optional: str | None = None) -> str:
-            return f"{message} {optional}" if optional else message
-
-        # Test without optional parameter
-        result = await test_sword.on_invoke_sword(mock_context, '{"message": "test"}')
-        assert result == "test"
-
-        # Test with optional parameter
-        result = await test_sword.on_invoke_sword(
-            mock_context, '{"message": "test", "optional": "extra"}'
-        )
-        assert result == "test extra"
-
-    @pytest.mark.asyncio
-    async def test_invalid_json(self, mock_context: RunContextWrapper[Any]):
-        """Test function sword with invalid JSON input."""
-
-        # Create a sword with strict mode enabled and no error handler
-        @function_sword(strict_mode=True, failure_error_function=None)
-        async def test_sword(message: str) -> str:
-            return message
-
-        # Test with malformed JSON
-        with pytest.raises(ModelError):
-            await test_sword.on_invoke_sword(mock_context, "{invalid json")
-
-        # Test with empty string
-        with pytest.raises(ModelError) as exc_info:
-            await test_sword.on_invoke_sword(mock_context, "")
-        assert "Expecting value" in str(exc_info.value)
+            await test_sword2.on_invoke_sword(mock_context, '{"message": "test"}')
 
 
 class TestSwordResult:

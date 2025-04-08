@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-A demonstration of chained agents that generate and modify cypherpunk sentences.
-Three agents work together: random number generator → cypherpunk sentence creator → word replacer.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -16,14 +11,14 @@ from typing import Any
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from src.agents.agent import Agent
-from src.agents.run import Runner
+from src.agents.agent_v1 import AgentV1 as Agent
 from src.gear.orbs import OrbsInputData, orbs
 from src.gear.sword import function_sword
-from src.util._client import setup_client
-from src.util._exceptions import AgentExecutionError
-from src.util._print import pretty_print_result, pretty_print_result_stats
-from src.util._types import RunContextWrapper
+from src.network.client import setup_client
+from src.runners.run import Runner
+from src.util.exceptions import AgentExecutionError
+from src.util.print import pretty_print_result, pretty_print_result_stats
+from src.util.types import RunContextWrapper
 
 ########################################################
 #              Swords and Filters

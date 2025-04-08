@@ -16,16 +16,16 @@ from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
-from ..agents.output import AgentOutputSchema
+from ..agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from ..gear.orbs import Orbs
 from ..gear.sword import Sword
-from ..util._constants import FAKE_RESPONSES_ID, HEADERS, UNSET, logger
-from ..util._exceptions import AgentError, UsageError
-from ..util._items import (
+from ..runners.items import (
     ModelResponse,
     TResponseOutputItem,
 )
-from ..util._types import (
+from ..util.constants import FAKE_RESPONSES_ID, HEADERS, UNSET, logger
+from ..util.exceptions import AgentError, UsageError
+from ..util.types import (
     AsyncDeepSeek,
     AsyncStream,
     ChatCompletion,

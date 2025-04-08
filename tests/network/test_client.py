@@ -1,17 +1,21 @@
+from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.util._client import DeepSeekClient, setup_client
+from src.network.client import DeepSeekClient, setup_client
 
 
 @pytest.fixture
-def mock_http_client():
+def mock_http_client() -> AsyncMock:
+    """Fixture providing a mocked HTTP client."""
     return AsyncMock()
 
 
 @pytest.fixture
-def client(mock_http_client):
+def client(mock_http_client: AsyncMock) -> DeepSeekClient:
+    """Fixture providing a configured DeepSeekClient instance."""
     return DeepSeekClient(
         api_key="test_key",
         base_url="http://test.com",
@@ -21,7 +25,26 @@ def client(mock_http_client):
     )
 
 
-def test_client_initialization():
+@pytest.fixture
+def mock_chat_completion_response() -> dict[str, Any]:
+    """Fixture providing a mock chat completion response."""
+    return {
+        "id": "test-id",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": "test-model",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "Hello!"},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+    }
+
+
+def test_client_initialization() -> None:
     """Test DeepSeekClient initialization with default values."""
     client = DeepSeekClient()
     assert client.api_key == "API_KEY"
@@ -31,7 +54,7 @@ def test_client_initialization():
     assert client.http_client is not None
 
 
-def test_client_initialization_with_custom_values():
+def test_client_initialization_with_custom_values() -> None:
     """Test DeepSeekClient initialization with custom values."""
     client = DeepSeekClient(
         api_key="custom_key",
@@ -46,23 +69,14 @@ def test_client_initialization_with_custom_values():
 
 
 @pytest.mark.asyncio
-async def test_chat_completion(client, mock_http_client):
+async def test_chat_completion(
+    client: DeepSeekClient,
+    mock_http_client: AsyncMock,
+    mock_chat_completion_response: dict[str, Any],
+) -> None:
     """Test chat completion creation."""
     mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "id": "test-id",
-        "object": "chat.completion",
-        "created": 1234567890,
-        "model": "test-model",
-        "choices": [
-            {
-                "index": 0,
-                "message": {"role": "assistant", "content": "Hello!"},
-                "finish_reason": "stop",
-            }
-        ],
-        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-    }
+    mock_response.json.return_value = mock_chat_completion_response
     mock_http_client.post.return_value = mock_response
 
     messages = [{"role": "user", "content": "Hello"}]
@@ -81,12 +95,14 @@ async def test_chat_completion(client, mock_http_client):
 
 
 @pytest.mark.asyncio
-async def test_chat_completion_with_streaming(client, mock_http_client):
+async def test_chat_completion_with_streaming(
+    client: DeepSeekClient,
+    mock_http_client: AsyncMock,
+) -> None:
     """Test chat completion with streaming enabled."""
     mock_response = MagicMock()
 
-    # Create an async iterator from the list
-    async def mock_aiter():
+    async def mock_aiter() -> AsyncGenerator[str, None]:
         yield 'data: {"choices": [{"delta": {"content": "Hello!"}}]}'
 
     mock_response.aiter_lines.return_value = mock_aiter()
@@ -104,7 +120,7 @@ async def test_chat_completion_with_streaming(client, mock_http_client):
         assert "Hello!" in chunk["choices"][0]["delta"]["content"]
 
 
-def test_setup_client():
+def test_setup_client() -> None:
     """Test setup_client function."""
     with patch("httpx.AsyncClient") as mock_client:
         mock_client.return_value.timeout = MagicMock(connect=30.0, read=90.0)

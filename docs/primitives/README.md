@@ -7,7 +7,8 @@ the drusilla project has a minimal set of core primitives that allows the design
 <br>
 
 - [agents](agents.md): LLM (ro)bots that can be equipped with orbs and shields
-- [sword](sword.md): part of the agent's gear, used to let agents take actions
-- [orbs](orbs.md): part of the agent's gear, used to delegate tasks to other agents
-- [shield](shield.md): part of the agent's gear, used to validate and protect the inputs from agents
-- [charms](charms.md): part of the agent's gear, used to receive callbacks on lifecycle events
+- [runners](runners.md): execution environments that run agents and manage their lifecycle
+- [sword](gear/sword.md): part of the agent's gear, used to let agents take actions
+- [orbs](gear/orbs.md): part of the agent's gear, used to delegate tasks to other agents
+- [shield](gear/shield.md): part of the agent's gear, used to validate and protect the inputs from agents
+- [charms](gear/charms.md): part of the agent's gear, used to receive callbacks on lifecycle events

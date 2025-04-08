@@ -1,35 +1,40 @@
 """Unit tests for the RunImpl class."""
 
+from __future__ import annotations
+
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
-from src.agents.agent import Agent
-from src.agents.run_impl import (
+from src.agents.agent_v1 import AgentV1 as Agent
+from src.gear.charms import RunCharms
+from src.gear.orbs import Orbs
+from src.gear.sword import Sword
+from src.models.chat import ModelChatCompletionsModel
+from src.models.interface import Model
+from src.models.settings import ModelSettings
+from src.runners.items import (
+    MessageOutputItem,
+    ModelResponse,
+    OrbsOutputItem,
+    SwordCallOutputItem,
+    Usage,
+)
+from src.runners.run import RunContextWrapper
+from src.runners.run_impl import (
     NextStepFinalOutput,
     NextStepOrbs,
     NextStepRunAgain,
     ProcessedResponse,
+    ResponseFunctionSwordCall,
     RunImpl,
     SingleStepResult,
     SwordResult,
     SwordRunFunction,
     SwordRunOrbs,
+    SwordsToFinalOutputResult,
 )
-from src.gear.charms import RunCharms
-from src.gear.orbs import Orbs
-from src.gear.sword import Sword
-from src.models.chat import ModelChatCompletionsModel
-from src.models.settings import ModelSettings
-from src.util._exceptions import AgentError, GenericError
-from src.util._items import (
-    MessageOutputItem,
-    ModelResponse,
-    OrbsOutputItem,
-    ResponseFunctionSwordCall,
-    SwordCallOutputItem,
-)
-from src.util._types import FunctionCallOutput, RunContextWrapper
+from src.util.exceptions import AgentError, GenericError
 
 
 # Test fixtures
@@ -45,12 +50,37 @@ def context_wrapper(mock_context):
 
 @pytest.fixture
 def mock_agent():
-    return Agent(
-        name="test_agent",
-        instructions="Test instructions",
-        model="test_model",
-        model_settings=ModelSettings(),
+    agent = MagicMock(spec=Agent)
+    agent.name = "test_agent"
+    agent.orbs = []
+    agent.model_settings = MagicMock(spec=ModelSettings)
+    agent.model_settings.resolve.return_value = None
+    agent.output_type = str
+    agent.swords = []
+    agent.input_shields = []
+    agent.output_shields = []
+    agent.charms = None
+    agent.instructions = "Test instructions"
+    agent.get_system_prompt = AsyncMock(return_value="Test system prompt")
+
+    # Create a mock model with get_response method
+    mock_model = MagicMock(spec=Model)
+    mock_model.get_response = AsyncMock(
+        return_value=ModelResponse(
+            referenceable_id="test_id",
+            output=[
+                {
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": "Test response"}],
+                    "role": "assistant",
+                }
+            ],
+            usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+        )
     )
+    agent.model = mock_model
+
+    return agent
 
 
 @pytest.fixture
@@ -58,6 +88,9 @@ def mock_sword():
     sword = AsyncMock(spec=Sword)
     sword.name = "test_sword"
     sword.on_invoke_sword = AsyncMock(return_value="sword_output")
+    sword.sword_use_behavior = AsyncMock(
+        return_value=SwordsToFinalOutputResult(is_final_output=False, final_output=None)
+    )
     return sword
 
 
@@ -174,6 +207,10 @@ async def test_execute_sword_call(
 ) -> None:
     """Test executing sword call."""
     mock_sword.on_invoke_sword = AsyncMock(return_value="sword_output")
+    mock_sword.sword_use_behavior = AsyncMock(
+        return_value=SwordsToFinalOutputResult(is_final_output=False, final_output=None)
+    )
+    mock_agent.sword_use_behavior = "run_llm_again"  # Set the agent's sword_use_behavior
 
     next_step = await RunImpl.execute_swords_and_side_effects(
         agent=mock_agent,
@@ -254,7 +291,7 @@ async def test_run_turn_error(
     mock_agent: Agent, mock_charms: RunCharms, context_wrapper: RunContextWrapper
 ) -> None:
     """Test error handling in run turn."""
-    with patch("src.agents.run_impl.RunImpl.execute_swords_and_side_effects") as mock_execute:
+    with patch("src.runners.run_impl.RunImpl.execute_swords_and_side_effects") as mock_execute:
         mock_execute.side_effect = GenericError("Test error")
 
         with pytest.raises(GenericError):
@@ -391,7 +428,10 @@ async def test_check_final_output_from_swords(
 ) -> None:
     """Test checking for final output from sword results."""
     sword_result = MagicMock()
-    sword_result.run_item = FunctionCallOutput(name="test_sword", output="test output")
+    sword_result.sword = MagicMock()
+    sword_result.sword.name = "test_sword"
+    sword_result.output = "test output"
+    mock_agent.sword_use_behavior = "run_llm_again"  # Set the agent's sword_use_behavior
 
     result = await RunImpl._check_for_final_output_from_swords(
         agent=mock_agent, sword_results=[sword_result], context_wrapper=context_wrapper
@@ -471,3 +511,92 @@ async def test_execute_orbs_error(
             context_wrapper=context_wrapper,
             run_config=None,
         )
+
+
+@pytest.mark.asyncio
+async def test_run_impl_with_error_handling(context_wrapper, mock_agent):
+    """Test run implementation with error handling."""
+    from src.runners.run_impl import RunImpl
+    from src.util.exceptions import ModelError
+
+    # Create a mock model that raises an error
+    class ErrorModel:
+        async def get_response(self, *args, **kwargs):
+            raise ModelError("Test error")
+
+    agent = mock_agent.clone(model=ErrorModel())
+
+    with pytest.raises(ModelError):
+        await RunImpl.run(agent=agent, input="test input", context=context_wrapper, max_turns=1)
+
+
+@pytest.mark.asyncio
+async def test_run_impl_with_custom_output_type(context_wrapper, mock_agent):
+    """Test run implementation with custom output type."""
+    from src.runners.items import ModelResponse, Usage
+    from src.runners.run_impl import RunImpl
+
+    # Create a mock model that returns a specific output type
+    class CustomOutputModel:
+        async def get_response(self, *args, **kwargs):
+            return ModelResponse(
+                output=[
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "custom output"}],
+                        "role": "assistant",
+                    }
+                ],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+                referenceable_id="test_id",
+            )
+
+    # Create an agent with custom output type
+    agent = mock_agent.clone()
+    agent.model = CustomOutputModel()
+    agent.output_type = str
+    agent.charms = RunCharms()
+    agent.charms.on_end = AsyncMock(return_value=None)
+
+    result = await RunImpl.run(
+        agent=agent, input="test input", context=context_wrapper, max_turns=1
+    )
+
+    assert result == "custom output"
+
+
+@pytest.mark.asyncio
+async def test_run_impl_with_multiple_turns(context_wrapper, mock_agent):
+    """Test run implementation with multiple turns."""
+    from src.runners.items import ModelResponse, Usage
+    from src.runners.run_impl import RunImpl
+
+    turn_count = 0
+
+    class MultiTurnModel:
+        async def get_response(self, *args, **kwargs):
+            nonlocal turn_count
+            turn_count += 1
+            return ModelResponse(
+                output=[
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": f"turn {turn_count}"}],
+                        "role": "assistant",
+                    }
+                ],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+                referenceable_id=f"test_id_{turn_count}",
+            )
+
+    agent = mock_agent.clone()
+    agent.model = MultiTurnModel()
+    agent.output_type = str
+    agent.charms = RunCharms()
+    agent.charms.on_end = AsyncMock(return_value=None)
+
+    result = await RunImpl.run(
+        agent=agent, input="test input", context=context_wrapper, max_turns=3
+    )
+
+    assert result == "turn 3"

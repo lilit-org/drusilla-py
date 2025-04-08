@@ -5,7 +5,7 @@ import pytest
 from src.models.chat import ModelChatCompletionsModel
 from src.models.provider import ModelProvider
 from src.models.responses import ModelResponsesModel
-from src.util._types import AsyncDeepSeek
+from src.util.types import AsyncDeepSeek
 
 
 @pytest.fixture

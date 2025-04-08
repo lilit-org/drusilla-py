@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
 
-"""
-This script demonstrates the agents-as-swords pattern where a frontline agent selects
-translation agents to handle user messages.
-"""
-
 import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from src.agents.agent import Agent
-from src.agents.run import Runner
-from src.util._client import setup_client
-from src.util._exceptions import AgentExecutionError
-from src.util._print import pretty_print_result, pretty_print_result_stats
+from src.agents.agent_v1 import AgentV1 as Agent
+from src.network.client import setup_client
+from src.runners.run import Runner
+from src.util.exceptions import AgentExecutionError
+from src.util.print import pretty_print_result, pretty_print_result_stats
 
 ########################################################
 #           Agent Creation                             #

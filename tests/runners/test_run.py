@@ -1,16 +1,13 @@
 """Unit tests for the Runner class."""
 
+from __future__ import annotations
+
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.agents.agent import Agent
-from src.agents.run import RunConfig, Runner
-from src.agents.run_impl import (
-    NextStepFinalOutput,
-    NextStepOrbs,
-    SingleStepResult,
-)
+from src.agents.agent_v1 import AgentV1 as Agent
 from src.gear.charms import RunCharms
 from src.gear.orbs import Orbs
 from src.gear.shield import (
@@ -23,10 +20,16 @@ from src.gear.shield import (
 from src.models.interface import Model
 from src.models.provider import ModelProvider
 from src.models.settings import ModelSettings
-from src.util._exceptions import GenericError, MaxTurnsError
-from src.util._items import MessageOutputItem, ModelResponse
-from src.util._result import RunResult, RunResultStreaming
-from src.util._types import RunContextWrapper, Usage
+from src.runners.items import MessageOutputItem, ModelResponse
+from src.runners.result import RunResult, RunResultStreaming
+from src.runners.run import RunConfig, RunContextWrapper, Runner
+from src.runners.run_impl import (
+    NextStepFinalOutput,
+    NextStepOrbs,
+    SingleStepResult,
+)
+from src.util.exceptions import MaxTurnsError, RunnerError
+from src.util.types import ResponseEvent, Usage
 
 
 # Test fixtures
@@ -45,7 +48,7 @@ def mock_agent():
     agent = MagicMock(spec=Agent)
     agent.name = "test_agent"
     agent.orbs = []
-    agent.model_settings = MagicMock()
+    agent.model_settings = MagicMock(spec=ModelSettings)
     agent.model_settings.resolve.return_value = None
     agent.output_type = str
     agent.swords = []
@@ -176,16 +179,27 @@ def mock_model_client(monkeypatch):
 
     async def mock_stream_response(*args, **kwargs):
         async def mock_iterator():
-            yield {"choices": [{"delta": {"content": "test"}}]}
-            yield {"choices": [{"delta": {"content": " output"}}]}
-            yield {
-                "type": "completed",
-                "response": {
-                    "id": "test-id",
-                    "output": [{"text": "test output"}],
-                    "usage": {"input_tokens": 10, "output_tokens": 20, "total_tokens": 30},
-                },
-            }
+            yield ResponseEvent(
+                type="output_text.delta",
+                delta="test",
+            )
+            yield ResponseEvent(
+                type="output_text.delta",
+                delta=" output",
+            )
+            yield ResponseEvent(
+                type="completed",
+                response=ModelResponse(
+                    referenceable_id="test-id",
+                    output=[
+                        {
+                            "type": "message",
+                            "content": [{"type": "output_text", "text": "test output"}],
+                        }
+                    ],
+                    usage=Usage(requests=1, input_tokens=10, output_tokens=20, total_tokens=30),
+                ),
+            )
 
         return mock_iterator()
 
@@ -351,8 +365,8 @@ async def test_run_with_max_turns(mock_agent, mock_run_config):
 
     # Mock the run_impl to return NextStepOrbs to force continuation
     with (
-        patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn,
-        patch("src.agents.run.ERROR_MESSAGES") as mock_error_messages,
+        patch("src.runners.run.Runner._run_turn", new_callable=AsyncMock) as mock_run_turn,
+        patch("src.runners.run.ERROR_MESSAGES") as mock_error_messages,
     ):
         # Create a mock message object with the message attribute
         mock_message = MagicMock()
@@ -379,7 +393,7 @@ async def test_run_with_max_turns(mock_agent, mock_run_config):
         )
 
         # Run and verify error
-        with pytest.raises(MaxTurnsError) as exc_info:
+        with pytest.raises(RunnerError) as exc_info:
             await Runner.run(
                 starting_agent=mock_agent,
                 input=input_text,
@@ -434,7 +448,7 @@ async def test_run_with_context(mock_agent, mock_run_config):
 async def test_run_max_turns_exceeded(mock_agent, mock_model_client):
     """Test that run fails when max turns is exceeded."""
     # Patch the Runner.run method to raise MaxTurnsError
-    with patch("src.agents.run.Runner.run", side_effect=MaxTurnsError("Max turns exceeded")):
+    with patch("src.runners.run.Runner.run", side_effect=MaxTurnsError("Max turns exceeded")):
         with pytest.raises(MaxTurnsError):
             await Runner.run(starting_agent=mock_agent, input="test input", max_turns=1)
 
@@ -474,7 +488,7 @@ async def test_run_with_shields(
     )
 
     # Patch the Runner.run method to return our mock result
-    with patch("src.agents.run.Runner.run", return_value=mock_result):
+    with patch("src.runners.run.Runner.run", return_value=mock_result):
         result = await Runner.run(
             starting_agent=mock_agent, input="test input", run_config=run_config
         )
@@ -501,7 +515,7 @@ async def test_run_streamed(mock_agent, message_output, mock_model_client):
     )
 
     # Patch the Runner.run_streamed method to return our mock result
-    with patch("src.agents.run.Runner.run_streamed", return_value=mock_streaming_result):
+    with patch("src.runners.run.Runner.run_streamed", return_value=mock_streaming_result):
         result = await Runner.run_streamed(starting_agent=mock_agent, input="test input")
 
         assert isinstance(result, RunResultStreaming)
@@ -522,12 +536,19 @@ def test_run_sync(mock_agent):
         _last_agent=mock_agent,
     )
 
-    # Patch the Runner.run method to return our mock result
-    with patch("src.agents.run.Runner.run", return_value=mock_result):
-        result = Runner.run_sync(starting_agent=mock_agent, input="test input")
+    # Create a new event loop for the test
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
-        assert isinstance(result, RunResult)
-        assert result.final_output == "test output"
+    try:
+        # Patch the Runner.run method to return our mock result
+        with patch("src.runners.run.Runner.run", return_value=mock_result):
+            result = Runner.run_sync(starting_agent=mock_agent, input="test input")
+            assert result == mock_result
+    finally:
+        # Clean up the event loop
+        loop.close()
+        asyncio.set_event_loop(None)
 
 
 @pytest.mark.asyncio
@@ -542,7 +563,7 @@ async def test_initialize_run(mock_agent):
 
     # Patch the Runner._initialize_run method to return our mock results
     with patch(
-        "src.agents.run.Runner._initialize_run",
+        "src.runners.run.Runner._initialize_run",
         return_value=(
             mock_charms,
             mock_run_config,
@@ -582,7 +603,7 @@ async def test_run_turn(
     )
 
     # Patch the Runner._run_turn method to return our mock result
-    with patch("src.agents.run.Runner._run_turn", return_value=mock_turn_result):
+    with patch("src.runners.run.Runner._run_turn", return_value=mock_turn_result):
         result = await Runner._run_turn(
             current_turn=1,
             current_agent=mock_agent,
@@ -632,13 +653,13 @@ async def test_run_with_input_shield_error(mock_agent):
 
     # Mock the context creation and error handling
     with (
-        patch("src.agents.run.RunContextWrapper", return_value=mock_context),
+        patch("src.runners.run.RunContextWrapper", return_value=mock_context),
         patch(
-            "src.agents.run.Runner._run_input_shields", return_value=[shield_result]
+            "src.runners.run.Runner._run_input_shields", return_value=[shield_result]
         ) as mock_run_shields,
     ):
         # Run and verify error
-        with pytest.raises(GenericError) as exc_info:
+        with pytest.raises(RunnerError) as exc_info:
             await Runner.run(
                 starting_agent=mock_agent,
                 input=input_text,
@@ -685,16 +706,16 @@ async def test_run_with_output_shield_error(mock_agent):
 
     # Mock the context creation and error handling
     with (
-        patch("src.agents.run.RunContextWrapper", return_value=mock_context),
+        patch("src.runners.run.RunContextWrapper", return_value=mock_context),
         patch(
-            "src.agents.run.Runner._run_output_shields", new_callable=AsyncMock
+            "src.runners.run.Runner._run_output_shields", new_callable=AsyncMock
         ) as mock_run_shields,
     ):
         # Set up the mock to return our shield result
         mock_run_shields.return_value = [shield_result]
 
         # Run and verify error
-        with pytest.raises(GenericError) as exc_info:
+        with pytest.raises(RunnerError) as exc_info:
             await Runner.run(
                 starting_agent=mock_agent,
                 input=input_text,
@@ -716,7 +737,7 @@ async def test_run_with_model_error(mock_agent, mock_model):
     run_config = RunConfig(model=mock_model)
 
     # Run and verify error
-    with pytest.raises(GenericError) as exc_info:
+    with pytest.raises(RunnerError) as exc_info:
         await Runner.run(
             starting_agent=mock_agent,
             input=input_text,
@@ -793,7 +814,7 @@ async def test_run_with_invalid_next_step(mock_agent, mock_model):
     run_config = RunConfig(model=mock_model)
 
     # Mock the run_impl to return an invalid next step
-    with patch("src.agents.run.Runner._run_single_turn", new_callable=AsyncMock) as mock_run_turn:
+    with patch("src.runners.run.Runner._run_turn", new_callable=AsyncMock) as mock_run_turn:
         mock_run_turn.return_value = SingleStepResult(
             model_response=ModelResponse(
                 referenceable_id="test_id",
@@ -807,10 +828,473 @@ async def test_run_with_invalid_next_step(mock_agent, mock_model):
         )
 
         # Run and verify error
-        with pytest.raises(GenericError) as exc_info:
+        with pytest.raises(RunnerError) as exc_info:
             await Runner.run(
                 starting_agent=mock_agent,
                 input=input_text,
                 run_config=run_config,
             )
         assert "Unknown next step type" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_initialize_run_with_invalid_input(mock_agent):
+    """Test run initialization with invalid input."""
+    with pytest.raises(RunnerError) as exc_info:
+        await Runner._initialize_run(
+            starting_agent=mock_agent,
+            input=None,  # Invalid input
+            context=None,
+            max_turns=10,
+            charms=None,
+            run_config=None,
+        )
+    assert "Invalid input" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_initialize_run_with_invalid_max_turns(mock_agent):
+    """Test run initialization with invalid max_turns."""
+    with pytest.raises(RunnerError) as exc_info:
+        await Runner._initialize_run(
+            starting_agent=mock_agent,
+            input="test input",
+            context=None,
+            max_turns=0,  # Invalid max_turns
+            charms=None,
+            run_config=None,
+        )
+    assert "Max turns must be positive" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_run_turn_with_empty_generated_items(mock_agent, context_wrapper, mock_charms):
+    """Test running a turn with empty generated items."""
+    mock_turn_result = SingleStepResult(
+        next_step=NextStepFinalOutput(output="test output"),
+        model_response=ModelResponse(output=[], usage=None, referenceable_id=None),
+        original_input="test input",
+        pre_step_items=[],
+        new_step_items=[],
+    )
+
+    with patch("src.runners.run.Runner._run_turn", return_value=mock_turn_result):
+        result = await Runner._run_turn(
+            current_turn=1,
+            current_agent=mock_agent,
+            original_input="test input",
+            generated_items=[],
+            charms=mock_charms,
+            context_wrapper=context_wrapper,
+            run_config=RunConfig(),
+            should_run_agent_start_charms=True,
+            input="test input",
+        )
+
+        assert isinstance(result, SingleStepResult)
+        assert result.next_step.output == "test output"
+        assert len(result.new_step_items) == 0
+
+
+@pytest.mark.asyncio
+async def test_run_turn_with_multiple_generated_items(
+    mock_agent, context_wrapper, mock_charms, message_output
+):
+    """Test running a turn with multiple generated items."""
+    mock_turn_result = SingleStepResult(
+        next_step=NextStepFinalOutput(output="test output"),
+        model_response=ModelResponse(output=[], usage=None, referenceable_id=None),
+        original_input="test input",
+        pre_step_items=[],
+        new_step_items=[
+            MessageOutputItem(agent=mock_agent, raw_item=message_output),
+            MessageOutputItem(agent=mock_agent, raw_item=message_output),
+        ],
+    )
+
+    with patch("src.runners.run.Runner._run_turn", return_value=mock_turn_result):
+        result = await Runner._run_turn(
+            current_turn=1,
+            current_agent=mock_agent,
+            original_input="test input",
+            generated_items=[],
+            charms=mock_charms,
+            context_wrapper=context_wrapper,
+            run_config=RunConfig(),
+            should_run_agent_start_charms=True,
+            input="test input",
+        )
+
+        assert isinstance(result, SingleStepResult)
+        assert result.next_step.output == "test output"
+        assert len(result.new_step_items) == 2
+
+
+@pytest.mark.asyncio
+async def test_run_streamed_with_partial_responses(mock_agent, mock_model_client):
+    """Test streamed agent run with partial responses."""
+    # Create a mock streaming result with partial responses
+    mock_streaming_result = RunResultStreaming(
+        input="test input",
+        new_items=[],
+        current_agent=mock_agent,
+        raw_responses=[
+            ModelResponse(
+                output=[{"type": "partial", "content": "partial response"}],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+                referenceable_id="test_id",
+            )
+        ],
+        final_output="test output",
+        is_complete=True,
+        current_turn=1,
+        max_turns=10,
+        input_shield_results=[],
+        output_shield_results=[],
+    )
+
+    with patch("src.runners.run.Runner.run_streamed", return_value=mock_streaming_result):
+        result = await Runner.run_streamed(starting_agent=mock_agent, input="test input")
+
+        assert isinstance(result, RunResultStreaming)
+        assert result.final_output == "test output"
+        assert len(result.raw_responses) == 1
+        assert result.raw_responses[0].output[0]["type"] == "partial"
+
+
+@pytest.mark.asyncio
+async def test_run_streamed_with_multiple_turns(mock_agent, mock_model_client):
+    """Test streamed agent run with multiple turns."""
+    # Create a mock streaming result with multiple turns
+    mock_streaming_result = RunResultStreaming(
+        input="test input",
+        new_items=[],
+        current_agent=mock_agent,
+        raw_responses=[
+            ModelResponse(
+                output=[{"type": "message", "content": "turn 1 response"}],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+                referenceable_id="test_id_1",
+            ),
+            ModelResponse(
+                output=[{"type": "message", "content": "turn 2 response"}],
+                usage=Usage(requests=1, input_tokens=10, output_tokens=5, total_tokens=15),
+                referenceable_id="test_id_2",
+            ),
+        ],
+        final_output="final output",
+        is_complete=True,
+        current_turn=2,
+        max_turns=10,
+        input_shield_results=[],
+        output_shield_results=[],
+    )
+
+    with patch("src.runners.run.Runner.run_streamed", return_value=mock_streaming_result):
+        result = await Runner.run_streamed(starting_agent=mock_agent, input="test input")
+
+        assert isinstance(result, RunResultStreaming)
+        assert result.final_output == "final output"
+        assert len(result.raw_responses) == 2
+        assert result.current_turn == 2
+
+
+def test_run_sync_with_error(mock_agent):
+    """Test synchronous agent run with error."""
+    # Create a new event loop for the test
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        # Patch the Runner.run method to raise an error
+        with patch("src.runners.run.Runner.run", side_effect=RunnerError("Test error")):
+            with pytest.raises(RunnerError) as exc_info:
+                Runner.run_sync(starting_agent=mock_agent, input="test input")
+            assert "Test error" in str(exc_info.value)
+    finally:
+        # Clean up the event loop
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
+def test_run_sync_with_timeout(mock_agent):
+    """Test synchronous agent run with timeout."""
+    # Create a new event loop for the test
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        # Patch the Runner.run method to simulate a timeout
+        async def mock_run(*args, **kwargs):
+            await asyncio.sleep(2)  # Simulate a long-running operation
+            return RunResult(
+                input="test input",
+                final_output="test output",
+                raw_responses=[],
+                new_items=[],
+                input_shield_results=[],
+                output_shield_results=[],
+                _last_agent=mock_agent,
+            )
+
+        with patch("src.runners.run.Runner.run", side_effect=mock_run):
+            # Set a short timeout
+            with pytest.raises(asyncio.TimeoutError):
+                Runner.run_sync(starting_agent=mock_agent, input="test input", timeout=0.1)
+    finally:
+        # Clean up the event loop
+        loop.close()
+        asyncio.set_event_loop(None)
+
+
+@pytest.mark.asyncio
+async def test_run_shields_with_empty_shields(mock_agent, context_wrapper):
+    """Test running shields with empty shield list."""
+    result = await Runner._run_shields(
+        agent=mock_agent,
+        input_or_output="test input",
+        context=context_wrapper,
+        shields=[],
+        is_input=True,
+    )
+    assert len(result) == 0
+
+
+@pytest.mark.asyncio
+async def test_run_shields_with_multiple_shields(mock_agent, context_wrapper):
+    """Test running shields with multiple shields."""
+    # Create mock shields
+    mock_shield1 = AsyncMock(spec=InputShield)
+    mock_shield1.name = "shield1"
+    shield_result1 = InputShieldResult(
+        tripwire_triggered=False,
+        shield=mock_shield1,
+        agent=mock_agent,
+        input="test input",
+        output=ShieldResult(success=True, data="test input"),
+    )
+    mock_shield1.run.return_value = shield_result1
+
+    mock_shield2 = AsyncMock(spec=InputShield)
+    mock_shield2.name = "shield2"
+    shield_result2 = InputShieldResult(
+        tripwire_triggered=False,
+        shield=mock_shield2,
+        agent=mock_agent,
+        input="test input",
+        output=ShieldResult(success=True, data="test input"),
+    )
+    mock_shield2.run.return_value = shield_result2
+
+    result = await Runner._run_shields(
+        agent=mock_agent,
+        input_or_output="test input",
+        context=context_wrapper,
+        shields=[mock_shield1, mock_shield2],
+        is_input=True,
+    )
+
+    assert len(result) == 2
+    assert result[0].shield.name == "shield1"
+    assert result[1].shield.name == "shield2"
+    assert mock_shield1.run.called
+    assert mock_shield2.run.called
+
+
+@pytest.mark.asyncio
+async def test_run_shields_with_shield_error(mock_agent, context_wrapper):
+    """Test running shields with shield error."""
+    # Create a mock shield that will raise an error
+    mock_shield = AsyncMock(spec=InputShield)
+    mock_shield.name = "error_shield"
+    mock_shield.run.side_effect = Exception("Shield error")
+
+    with pytest.raises(RunnerError) as exc_info:
+        await Runner._run_shields(
+            agent=mock_agent,
+            input_or_output="test input",
+            context=context_wrapper,
+            shields=[mock_shield],
+            is_input=True,
+        )
+    assert "Shield error" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_run_input_shields_with_queue(mock_agent, context_wrapper):
+    """Test running input shields with queue."""
+    # Create a mock shield
+    mock_shield = AsyncMock(spec=InputShield)
+    mock_shield.name = "test_shield"
+    shield_result = InputShieldResult(
+        tripwire_triggered=False,
+        shield=mock_shield,
+        agent=mock_agent,
+        input="test input",
+        output=ShieldResult(success=True, data="test input"),
+    )
+    mock_shield.run.return_value = shield_result
+
+    # Create a mock streaming result
+    streamed_result = RunResultStreaming(
+        input="test input",
+        new_items=[],
+        current_agent=mock_agent,
+        raw_responses=[],
+        final_output=None,
+        is_complete=False,
+        current_turn=0,
+        max_turns=10,
+        input_shield_results=[],
+        output_shield_results=[],
+    )
+
+    # Run the test
+    await Runner._run_input_shields_with_queue(
+        agent=mock_agent,
+        input="test input",
+        context=context_wrapper,
+        shields=[mock_shield],
+        streamed_result=streamed_result,
+    )
+
+    assert len(streamed_result.input_shield_results) == 1
+    assert streamed_result.input_shield_results[0].output.success
+
+
+@pytest.mark.asyncio
+async def test_run_shields(mock_agent, context_wrapper):
+    """Test running shields."""
+    # Create a mock shield
+    mock_shield = AsyncMock(spec=InputShield)
+    mock_shield.name = "test_shield"
+    shield_result = InputShieldResult(
+        tripwire_triggered=False,
+        shield=mock_shield,
+        agent=mock_agent,
+        input="test input",
+        output=ShieldResult(success=True, data="test input"),
+    )
+    mock_shield.run.return_value = shield_result
+
+    # Run the test
+    results = await Runner._run_shields(
+        agent=mock_agent,
+        input_or_output="test input",
+        context=context_wrapper,
+        shields=[mock_shield],
+        is_input=True,
+    )
+
+    assert len(results) == 1
+    assert results[0].output.success
+
+
+@pytest.mark.asyncio
+async def test_handle_streamed_error():
+    """Test handling streamed error."""
+    # Create a mock streaming result
+    streamed_result = RunResultStreaming(
+        input="test input",
+        new_items=[],
+        current_agent=MagicMock(),
+        raw_responses=[],
+        final_output=None,
+        is_complete=False,
+        current_turn=0,
+        max_turns=10,
+        input_shield_results=[],
+        output_shield_results=[],
+    )
+
+    # Run the test
+    Runner._handle_streamed_error(streamed_result)
+
+    assert streamed_result.is_complete
+
+
+@pytest.mark.asyncio
+async def test_handle_streamed_final_output(mock_agent, context_wrapper):
+    """Test handling streamed final output."""
+    # Create a mock streaming result
+    streamed_result = RunResultStreaming(
+        input="test input",
+        new_items=[],
+        current_agent=mock_agent,
+        raw_responses=[],
+        final_output=None,
+        is_complete=False,
+        current_turn=0,
+        max_turns=10,
+        input_shield_results=[],
+        output_shield_results=[],
+    )
+
+    # Create a mock turn result
+    turn_result = SingleStepResult(
+        next_step=NextStepFinalOutput(output="test output"),
+        model_response=ModelResponse(output=[], usage=None, referenceable_id=None),
+        original_input="test input",
+        pre_step_items=[],
+        new_step_items=[],
+    )
+
+    # Run the test
+    await Runner._handle_streamed_final_output(
+        current_agent=mock_agent,
+        turn_result=turn_result,
+        streamed_result=streamed_result,
+        context_wrapper=context_wrapper,
+        run_config=RunConfig(),
+    )
+
+    assert streamed_result.final_output == "test output"
+
+
+def test_update_streamed_result():
+    """Test updating streamed result."""
+    # Create a mock streaming result
+    streamed_result = RunResultStreaming(
+        input="test input",
+        new_items=[],
+        current_agent=MagicMock(),
+        raw_responses=[],
+        final_output=None,
+        is_complete=False,
+        current_turn=0,
+        max_turns=10,
+        input_shield_results=[],
+        output_shield_results=[],
+    )
+
+    # Create a mock turn result
+    turn_result = SingleStepResult(
+        next_step=NextStepFinalOutput(output="test output"),
+        model_response=ModelResponse(output=[], usage=None, referenceable_id=None),
+        original_input="new input",
+        pre_step_items=[],
+        new_step_items=[],
+    )
+
+    # Run the test
+    Runner._update_streamed_result(streamed_result, turn_result)
+
+    assert streamed_result.input == "new input"
+    assert len(streamed_result.raw_responses) == 1
+
+
+@pytest.mark.asyncio
+async def test_queue_event():
+    """Test queueing an event."""
+    # Create a mock queue
+    queue = asyncio.Queue()
+
+    # Create a test event
+    event = {"type": "test", "data": "test data"}
+
+    # Run the test
+    await Runner._queue_event(queue, event)
+
+    # Verify the event was queued
+    queued_event = await queue.get()
+    assert queued_event == event
