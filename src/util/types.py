@@ -16,12 +16,9 @@ from __future__ import annotations
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypedDict
+from typing import Any, Generic, Literal, TypeAlias, TypedDict
 
 from typing_extensions import NotRequired, TypeVar
-
-if TYPE_CHECKING:
-    from src.runner.items import ResponseInputItemParam
 
 ########################################################
 #              Type Variables

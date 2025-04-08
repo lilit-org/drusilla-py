@@ -7,10 +7,14 @@ import pytest
 
 def test_constants():
     """Test basic constants."""
-    from src.util.constants import FAKE_RESPONSES_ID, UNSET
+    from src.util.constants import FAKE_RESPONSES_ID, THINK_TAGS, UNSET
 
     assert UNSET is not None
     assert FAKE_RESPONSES_ID == "fake_responses"
+    assert isinstance(THINK_TAGS, tuple)
+    assert len(THINK_TAGS) == 2
+    assert THINK_TAGS[0] == "<think>"
+    assert THINK_TAGS[1] == "</think>"
 
 
 def test_supported_languages():

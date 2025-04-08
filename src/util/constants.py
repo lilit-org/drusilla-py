@@ -19,6 +19,7 @@ __all__ = (
     "HEADERS",
     "UNSET",
     "FAKE_RESPONSES_ID",
+    "THINK_TAGS",
     "Config",
     "CHAT_COMPLETIONS_ENDPOINT",
     "SUPPORTED_LANGUAGES",
@@ -33,6 +34,7 @@ load_dotenv(find_dotenv())
 # Core Constants
 UNSET = object()
 FAKE_RESPONSES_ID = "fake_responses"
+THINK_TAGS = ("<think>", "</think>")
 
 # API Configuration
 _USER_AGENT = "Agents/Python"
@@ -142,6 +144,7 @@ class ErrorMessages:
             "RUNNER_ERROR": ("RUNNER_ERROR_MESSAGE", "src/runners/run.py"),
             "ORBS_ERROR": ("ORBS_ERROR_MESSAGE", "src/gear/orbs.py"),
             "AGENT_EXEC_ERROR": ("AGENT_EXEC_ERROR_MESSAGE", "src/agents/agent.py"),
+            "MODEL_ERROR": ("MODEL_ERROR_MESSAGE", "src/util/print.py"),
         }
 
         for name, (env_var, used_in) in error_vars.items():
