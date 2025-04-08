@@ -8,10 +8,6 @@ Key features:
 - Handles schema references ($ref) resolution with caching
 - Supports logical operators (anyOf, allOf)
 - Ensures consistent schema structure and validation rules
-
-The module is particularly useful for ensuring type safety and strict validation
-in JSON schema-based systems, preventing unexpected property additions and
-maintaining consistent data structures.
 """
 
 from __future__ import annotations
@@ -22,7 +18,7 @@ from typing import Any, Final, TypeAlias, cast, get_args, get_origin
 from pydantic import BaseModel, TypeAdapter
 
 from .constants import LRU_CACHE_SIZE, UNSET
-from .exceptions import ModelError, UsageError
+from .exceptions import ModelError, UsageError, format_error_message
 
 ########################################################
 #             Type Aliases and Constants                #
@@ -41,38 +37,54 @@ CACHE_SIZE: Final[int] = LRU_CACHE_SIZE
 LOGICAL_OPERATORS: Final[tuple[str, ...]] = ("anyOf", "allOf")
 SCHEMA_DEFINITION_KEYS: Final[tuple[str, ...]] = ("definitions", "$defs")
 
+# Error message templates
+TYPES_ERROR_MESSAGE: Final[str] = "Type error: {error}"
+OBJECT_ADDITIONAL_PROPERTIES_ERROR: Final[str] = (
+    "Object types cannot allow additional properties. This may be due to using an "
+    "older Pydantic version or explicit configuration. If needed, update the function "
+    "or output sword to use a non-strict schema."
+)
 
 ########################################################
 #               Private Methods
 ########################################################
 
 
-def _make_hashable(d: dict) -> tuple:
+def _make_hashable(d: dict[str, Any]) -> tuple[tuple[str, Any], ...]:
     """Convert a dictionary to a hashable tuple representation."""
-    return tuple(sorted((k, _make_hashable(v) if isinstance(v, dict) else v) for k, v in d.items()))
+    return tuple((k, _make_hashable(v) if isinstance(v, dict) else v) for k, v in sorted(d.items()))
 
 
 @lru_cache(maxsize=CACHE_SIZE)
-def _resolve_schema_ref_cached(*, root_hash: tuple, ref: str) -> JSONSchema:
+def _resolve_schema_ref_cached(*, root_hash: tuple[tuple[str, Any], ...], ref: str) -> JSONSchema:
     """Resolve a JSON schema reference to its target schema with caching."""
     if not ref.startswith("#/"):
-        raise ModelError(f"Invalid $ref format {ref!r}; must start with #/")
+        raise ModelError(
+            format_error_message(
+                ValueError(f"Invalid $ref format {ref!r}; must start with #/"), TYPES_ERROR_MESSAGE
+            )
+        )
 
     try:
-        # Convert root_hash back to dict for resolution
         resolved = dict(_make_dict(root_hash))
         for key in ref[2:].split("/"):
             resolved = resolved[key]
             if not isinstance(resolved, dict):
                 raise ModelError(
-                    f"Invalid resolution path for {ref} - encountered non-dictionary at {resolved}"
+                    format_error_message(
+                        ValueError(
+                            f"Invalid resolution path for {ref} - "
+                            f"encountered non-dictionary at {resolved}"
+                        ),
+                        TYPES_ERROR_MESSAGE,
+                    )
                 )
         return cast(JSONSchema, resolved)
     except KeyError as e:
-        raise ModelError(f"Invalid $ref path {ref}: {str(e)}") from e
+        raise ModelError(format_error_message(e, TYPES_ERROR_MESSAGE, {"ref": ref})) from e
 
 
-def _make_dict(t: tuple) -> dict:
+def _make_dict(t: tuple[tuple[str, Any], ...]) -> dict[str, Any]:
     """Convert a hashable tuple representation back to a dictionary."""
     return {k: _make_dict(v) if isinstance(v, tuple) else v for k, v in t}
 
@@ -99,11 +111,7 @@ def _enforce_strict_schema_rules(
         if "additionalProperties" not in schema:
             schema["additionalProperties"] = False
         elif schema["additionalProperties"] is True:
-            raise UsageError(
-                "Object types cannot allow additional properties. This may be due to using an "
-                "older Pydantic version or explicit configuration. If needed, update the function "
-                "or output sword to use a non-strict schema."
-            )
+            raise UsageError(OBJECT_ADDITIONAL_PROPERTIES_ERROR)
 
     # Process object properties
     if "properties" in schema and isinstance(schema["properties"], dict):
@@ -130,7 +138,7 @@ def _enforce_strict_schema_rules(
                 schema.update(
                     _enforce_strict_schema_rules(values[0], path=(*path, operator, "0"), root=root)
                 )
-                schema.pop(operator)
+                del schema[operator]
             else:
                 schema[operator] = [
                     _enforce_strict_schema_rules(entry, path=(*path, operator, str(i)), root=root)
@@ -139,18 +147,22 @@ def _enforce_strict_schema_rules(
 
     # Clean up default values
     if schema.get("default", UNSET) is None:
-        schema.pop("default")
+        del schema["default"]
 
     # Handle schema references
     if ref := schema.get("$ref"):
         if not isinstance(ref, str):
-            raise ModelError(f"$ref must be a string, got {ref}")
+            raise ModelError(
+                format_error_message(
+                    TypeError(f"$ref must be a string, got {ref}"), TYPES_ERROR_MESSAGE
+                )
+            )
 
         if len(schema) > 1:
             root_hash = _make_hashable(root)
             resolved = _resolve_schema_ref_cached(root_hash=root_hash, ref=ref)
             schema.update({**resolved, **schema})
-            schema.pop("$ref")
+            del schema["$ref"]
             schema = _enforce_strict_schema_rules(schema, path=path, root=root)
 
     return schema
@@ -180,8 +192,6 @@ def type_to_str(t: type[Any]) -> str:
 @lru_cache(maxsize=CACHE_SIZE)
 def get_type_adapter(output_type: type[Any]) -> TypeAdapter[Any]:
     """Get or create a type adapter with caching."""
-    if output_type is None or output_type is str:
-        return TypeAdapter(output_type)
     return TypeAdapter(output_type)
 
 

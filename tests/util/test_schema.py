@@ -204,3 +204,74 @@ def test_get_type_adapter():
     # Test with None
     adapter4 = get_type_adapter(None)
     assert adapter4 is not None
+
+
+def test_make_hashable_and_dict():
+    """Test conversion between dict and hashable tuple representation."""
+    test_dict = {"a": 1, "b": {"c": 2, "d": {"e": 3}}, "f": [4, 5, 6]}
+
+    from src.util.schema import _make_dict, _make_hashable
+
+    hashable = _make_hashable(test_dict)
+    assert isinstance(hashable, tuple)
+    assert all(isinstance(item, tuple) for item in hashable)
+
+    reconstructed = _make_dict(hashable)
+    assert reconstructed == test_dict
+
+
+def test_enforce_strict_schema_with_default():
+    """Test schema enforcement with default values."""
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "default": None},
+            "age": {"type": "integer", "default": 0},
+        },
+    }
+
+    result = ensure_strict_json_schema(schema)
+
+    assert "default" not in result["properties"]["name"]
+    assert "default" in result["properties"]["age"]
+    assert result["properties"]["age"]["default"] == 0
+
+
+def test_resolve_schema_ref_invalid_formats():
+    """Test schema reference resolution with invalid formats."""
+    schema = {
+        "definitions": {"Person": {"type": "object", "properties": {"name": {"type": "string"}}}}
+    }
+
+    with pytest.raises(ModelError):
+        resolve_schema_ref(root=schema, ref="invalid_ref")
+
+    with pytest.raises(ModelError):
+        resolve_schema_ref(root=schema, ref="#/definitions/Person/name/extra")
+
+    with pytest.raises(ModelError):
+        resolve_schema_ref(root=schema, ref="#/definitions/Invalid")
+
+
+def test_type_to_str_complex():
+    """Test type to string conversion with complex types."""
+
+    assert type_to_str(str | None) == "UnionType[str, NoneType]"
+    assert type_to_str(str | int) == "UnionType[str, int]"
+    assert type_to_str(list[dict[str, int]]) == "list[dict[str, int]]"
+    assert type_to_str(tuple[str, int, bool]) == "tuple[str, int, bool]"
+    assert type_to_str(list[dict[str, int]] | None) == "UnionType[list[dict[str, int]], NoneType]"
+
+
+def test_get_type_adapter_edge_cases():
+    """Test type adapter with edge cases."""
+    from typing import Any
+
+    adapter1 = get_type_adapter(None)
+    assert adapter1 is not None
+
+    adapter2 = get_type_adapter(Any)
+    assert adapter2 is not None
+
+    adapter3 = get_type_adapter(str | int)
+    assert adapter3 is not None
