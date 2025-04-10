@@ -175,9 +175,9 @@ def test_error_messages():
     assert err.MODEL_ERROR.format(error=test_error) == f"Model error: {test_error}"
     assert err.TYPES_ERROR.format(error=test_error) == f"Type error: {test_error}"
     assert err.OBJECT_ADDITIONAL_PROPERTIES_ERROR == (
-        "Object types cannot allow additional properties. This may be due to using an older "
-        "Pydantic version or explicit configuration. If needed, update the function or output "
-        "sword to use a non-strict schema."
+        "Object types cannot allow additional properties. This may be due to using an "
+        "older Pydantic version or explicit configuration. If needed, update the "
+        "function or output sword to use a non-strict schema."
     )
 
 
