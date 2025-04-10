@@ -36,7 +36,7 @@ class BaseConfig:
             return (
                 True
                 if value_lower in self.BOOLEAN_TRUE_VALUES
-                else False if value_lower in self.BOOLEAN_FALSE_VALUES else current_value
+                else (False if value_lower in self.BOOLEAN_FALSE_VALUES else current_value)
             )
 
         try:

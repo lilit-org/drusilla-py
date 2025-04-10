@@ -119,7 +119,10 @@ def test_schema_with_logical_operators():
 
 def test_schema_with_allof_single():
     """Test schema with single allOf operator."""
-    schema = {"type": "object", "properties": {"value": {"allOf": [{"type": "string"}]}}}
+    schema = {
+        "type": "object",
+        "properties": {"value": {"allOf": [{"type": "string"}]}},
+    }
 
     result = ensure_strict_json_schema(schema)
 

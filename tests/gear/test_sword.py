@@ -377,7 +377,10 @@ class TestProcessParameters:
         """Test processing parameters with complex type hints."""
 
         def test_func(
-            message: str, items: list[int], config: dict[str, Any], optional: str | None = None
+            message: str,
+            items: list[int],
+            config: dict[str, Any],
+            optional: str | None = None,
         ) -> None:
             pass
 

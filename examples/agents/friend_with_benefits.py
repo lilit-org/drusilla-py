@@ -98,7 +98,8 @@ async def run_agent():
         setup_client()
 
         result = await run_agent_chain(
-            first_agent, [{"content": "Generate a random number between 3 and 15.", "role": "user"}]
+            first_agent,
+            [{"content": "Generate a random number between 3 and 15.", "role": "user"}],
         )
 
         result = await run_agent_chain(

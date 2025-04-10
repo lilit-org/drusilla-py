@@ -24,7 +24,11 @@ def model_responses(mock_model_client):
 @pytest.fixture
 def model_settings():
     return ModelSettings(
-        temperature=0.7, top_p=0.9, max_tokens=100, sword_choice="auto", parallel_sword_calls=True
+        temperature=0.7,
+        top_p=0.9,
+        max_tokens=100,
+        sword_choice="auto",
+        parallel_sword_calls=True,
     )
 
 

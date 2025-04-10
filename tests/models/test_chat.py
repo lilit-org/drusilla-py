@@ -5,7 +5,12 @@ import pytest
 from src.agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from src.gear.orbs import Orbs
 from src.gear.sword import Sword
-from src.models.chat import ModelChatCompletionsModel, SwordConverter, _Converter, _StreamingState
+from src.models.chat import (
+    ModelChatCompletionsModel,
+    SwordConverter,
+    _Converter,
+    _StreamingState,
+)
 from src.models.settings import ModelSettings
 from src.runners.items import ModelResponse
 from src.util.exceptions import AgentError, UsageError
@@ -255,7 +260,12 @@ def test_converter_maybe_file_search_call():
 
 def test_converter_maybe_function_sword_call():
     # Test valid function sword call
-    valid_call = {"type": "function_call", "call_id": "test_id", "name": "test", "arguments": "{}"}
+    valid_call = {
+        "type": "function_call",
+        "call_id": "test_id",
+        "name": "test",
+        "arguments": "{}",
+    }
     assert _Converter.maybe_function_sword_call(valid_call) == valid_call
 
     # Test invalid call
@@ -265,7 +275,11 @@ def test_converter_maybe_function_sword_call():
 
 def test_converter_maybe_function_sword_call_output():
     # Test valid function sword call output
-    valid_output = {"type": "function_call_output", "call_id": "test_id", "output": "test"}
+    valid_output = {
+        "type": "function_call_output",
+        "call_id": "test_id",
+        "output": "test",
+    }
     assert _Converter.maybe_function_sword_call_output(valid_output) == valid_output
 
     # Test invalid output
@@ -354,8 +368,17 @@ def test_converter_items_to_messages():
 
     # Test list of items with messages
     items = [
-        {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "test1"}]},
-        {"type": "function_call", "call_id": "test_id", "name": "test_sword", "arguments": "{}"},
+        {
+            "type": "message",
+            "role": "user",
+            "content": [{"type": "input_text", "text": "test1"}],
+        },
+        {
+            "type": "function_call",
+            "call_id": "test_id",
+            "name": "test_sword",
+            "arguments": "{}",
+        },
         {
             "type": "message",
             "role": "assistant",
@@ -372,8 +395,18 @@ def test_converter_items_to_messages():
 
     # Test list with only function calls
     items = [
-        {"type": "function_call", "call_id": "test_id1", "name": "test_sword1", "arguments": "{}"},
-        {"type": "function_call", "call_id": "test_id2", "name": "test_sword2", "arguments": "{}"},
+        {
+            "type": "function_call",
+            "call_id": "test_id1",
+            "name": "test_sword1",
+            "arguments": "{}",
+        },
+        {
+            "type": "function_call",
+            "call_id": "test_id2",
+            "name": "test_sword2",
+            "arguments": "{}",
+        },
     ]
     messages = _Converter.items_to_messages(items)
     assert len(messages) == 1

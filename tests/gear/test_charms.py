@@ -44,7 +44,12 @@ class MockBaseCharms(BaseCharms[Any]):
     """Implementation of BaseCharms for testing."""
 
     def __init__(self):
-        self.calls = {"start": False, "end": False, "sword_start": False, "sword_end": False}
+        self.calls = {
+            "start": False,
+            "end": False,
+            "sword_start": False,
+            "sword_end": False,
+        }
 
     async def on_start(self, context: RunContextWrapper[Any], agent: Agent[Any]) -> None:
         self.calls["start"] = True
@@ -58,7 +63,11 @@ class MockBaseCharms(BaseCharms[Any]):
         self.calls["sword_start"] = True
 
     async def on_sword_end(
-        self, context: RunContextWrapper[Any], agent: Agent[Any], sword: Sword, result: Any
+        self,
+        context: RunContextWrapper[Any],
+        agent: Agent[Any],
+        sword: Sword,
+        result: Any,
     ) -> None:
         self.calls["sword_end"] = True
 
@@ -71,7 +80,10 @@ class MockRunCharms(RunCharms[Any]):
         self.calls = {"orbs": False}
 
     async def on_orbs(
-        self, context: RunContextWrapper[Any], from_agent: Agent[Any], to_agent: Agent[Any]
+        self,
+        context: RunContextWrapper[Any],
+        from_agent: Agent[Any],
+        to_agent: Agent[Any],
     ) -> None:
         self.calls["orbs"] = True
 

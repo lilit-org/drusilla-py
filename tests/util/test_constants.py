@@ -11,7 +11,14 @@ from src.util.constants import BaseConfig, Config, config, HEADERS, logger
 def setup_env(monkeypatch):
     """Setup environment variables for tests."""
     # Clear any existing environment variables
-    for key in ["THINK_TAGS", "SUPPORTED_LANGUAGES", "API_KEY", "LOG_LEVEL", "BASE_URL", "MODEL"]:
+    for key in [
+        "THINK_TAGS",
+        "SUPPORTED_LANGUAGES",
+        "API_KEY",
+        "LOG_LEVEL",
+        "BASE_URL",
+        "MODEL",
+    ]:
         monkeypatch.delenv(key, raising=False)
 
     # Set up clean environment with properly escaped values
@@ -155,33 +162,18 @@ def test_base_config():
 
 def test_error_messages():
     """Test error message constants."""
-    from src.util.constants import (
-        AGENT_EXEC_ERROR,
-        MODEL_ERROR,
-        OBJECT_ADDITIONAL_PROPERTIES_ERROR,
-        ORBS_ERROR,
-        RUNCONTEXT_ERROR,
-        RUNNER_ERROR,
-        SHIELD_ERROR,
-        SWORD_ERROR,
-        TYPES_ERROR,
-    )
+    from src.util.constants import err
 
     # Test that all error messages are properly formatted
     test_error = "test error"
-    assert SWORD_ERROR.format(error=test_error) == f"Sword error: {test_error}"
-    assert SHIELD_ERROR.format(error=test_error) == f"Shield error: {test_error}"
-    assert RUNCONTEXT_ERROR.format(error=test_error) == f"RunContextWrapper error: {test_error}"
-    assert RUNNER_ERROR.format(error=test_error) == f"Runner error: {test_error}"
-    assert ORBS_ERROR.format(error=test_error) == f"Orbs error: {test_error}"
-    assert AGENT_EXEC_ERROR.format(error=test_error) == f"Agent execution error: {test_error}"
-    assert MODEL_ERROR.format(error=test_error) == f"Model error: {test_error}"
-    assert TYPES_ERROR.format(error=test_error) == f"Type error: {test_error}"
-    assert OBJECT_ADDITIONAL_PROPERTIES_ERROR == (
-        "Object types cannot allow additional properties. This may be due to using an older "
-        "Pydantic version or explicit configuration. If needed, update the function or output "
-        "sword to use a non-strict schema."
-    )
+    assert err.SWORD_ERROR.format(error=test_error) == f"Sword error: {test_error}"
+    assert err.SHIELD_ERROR.format(error=test_error) == f"Shield error: {test_error}"
+    assert err.RUNCONTEXT_ERROR.format(error=test_error) == f"RunContextWrapper error: {test_error}"
+    assert err.RUNNER_ERROR.format(error=test_error) == f"Runner error: {test_error}"
+    assert err.ORBS_ERROR.format(error=test_error) == f"Orbs error: {test_error}"
+    assert err.AGENT_EXEC_ERROR.format(error=test_error) == f"Agent execution error: {test_error}"
+    assert err.MODEL_ERROR.format(error=test_error) == f"Model error: {test_error}"
+    assert err.TYPES_ERROR.format(error=test_error) == f"Type error: {test_error}"
 
 
 def test_validate_env_vars():
@@ -209,7 +201,10 @@ def test_validate_env_vars():
             "HTTP_MAX_CONNECTIONS": "10",
             "CHAT_COMPLETIONS_ENDPOINT": "/api/chat",
             "THINK_TAGS": "('<think>', '</think>')",
-            "SUPPORTED_LANGUAGES": "{'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'ar', 'hi', 'nl', 'pl', 'tr', 'vi', 'he'}",
+            "SUPPORTED_LANGUAGES": (
+                "{'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', "
+                "'zh', 'ar', 'hi', 'nl', 'pl', 'tr', 'vi', 'he'}"
+            ),
         },
         clear=True,
     ):

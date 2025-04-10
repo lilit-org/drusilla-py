@@ -60,7 +60,8 @@ def mock_sword():
         def clone(self, **kwargs: Any) -> "MockSword":
             """Create a copy of the sword with optional field updates."""
             new_sword = MockSword(
-                name=kwargs.get("name", self.name), result=kwargs.get("result", self._result)
+                name=kwargs.get("name", self.name),
+                result=kwargs.get("result", self._result),
             )
             return new_sword
 
@@ -273,7 +274,8 @@ def test_swords_to_final_output_result():
 async def test_agent_with_orbs(mock_run_context, basic_agent):
     """Test agent with orbs configuration."""
     agent = basic_agent.clone(
-        orbs_description="Test orbs description", orbs=[basic_agent.clone(name="orb_agent")]
+        orbs_description="Test orbs description",
+        orbs=[basic_agent.clone(name="orb_agent")],
     )
     assert agent.orbs_description == "Test orbs description"
     assert len(agent.orbs) == 1
@@ -332,7 +334,8 @@ async def test_agent_run_basic(mock_run_context, basic_agent, mock_model):
     from src.runners.run import Runner
 
     agent = basic_agent.clone(
-        instructions="You are a test agent. Respond with 'test response'", model=mock_model
+        instructions="You are a test agent. Respond with 'test response'",
+        model=mock_model,
     )
 
     # Run the agent using the Runner class

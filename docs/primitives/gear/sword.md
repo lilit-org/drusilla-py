@@ -1,3 +1,4 @@
+
 # swords
 
 <br>
@@ -6,7 +7,7 @@
 
 <br>
 
-swords are specialized tools that wrap python functions with enhanced capabilities, letting agents take actions such as:
+swords are specialized objects that wrap python functions with enhanced capabilities, letting agents take actions such as:
 
 - running code
 - fetching data
@@ -61,9 +62,7 @@ class Sword:
     params_json_schema: dict[str, Any]
     on_invoke_sword: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
     strict_json_schema: bool = True
-    failure_error_function: (
-        Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]] | None
-    ) = SWORD_ERROR_HANDLER
+    failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER
 ```
 
 <br>
@@ -111,55 +110,130 @@ def create_sword_decorator(
     sync_func_type: type,
     async_func_type: type,
 ):
-    def decorator(
-        func: sync_func_type | async_func_type | None = None,
-        *,
-        name_override: str | None = None,
-        description_override: str | None = None,
-        use_docstring_info: bool = True,
-        failure_error_function: SwordErrorFunction | None = SWORD_ERROR_HANDLER,
-        strict_mode: bool = True,
-    ) -> sword_class | Callable[[sync_func_type | async_func_type], sword_class]:
-        def create_sword(f: sync_func_type | async_func_type) -> sword_class:
-            schema = function_schema(
-                func=f,
-                name_override=name_override,
-                description_override=description_override,
-                use_docstring_info=use_docstring_info,
-                strict_json_schema=strict_mode,
-            )
+    def pre_init_hook(f: Any, params: dict[str, Any]) -> dict[str, Any]:
+        schema = function_schema(
+            func=f,
+            name_override=params.get("name_override"),
+            description_override=params.get("description_override"),
+            use_docstring_info=params.get("use_docstring_info", True),
+            strict_json_schema=params.get("strict_mode", True),
+        )
 
-            async def on_invoke(ctx: RunContextWrapper[Any], input: str) -> Any:
-                try:
-                    return await schema.on_invoke_sword(ctx, input)
-                except Exception as e:
-                    if failure_error_function:
-                        error_msg = failure_error_function(ctx, e)
-                        if inspect.iscoroutinefunction(failure_error_function):
-                            error_msg = await error_msg
-                        raise ModelError(error_msg) from e
-                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.format(error=str(e))) from e
+        async def on_invoke(ctx: RunContextWrapper[Any], input: str) -> Any:
+            try:
+                return await schema.on_invoke_sword(ctx, input)
+            except Exception as e:
+                failure_error_function = params.get("failure_error_function", SWORD_ERROR_HANDLER)
+                if not failure_error_function:
+                    raise set_error(ModelError, error_messages.SWORD_ERROR, error=str(e)) from e
 
-            return sword_class(
-                name=schema.name,
-                description=schema.description,
-                params_json_schema=schema.params_json_schema,
-                on_invoke_sword=on_invoke,
-                strict_json_schema=strict_mode,
-                failure_error_function=failure_error_function,
-            )
+                error_msg = failure_error_function(ctx, e)
+                if inspect.iscoroutinefunction(failure_error_function):
+                    error_msg = await error_msg
+                raise set_error(ModelError, error_msg, error=str(e)) from e
 
-        return create_sword if func is None else create_sword(func)
+        return {
+            "name": schema.name,
+            "description": schema.description,
+            "params_json_schema": schema.params_json_schema,
+            "on_invoke_sword": on_invoke,
+            "strict_json_schema": params.get("strict_mode", True),
+            "failure_error_function": params.get("failure_error_function", SWORD_ERROR_HANDLER),
+        }
 
-    return decorator
+    return create_decorator_factory(
+        sword_class,
+        sync_func_type,
+        async_func_type,
+        constructor_params={
+            "name": None,
+            "description": None,
+            "params_json_schema": None,
+            "on_invoke_sword": None,
+            "strict_json_schema": True,
+            "failure_error_function": SWORD_ERROR_HANDLER,
+        },
+        pre_init_hook=pre_init_hook,
+    )
 
 
-# Type aliases for sword functions
-function_sword = create_sword_decorator(
-    Sword,
-    SwordFuncSync,
-    SwordFuncAsync,
-)
+@dataclass(frozen=True)
+class FuncSchema:
+    """Schema for a function that can be used as a sword."""
+
+    name: str
+    description: str | None
+    params_pydantic_model: type[BaseModel]
+    params_json_schema: dict[str, Any]
+    signature: inspect.Signature
+    on_invoke_sword: Callable[[RunContextWrapper[Any], str], Awaitable[Any]]
+    takes_context: bool = False
+    strict_json_schema: bool = True
+    _positional_params: list[str] = field(init=False)
+    _keyword_params: list[str] = field(init=False)
+    _var_positional: str | None = field(init=False)
+    _var_keyword: str | None = field(init=False)
+
+    def __post_init__(self) -> None:
+        """Initialize parameter lists after object creation."""
+        positional_params: list[str] = []
+        keyword_params: list[str] = []
+        var_positional: str | None = None
+        var_keyword: str | None = None
+
+        # Skip context parameter if present
+        params = list(self.signature.parameters.items())
+        if self.takes_context and params:
+            params = params[1:]
+
+        for name, param in params:
+            if param.kind == param.VAR_POSITIONAL:
+                var_positional = name
+            elif param.kind == param.VAR_KEYWORD:
+                var_keyword = name
+            elif param.kind == param.POSITIONAL_ONLY:
+                positional_params.append(name)
+            elif param.kind == param.POSITIONAL_OR_KEYWORD:
+                if param.default == param.empty:
+                    positional_params.append(name)
+                else:
+                    keyword_params.append(name)
+            else:
+                keyword_params.append(name)
+
+        object.__setattr__(self, "_positional_params", positional_params)
+        object.__setattr__(self, "_keyword_params", keyword_params)
+        object.__setattr__(self, "_var_positional", var_positional)
+        object.__setattr__(self, "_var_keyword", var_keyword)
+
+    def to_call_args(self, data: BaseModel) -> tuple[list[Any], dict[str, Any]]:
+        """Convert Pydantic model to function call arguments."""
+        positional_args: list[Any] = []
+        keyword_args: dict[str, Any] = {}
+
+        # Handle positional arguments
+        for name in self._positional_params:
+            if hasattr(data, name):
+                positional_args.append(getattr(data, name))
+
+        # Handle variable positional arguments (*args)
+        if self._var_positional and hasattr(data, self._var_positional):
+            var_args = getattr(data, self._var_positional)
+            if var_args is not None:
+                positional_args.extend(var_args)
+
+        # Handle keyword arguments
+        for name in self._keyword_params:
+            if hasattr(data, name):
+                keyword_args[name] = getattr(data, name)
+
+        # Handle variable keyword arguments (**kwargs)
+        if self._var_keyword and hasattr(data, self._var_keyword):
+            var_kwargs = getattr(data, self._var_keyword)
+            if var_kwargs is not None:
+                keyword_args.update(var_kwargs)
+
+        return positional_args, keyword_args
 ```
 
 <br>

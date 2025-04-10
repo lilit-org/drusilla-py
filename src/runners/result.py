@@ -115,7 +115,8 @@ class RunResultStreaming:
 
     # Internal state
     _event_queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=config.MAX_SHIELD_QUEUE_SIZE), repr=False
+        default_factory=lambda: asyncio.Queue(maxsize=config.MAX_SHIELD_QUEUE_SIZE),
+        repr=False,
     )
     _input_shield_queue: asyncio.Queue[InputShieldResult] = field(
         default_factory=lambda: asyncio.Queue(maxsize=config.MAX_SHIELD_QUEUE_SIZE),
@@ -166,7 +167,11 @@ class RunResultStreaming:
 
     def _cleanup_tasks(self) -> None:
         """Cancel any pending tasks that haven't completed."""
-        tasks = (self._run_impl_task, self._input_shields_task, self._output_shields_task)
+        tasks = (
+            self._run_impl_task,
+            self._input_shields_task,
+            self._output_shields_task,
+        )
         for task in filter(lambda t: t and not t.done(), tasks):
             task.cancel()
 

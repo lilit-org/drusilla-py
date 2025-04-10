@@ -43,6 +43,8 @@ orbs serve as intelligent intermediaries that:
 ```python
 @dataclass(frozen=True)
 class OrbsInputData:
+    """Data structure for input filtering during orbs operations."""
+
     input_history: str | tuple[InputItem, ...]
     pre_orbs_items: tuple[RunItem, ...]
     new_items: tuple[RunItem, ...]
@@ -56,7 +58,7 @@ OrbsInputFilter = Callable[[OrbsInputData], OrbsInputData]
 class Orbs(Generic[TContext]):
     """Represents delegation of a task from one agent to another."""
 
-    on_invoke_orbs: Callable[[RunContextWrapper[Any], str | None], Awaitable[Agent[TContext]]]
+    on_invoke_orbs: Callable[[RunContextWrapper[TContext], str | None], Awaitable[Agent[TContext]]]
     name: str | None = None
     description: str | None = None
     input_json_schema: dict[str, Any] | None = None
@@ -64,10 +66,12 @@ class Orbs(Generic[TContext]):
 
     @classmethod
     def default_name(cls, agent: Agent[Any]) -> str:
+        """Generate a default name for the orbs based on the agent name."""
         return transform_string_function_style(f"transfer_to_{agent.name}")
 
     @classmethod
     def default_description(cls, agent: Agent[Any]) -> str:
+        """Generate a default description for the orbs based on the agent."""
         desc = agent.orbs_description or ""
         return f"Orbs to the {agent.name} agent to handle the request. {desc}"
 ```
@@ -94,7 +98,7 @@ and for filters:
 | Parameter           | Type        | Description                        |
 |---------------------|-------------|------------------------------------|
 | `input_history`     | `str`       | input history before `Runner.run()`|
-| `pre_handoff_items` | `tuple`     | generated before the agent turn    |
+| `pre_orbs_items`    | `tuple`     | generated before the agent turn    |
 | `new_items`         | `tuple`     | new items generated                |
 
 <br>
@@ -104,20 +108,20 @@ a simple example of how orbs can be integrated to an agent is shown below:
 <br>
 
 ```python
-third_agent = AgentV1(
+third_agent = Agent(
     name="Assistant Three",
     instructions="Replace one word in the sentence received from agent two with 'love' in a way that makes sense or is entertaining.",
     orbs_description="Replace one word in the input sentence with the word 'love'.",
 )
 
-second_agent = AgentV1(
+second_agent = Agent(
     name="Agent Two",
     instructions="Create a sentence about the cypherpunk world with number of words exactly equal to the input number from agent one.",
     orbs=[orbs(third_agent, input_filter=orbs_message_filter)(transfer_to_third_agent)],
     orbs_description="Create sentences about the cypherpunk world.",
 )
 
-first_agent = AgentV1(
+first_agent = Agent(
     name="Agent One",
     instructions="Generate a random between 3 and 15.",
     swords=[random_number],
@@ -150,7 +154,7 @@ def create_orbs_decorator(
                 try:
                     input_json_schema = input_type.model_json_schema()
                 except (AttributeError, TypeError) as e:
-                    raise UsageError(err.ORBS_ERROR.format(error=str(e))) from e
+                    raise set_error(UsageError, error_messages.ORBS_ERROR, error=str(e)) from e
 
         async def on_invoke(
             ctx: RunContextWrapper[T],
@@ -158,21 +162,16 @@ def create_orbs_decorator(
         ) -> Agent[T]:
             if hasattr(f, "input_type"):
                 if input_json is None:
-                    raise UsageError(
-                        err.ORBS_ERROR.format(
-                            error=(
-                                f"{f.__name__}() missing 1 required "
-                                "positional argument: 'input_data'"
-                            )
-                        )
+                    raise set_error(
+                        UsageError,
+                        error_messages.ORBS_ERROR,
+                        error=f"{f.__name__}() missing 1 required positional argument: 'input_data'"
                     )
                 try:
                     input_data = f.input_type.model_validate_json(input_json)
                     await _invoke_function(f, ctx, input_data)
                 except Exception as e:
-                    raise UsageError(
-                        err.ORBS_ERROR.format(error=f"Invalid input JSON: {str(e)}")
-                    ) from e
+                    raise set_error(UsageError, error_messages.ORBS_ERROR, error=str(e)) from e
             else:
                 await _invoke_function(f, ctx)
             return agent
@@ -220,12 +219,12 @@ orbs = create_orbs_decorator
 in the code above, error handlers (and their messages) are stored inside `ORBS_ERROR_HANDLER`, which is defined in the top of the file with:
 
 ```python
-ORBS_ERROR_HANDLER = create_error_handler(err.ORBS_ERROR)
+ORBS_ERROR_HANDLER = create_error_handler(ERROR_MESSAGES.ORBS_ERROR.message)
 ```
 
 <br>
 
-`create_error_handler()` is a method defined in [util/_exceptions.py](../../src/util/_exceptions.py) and is not intended to be modified. however, the string `err.ORBS_ERROR` (which is imported from [util/_constants.py](../../src/util/_constants.py)) can be directly customized inside your [`.env`](../../.env.example).
+`create_error_handler()` is a method defined in [src/util/exceptions.py](../../src/util/exceptions.py) and is not intended to be modified. however, the string `ERROR_MESSAGES.ORBS_ERROR.message` (which is imported from [src/util/constants.py](../../src/util/constants.py)) can be directly customized inside your [`.env`](../../../.env.example).
 
 <br>
 

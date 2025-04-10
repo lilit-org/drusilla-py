@@ -26,7 +26,7 @@ jobs:
         pip install black autoflake ruff
 
     - name: Check formatting with black
-      run: black --check .
+      run: black --check --line-length 100 .
 
     - name: Check for unused imports with autoflake
       run: autoflake --check --recursive --remove-all-unused-imports .

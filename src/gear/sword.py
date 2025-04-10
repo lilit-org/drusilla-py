@@ -238,7 +238,10 @@ def function_schema(
 
     # Create base model with desired configuration
     class DynamicBase(BaseModel):
-        model_config = {"extra": "forbid" if strict_json_schema else "allow", "strict": True}
+        model_config = {
+            "extra": "forbid" if strict_json_schema else "allow",
+            "strict": True,
+        }
 
     # Create dynamic model and schema
     dynamic_model = create_model(
