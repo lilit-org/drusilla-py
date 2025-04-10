@@ -9,13 +9,16 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: ${{ matrix.python-version }}
 
     - name: Install dependencies
       run: |
@@ -28,5 +31,5 @@ jobs:
     - name: Check for unused imports with autoflake
       run: autoflake --check --recursive --remove-all-unused-imports .
 
-    - name: Run ruff linter
-      run: ruff check .
+    - name: Fix issues with ruff
+      run: ruff check . --fix

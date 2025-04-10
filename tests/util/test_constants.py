@@ -1,8 +1,10 @@
 import logging
 import os
+from dataclasses import dataclass
 from unittest.mock import patch
 
 import pytest
+from src.util.constants import BaseConfig, Config, config, HEADERS, logger
 
 
 @pytest.fixture(autouse=True)
@@ -20,16 +22,12 @@ def setup_env(monkeypatch):
 
     # Import after environment is set
     global config
-    from src.util.constants import Config, config
-
     config = Config()
     yield config
 
 
 def test_logging_config():
     """Test logging configuration."""
-    from src.util.constants import config, logger
-
     assert config.LOG_LEVEL in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     assert logger.level == getattr(logging, config.LOG_LEVEL)
     assert len(logger.handlers) > 0
@@ -38,8 +36,6 @@ def test_logging_config():
 
 def test_connection_constants():
     """Test connection-related constants."""
-    from src.util.constants import config
-
     assert isinstance(config.BASE_URL, str)
     assert config.BASE_URL.startswith(("http://", "https://"))
     assert isinstance(config.API_KEY, str)
@@ -49,8 +45,6 @@ def test_connection_constants():
 
 def test_model_logic_constants():
     """Test model logic and optimization constants."""
-    from src.util.constants import config
-
     assert isinstance(config.MAX_TURNS, int)
     assert config.MAX_TURNS > 0
     assert isinstance(config.MAX_QUEUE_SIZE, int)
@@ -65,8 +59,6 @@ def test_model_logic_constants():
 
 def test_http_constants():
     """Test HTTP client configuration constants."""
-    from src.util.constants import config
-
     assert isinstance(config.HTTP_TIMEOUT_TOTAL, float)
     assert config.HTTP_TIMEOUT_TOTAL > 0
     assert isinstance(config.HTTP_TIMEOUT_CONNECT, float)
@@ -81,8 +73,6 @@ def test_http_constants():
 
 def test_api_constants():
     """Test API configuration constants."""
-    from src.util.constants import config, HEADERS
-
     assert isinstance(HEADERS, dict)
     assert "User-Agent" in HEADERS
     assert HEADERS["User-Agent"] == config.USER_AGENT
@@ -92,8 +82,6 @@ def test_api_constants():
 
 def test_base_config():
     """Test the BaseConfig class functionality."""
-    from src.util.constants import BaseConfig
-    from dataclasses import dataclass
 
     @dataclass
     class TestConfig(BaseConfig):
@@ -166,28 +154,34 @@ def test_base_config():
 
 
 def test_error_messages():
-    """Test the ErrMsg class."""
-    from src.util.constants import ErrMsg
+    """Test error message constants."""
+    from src.util.constants import (
+        AGENT_EXEC_ERROR,
+        MODEL_ERROR,
+        OBJECT_ADDITIONAL_PROPERTIES_ERROR,
+        ORBS_ERROR,
+        RUNCONTEXT_ERROR,
+        RUNNER_ERROR,
+        SHIELD_ERROR,
+        SWORD_ERROR,
+        TYPES_ERROR,
+    )
 
-    error_msgs = ErrMsg()
-
-    # Test default error messages
-    assert error_msgs.SWORD_ERROR == "Sword error: {error}"
-    assert error_msgs.RUNCONTEXT_ERROR == "RunContextWrapper error: {error}"
-    assert error_msgs.SHIELD_ERROR == "Shield error: {error}"
-
-    # Test overriding error messages from environment
-    with patch.dict(
-        os.environ,
-        {
-            "SWORD_ERROR": "Custom sword error: {error}",
-            "INVALID_ERROR": "This should be ignored",
-        },
-    ):
-        error_msgs = ErrMsg()  # Create new instance to test initialization
-        error_msgs.update_from_env()  # Explicitly update from environment
-        assert error_msgs.SWORD_ERROR == "Custom sword error: {error}"
-        assert not hasattr(error_msgs, "INVALID_ERROR")
+    # Test that all error messages are properly formatted
+    test_error = "test error"
+    assert SWORD_ERROR.format(error=test_error) == f"Sword error: {test_error}"
+    assert SHIELD_ERROR.format(error=test_error) == f"Shield error: {test_error}"
+    assert RUNCONTEXT_ERROR.format(error=test_error) == f"RunContextWrapper error: {test_error}"
+    assert RUNNER_ERROR.format(error=test_error) == f"Runner error: {test_error}"
+    assert ORBS_ERROR.format(error=test_error) == f"Orbs error: {test_error}"
+    assert AGENT_EXEC_ERROR.format(error=test_error) == f"Agent execution error: {test_error}"
+    assert MODEL_ERROR.format(error=test_error) == f"Model error: {test_error}"
+    assert TYPES_ERROR.format(error=test_error) == f"Type error: {test_error}"
+    assert OBJECT_ADDITIONAL_PROPERTIES_ERROR == (
+        "Object types cannot allow additional properties. This may be due to using an older "
+        "Pydantic version or explicit configuration. If needed, update the function or output "
+        "sword to use a non-strict schema."
+    )
 
 
 def test_validate_env_vars():
@@ -324,8 +318,6 @@ def test_get_env_var_edge_cases():
 
 def test_update_from_env_edge_cases():
     """Test edge cases for update_from_env method."""
-    from dataclasses import dataclass
-    from src.util.constants import BaseConfig
 
     @dataclass
     class TestConfig(BaseConfig):
