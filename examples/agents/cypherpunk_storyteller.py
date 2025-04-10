@@ -12,7 +12,7 @@ from src.agents.agent_v1 import AgentV1 as Agent
 from src.network.client import setup_client
 from src.runners.run import Runner
 from src.util.exceptions import AgentExecutionError, ModelError
-from src.util.print import validate_json, _format_final_output, pretty_print_result_stream
+from src.util.print import validate_json, format_final_output, pretty_print_result_stream
 from src.runners.items import ModelResponse
 
 ########################################################
@@ -104,18 +104,27 @@ def _select_genre() -> str:
 def _extract_and_validate_json(result_text: str) -> OutlineCheckerOutput | None:
     """Extract and validate JSON from the result text."""
     try:
-        result_text = result_text.strip()
-        start, end = result_text.find("{"), result_text.rfind("}")
+        # Create a ModelResponse object to use with format_final_output
+        model_response = ModelResponse(
+            output=[{"text": result_text}], usage=None, referenceable_id=None
+        )
+
+        # Get the result part from format_final_output
+        _, result = format_final_output(model_response)
+
+        # Extract JSON from the result
+        result = result.strip()
+        start, end = result.find("{"), result.rfind("}")
         if start == -1 or end == -1:
             print("\n❌ Could not find valid JSON in the response.")
             return None
-            
-        json_text = result_text[start : end + 1].strip()
+
+        json_text = result[start : end + 1].strip()
         return validate_json(json_text, TypeAdapter(OutlineCheckerOutput))
-        
+
     except ModelError as e:
         print(f"\n❌ Failed to validate checker output: {e}")
-        print(f"Raw text: {json_text}")
+        print(f"Raw text: {result}")
         return None
 
 
@@ -124,15 +133,15 @@ def _validate_checker_output(result_text: str, selected_genre: str) -> bool:
     checker_output = _extract_and_validate_json(result_text)
     if checker_output is None:
         return False
-        
+
     if not checker_output.good_quality:
         print("\n❌ Story outline is not of good quality.")
         return False
-        
+
     if checker_output.genre.lower() != selected_genre.lower():
         print(f"\n❌ Story is not a {selected_genre} story.")
         return False
-        
+
     return True
 
 
@@ -141,7 +150,7 @@ def _validate_checker_output(result_text: str, selected_genre: str) -> bool:
 ########################################################
 
 
-def run_agents() -> str | None:
+def run_agents() -> None:
     try:
         setup_client()
         agents = create_agents()
@@ -158,7 +167,7 @@ def run_agents() -> str | None:
         print("\n🔍 Quality Analysis:")
         print(pretty_print_result_stream(checker_result.final_output))
 
-        _, result_text = _format_final_output(
+        _, result_text = format_final_output(
             ModelResponse(
                 output=[{"text": str(checker_result.final_output)}],
                 usage=None,
@@ -170,7 +179,6 @@ def run_agents() -> str | None:
             story_result = Runner.run_sync(story_agent, outline_result.final_output)
             print("\n📖 Final Story:")
             print(pretty_print_result_stream(story_result.final_output))
-            return story_result.final_output
 
     except Exception as e:
         raise AgentExecutionError(e) from e

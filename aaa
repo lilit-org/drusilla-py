@@ -1,94 +1,6 @@
-# agent "cypherpunk storyteller": an example of a multi-agent story generation system
+poetry run python examples/agents/cypherpunk_storyteller.py
 
-<br>
-
-run with:
-
-```shell
-make cypherpunk-storyteller
-```
-
-<br>
-
-the system uses four agents working together:
-
-1. **story outline generator**: creates a concise story outline based on the selected genre
-2. **outline quality checker**: analyzes the outline's quality and genre match
-3. **json parser**: converts the quality analysis into a structured json format
-4. **story writer**: expands the outline into a full story
-
-<br>
-
-with the following code:
-
-<br>
-
-```python
-def create_agents() -> List[Agent]:
-    story_outline_agent = Agent(
-        name="Agent Outline Generator",
-        instructions=(
-            "You are a creative story outline generator. "
-            "Generate a very short story outline based on the user's input and selected genre. "
-            "Keep the outline concise but include key plot points and character development. "
-            "Make sure the story fits the selected genre."
-        ),
-    )
-
-    quality_checker_agent = Agent(
-        name="Agent Quality Checker",
-        instructions=(
-            "You are a story quality analyst. "
-            "Read the given story outline and evaluate its quality and genre match. "
-            "Focus on coherence, creativity, and whether it fits the selected genre. "
-            "Provide your analysis in a clear format with REASONING and RESULT sections. "
-            "In the RESULT section, provide a JSON object with 'good_quality' (boolean) and 'genre' (string) fields."
-        ),
-        output_type=str,
-    )
-
-    story_agent = Agent(
-        name="Agent Writer",
-        instructions=(
-            "You are a creative writer. "
-            "Write a compelling short story based on the given outline. "
-            "Maintain the original plot points while adding engaging details and dialogue. "
-            "Ensure the story matches the selected genre."
-        ),
-        output_type=str,
-    )
-
-    return [story_outline_agent, quality_checker_agent, story_agent]
-```
-
-<br>
-
----
-
-### solution example for a lunapunk story
-
-<br>
-
-```
-> make cypherpunk-story
-
-📚 Available Story Genres:
-   1. Sci-fi
-   2. Fantasy
-   3. Romance
-   4. Mystery
-   5. Horror
-   6. Adventure
-   7. Solarpunk
-   8. Lunarpunk
-   9. Cyberpunk
-   10. Dystopian
-   11. Post-apocalyptic
-   12. Steampunk
-   13. Urban fantasy
-   14. Paranormal
-
-❓ Select a genre number (1-14): 8
+✅ Successfully received model response...
 
 📝 Generated Outline:
 
@@ -267,4 +179,4 @@ In the isolated depths of space, a lone astronaut discovers an alien spacecraft 
 The story culminates as Kaelthus confronts Eos with a final query about their shared memories and identities. In the end, they reconcile in a way neither could have anticipated—their combined consciousnesses forming a bridge between the finite and the infinite, humanity and alien existence. Yet, this harmony comes at a cost: one of them may lose their humanity, or worse, both are forced to confront the ultimate truth about what it means to be human—or if it even matters anymore.
 
 *The Mirror Moon* is a meditation on the fragility of connection between humans and machines, past and present, and the indistinguishable blur that exists between them.
-```
+
