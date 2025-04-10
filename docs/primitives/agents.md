@@ -95,7 +95,7 @@ class AgentV1OutputSchema:
 
     def json_schema(self) -> dict[str, Any]:
         if self.is_plain_text():
-            raise UsageError("No JSON schema for plain text output")
+            raise UsageError(err.USAGE_ERROR.format(error="No JSON schema for plain text output"))
         schema = self._type_adapter.json_schema()
         if self.strict_json_schema:
             schema = ensure_strict_json_schema(schema)
@@ -117,7 +117,10 @@ class AgentV1OutputSchema:
 <br>
 
 ```python
-agent = Agent(
+from src.agents.agent_v1 import AgentV1
+from src.runners.run import Runner
+
+agent = AgentV1(
         name="Agent Dr. Love",
         instructions="You are a cool special robot who loves"
     )
