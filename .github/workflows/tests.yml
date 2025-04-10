@@ -51,8 +51,9 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          pytest tests/ \
-            --cov=src \
-            --cov-report=xml \
-            --cov-report=term-missing \
-            --cov-fail-under=75
+          pytest --cov --cov-branch --cov-report=xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
