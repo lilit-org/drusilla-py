@@ -5,7 +5,7 @@ from ..gear.shield import InputShield, OutputShield
 from ..models.interface import Model
 from ..models.provider import ModelProvider
 from ..models.settings import ModelSettings
-from ..util.constants import MAX_TURNS
+from ..util.constants import config
 from ..util.types import TContext
 
 
@@ -19,4 +19,4 @@ class RunConfig:
     orbs_input_filter: OrbsInputFilter | None = None
     input_shields: list[InputShield[TContext]] = field(default_factory=list)
     output_shields: list[OutputShield[TContext]] = field(default_factory=list)
-    max_turns: int = MAX_TURNS
+    max_turns: int = config.MAX_TURNS

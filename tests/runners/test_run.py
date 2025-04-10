@@ -364,16 +364,7 @@ async def test_run_with_max_turns(mock_agent, mock_run_config):
     )
 
     # Mock the run_impl to return NextStepOrbs to force continuation
-    with (
-        patch("src.runners.run.Runner._run_turn", new_callable=AsyncMock) as mock_run_turn,
-        patch("src.runners.run.ERROR_MESSAGES") as mock_error_messages,
-    ):
-        # Create a mock message object with the message attribute
-        mock_message = MagicMock()
-        mock_message.message = "❌ Runner error: {error}"
-        # Set the RUNNER_ERROR attribute on the mock
-        mock_error_messages.RUNNER_ERROR = mock_message
-
+    with patch("src.runners.run.Runner._run_turn", new_callable=AsyncMock) as mock_run_turn:
         mock_run_turn.return_value = SingleStepResult(
             model_response=ModelResponse(
                 referenceable_id="test_id",

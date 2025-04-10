@@ -19,7 +19,7 @@ from typing import Any, Generic
 
 from ..agents.agent_v1 import AgentV1 as Agent
 from ..runners.items import RunItem
-from ..util.constants import ERROR_MESSAGES
+from ..util.constants import err
 from ..util.exceptions import UsageError
 from ..util.print import transform_string_function_style
 from ..util.types import (
@@ -89,7 +89,7 @@ def create_orbs_decorator(
                 try:
                     input_json_schema = input_type.model_json_schema()
                 except (AttributeError, TypeError) as e:
-                    raise UsageError(ERROR_MESSAGES.ORBS_ERROR.message.format(error=str(e))) from e
+                    raise UsageError(err.ORBS_ERROR.format(error=str(e))) from e
 
         async def on_invoke(
             ctx: RunContextWrapper[T],
@@ -98,7 +98,7 @@ def create_orbs_decorator(
             if hasattr(f, "input_type"):
                 if input_json is None:
                     raise UsageError(
-                        ERROR_MESSAGES.ORBS_ERROR.message.format(
+                        err.ORBS_ERROR.format(
                             error=(
                                 f"{f.__name__}() missing 1 required "
                                 "positional argument: 'input_data'"
@@ -110,9 +110,7 @@ def create_orbs_decorator(
                     await _invoke_function(f, ctx, input_data)
                 except Exception as e:
                     raise UsageError(
-                        ERROR_MESSAGES.ORBS_ERROR.message.format(
-                            error=f"Invalid input JSON: {str(e)}"
-                        )
+                        err.ORBS_ERROR.format(error=f"Invalid input JSON: {str(e)}")
                     ) from e
             else:
                 await _invoke_function(f, ctx)

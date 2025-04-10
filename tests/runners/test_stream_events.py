@@ -12,6 +12,7 @@ from src.runners.stream_events import (
     StreamEvent,
 )
 from src.util.types import ResponseStreamEvent
+from src.util.exceptions import ModelError
 
 
 # Mock classes for testing
@@ -97,6 +98,6 @@ def test_run_item_stream_event_name():
         event = RunItemStreamEvent(name=name, item=MockRunItem())
         assert event.name == name
 
-    # Test invalid name (should raise type error)
-    with pytest.raises(TypeError):
+    # Test invalid name (should raise model error)
+    with pytest.raises(ModelError):
         RunItemStreamEvent(name="invalid_name", item=MockRunItem())  # type: ignore

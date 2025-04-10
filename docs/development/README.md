@@ -49,6 +49,10 @@ HTTP_MAX_CONNECTIONS = 10
 
 <br>
 
+for customizing error messages, see [error messages documentation](error_messages.md).
+
+<br>
+
 start [ollama](https://ollama.com/) in another terminal window (after downloading [deepseek-r1](https://ollama.com/library/deepseek-r1)):
 
 ```shell

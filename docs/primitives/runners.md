@@ -56,6 +56,10 @@ class Runner:
         str | list[InputItem],
         AgentOutputSchema | None,
     ]:
+        if input is None:
+            raise RunnerError(err.RUNNER_ERROR.format(error="Invalid input: input cannot be None"))
+        if max_turns <= 0:
+            raise RunnerError(err.RUNNER_ERROR.format(error="Max turns must be positive"))
 
         charms = charms or RunCharms[Any]()
         run_config = run_config or RunConfig()
@@ -167,7 +171,7 @@ await _handle_stream_events(result, num_jokes)
 
 in the code above, error handlers (and their messages) are held inside `RUNNER_ERROR`.
 
-`create_error_handler()` is a method defined inside [util/_exceptions.py](../../src/util/_exceptions.py) and is not intended to be modified. however, the string `ERROR_MESSAGES.SWORD_ERROR.message` (which is imported from [util/_constants.py](../../src/util/_constants.py)) can be directly customized inside your [`.env`](../../.env.example).
+`create_error_handler()` is a method defined inside [util/_exceptions.py](../../src/util/_exceptions.py) and is not intended to be modified. however, the string `err.RUNNER_ERROR` (which is imported from [util/_constants.py](../../src/util/_constants.py)) can be directly customized inside your [`.env`](../../.env.example).
 
 <br>
 

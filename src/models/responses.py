@@ -18,13 +18,14 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, overload
+from typing import Literal, overload
 
 from ..agents.agent_v1 import AgentV1OutputSchema as AgentOutputSchema
 from ..gear.orbs import Orbs
 from ..gear.sword import Sword
 from ..runners.items import ItemHelpers, ModelResponse
-from ..util.constants import HEADERS, UNSET, logger
+from ..util.constants import HEADERS, UNSET, err, logger
+from ..util.exceptions import ModelError
 from ..util.types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -36,9 +37,6 @@ from ..util.types import (
 )
 from .interface import Model
 from .settings import ModelSettings
-
-if TYPE_CHECKING:
-    pass
 
 ########################################################
 #               Main Class: Responses Model            #
@@ -99,7 +97,7 @@ class ModelResponsesModel(Model):
         except Exception as e:
             request_id = getattr(e, "request_id", None)
             logger.error(f"Error getting response: {e}. (request_id: {request_id})")
-            raise
+            raise ModelError(err.MODEL_ERROR.format(error=str(e))) from e
 
     async def stream_response(
         self,
@@ -126,7 +124,7 @@ class ModelResponsesModel(Model):
 
         except Exception as e:
             logger.error(f"Error streaming response: {e}")
-            raise
+            raise ModelError(err.MODEL_ERROR.format(error=str(e))) from e
 
     @overload
     async def _fetch_response(

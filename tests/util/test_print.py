@@ -197,13 +197,13 @@ def test_pretty_print_result():
     result.raw_responses = []
     with pytest.raises(ModelError) as exc_info:
         pretty_print_result(result)
-    assert "Model error" in str(exc_info.value)
+    assert "Runner error" in str(exc_info.value)
 
-    # Test case 3: With reasoning disabled
-    result.raw_responses = [response]
-    output = pretty_print_result(result, show_reasoning=False)
-    assert "Reasoning" not in output
-    assert "Result" in output
+    # Test case 3: Invalid result format
+    result.raw_responses = [None]
+    with pytest.raises(ModelError) as exc_info:
+        pretty_print_result(result)
+    assert "Runner error" in str(exc_info.value)
 
 
 def test_validate_json():
@@ -225,13 +225,13 @@ def test_validate_json():
     json_str = '{"name": "John", "age": "thirty"}'
     with pytest.raises(ModelError) as exc_info:
         validate_json(json_str, adapter)
-    assert "model error" in str(exc_info.value).lower()
+    assert "runner error" in str(exc_info.value).lower()
 
     # Test case 3: Partial validation
     json_str = '{"name": "John"}'
     with pytest.raises(ModelError) as exc_info:
         validate_json(json_str, adapter, partial=False)
-    assert "model error" in str(exc_info.value).lower()
+    assert "runner error" in str(exc_info.value).lower()
 
     # Test case 4: Partial validation allowed
     class PartialTestModel(BaseModel):

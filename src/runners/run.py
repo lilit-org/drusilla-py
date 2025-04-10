@@ -30,13 +30,15 @@ from ..gear.shield import (
     OutputShieldResult,
 )
 from ..models.interface import Model
-from ..util.constants import ERROR_MESSAGES, MAX_TURNS
+from ..util.constants import config, err
 from ..util.exceptions import (
     AgentError,
     InputShieldError,
     MaxTurnsError,
+    ModelError,
     OutputShieldError,
     RunnerError,
+    ShieldError,
 )
 from ..util.types import InputItem, ResponseEvent, RunContextWrapper, TContext, Usage
 from .config import RunConfig
@@ -75,15 +77,9 @@ class Runner:
         AgentOutputSchema | None,
     ]:
         if input is None:
-            raise RunnerError(
-                ERROR_MESSAGES.RUNNER_ERROR.message.format(
-                    error="Invalid input: input cannot be None"
-                )
-            )
+            raise RunnerError(err.RUNNER_ERROR.format(error="Invalid input: input cannot be None"))
         if max_turns <= 0:
-            raise RunnerError(
-                ERROR_MESSAGES.RUNNER_ERROR.message.format(error="Max turns must be positive")
-            )
+            raise RunnerError(err.RUNNER_ERROR.format(error="Max turns must be positive"))
 
         charms = charms or RunCharms[Any]()
         run_config = run_config or RunConfig()
@@ -107,7 +103,7 @@ class Runner:
         input: str | list[InputItem],
         *,
         context: TContext | None = None,
-        max_turns: int = MAX_TURNS,
+        max_turns: int = config.MAX_TURNS,
         charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> RunResult:
@@ -128,9 +124,7 @@ class Runner:
                 current_turn += 1
                 if current_turn > run_config.max_turns:
                     raise MaxTurnsError(
-                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
-                            error=f"Max turns ({max_turns}) exceeded"
-                        )
+                        err.RUNNER_ERROR.format(error=f"Max turns ({max_turns}) exceeded")
                     )
 
                 try:
@@ -146,7 +140,7 @@ class Runner:
                         input,
                     )
                 except Exception as e:
-                    error_message = ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))
+                    error_message = err.AGENT_EXEC_ERROR.format(error=str(e))
                     raise AgentError(error_message) from e
 
                 should_run_agent_start_charms = False
@@ -172,12 +166,12 @@ class Runner:
                     continue
                 else:
                     raise RunnerError(
-                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
+                        err.RUNNER_ERROR.format(
                             error=f"Unknown next step type: {type(turn_result.next_step)}"
                         )
                     )
         except Exception as e:
-            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
+            raise RunnerError(err.RUNNER_ERROR.format(error=str(e))) from e
 
     ########################################################
     #                     RUN_SYNC()
@@ -189,7 +183,7 @@ class Runner:
         input: str | list[InputItem],
         *,
         context: TContext | None = None,
-        max_turns: int = MAX_TURNS,
+        max_turns: int = config.MAX_TURNS,
         charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
         timeout: float | None = None,
@@ -218,7 +212,7 @@ class Runner:
         starting_agent: Agent[TContext],
         input: str | list[InputItem],
         context: TContext | None = None,
-        max_turns: int = MAX_TURNS,
+        max_turns: int = config.MAX_TURNS,
         charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> RunResultStreaming:
@@ -275,11 +269,7 @@ class Runner:
             )
             for result in shield_result:
                 if result.output.tripwire_triggered:
-                    raise RunnerError(
-                        ERROR_MESSAGES.RUNNER_ERROR.message.format(
-                            error=str(InputShieldError(result))
-                        )
-                    )
+                    raise ShieldError(err.SHIELD_ERROR.format(error=str(InputShieldError(result))))
 
         system_prompt = await agent.get_system_prompt(context_wrapper)
         output_schema = cls._get_output_schema(agent)
@@ -346,7 +336,7 @@ class Runner:
                 input=input,
             )
         except Exception as e:
-            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
+            raise RunnerError(err.RUNNER_ERROR.format(error=str(e))) from e
 
     @classmethod
     async def _handle_final_output(
@@ -370,8 +360,7 @@ class Runner:
             # Check output shield results for errors
             for result in output_shield_results:
                 if result.output.tripwire_triggered:
-                    e = OutputShieldError(result)
-                    raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e)))
+                    raise ShieldError(err.SHIELD_ERROR.format(error=str(OutputShieldError(result))))
 
             return RunResult(
                 input=original_input,
@@ -383,7 +372,7 @@ class Runner:
                 output_shield_results=output_shield_results,
             )
         except Exception as e:
-            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
+            raise RunnerError(err.RUNNER_ERROR.format(error=str(e))) from e
 
     @classmethod
     def _create_streamed_result(
@@ -410,7 +399,9 @@ class Runner:
         """Common error handling implementation."""
         if message is None:
             message = str(error)
-        raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=message)) from error
+        if isinstance(error, AgentError):
+            raise error
+        raise RunnerError(err.RUNNER_ERROR.format(error=message)) from error
 
     @classmethod
     async def _handle_shield_error(
@@ -420,7 +411,7 @@ class Runner:
     ) -> None:
         """Handle shield tripwire errors."""
         error_class = InputShieldError if is_input else OutputShieldError
-        await cls._handle_error(error_class(result))
+        raise ShieldError(err.SHIELD_ERROR.format(error=str(error_class(result))))
 
     @classmethod
     async def _process_shields(
@@ -454,7 +445,8 @@ class Runner:
                     for t in shield_tasks:
                         if not t.done():
                             t.cancel()
-                    await cls._handle_shield_error(result, is_input)
+                    error_class = InputShieldError if is_input else OutputShieldError
+                    raise ShieldError(err.SHIELD_ERROR.format(error=str(error_class(result))))
                 if queue is not None:
                     queue.put_nowait(result)
                 shield_results.append(result)
@@ -463,7 +455,7 @@ class Runner:
             for t in shield_tasks:
                 if not t.done():
                     t.cancel()
-            await cls._handle_error(e)
+            raise RunnerError(err.RUNNER_ERROR.format(error=str(e))) from e
 
         return shield_results
 
@@ -564,7 +556,9 @@ class Runner:
 
                 if current_turn > max_turns:
                     await cls._queue_event(streamed_result._event_queue, QueueCompleteSentinel())
-                    await cls._handle_error(MaxTurnsError(f"Max turns ({max_turns}) exceeded"))
+                    raise MaxTurnsError(
+                        err.RUNNER_ERROR.format(error=f"Max turns ({max_turns}) exceeded")
+                    )
 
                 if current_turn == 1:
                     streamed_result._input_shields_task = asyncio.create_task(
@@ -771,11 +765,7 @@ class Runner:
                 streamed_result._event_queue, RawResponsesStreamEvent(data=event)
             )
 
-        raise AgentError(
-            ERROR_MESSAGES.RUNNER_ERROR.message.format(
-                error="Model did not produce a final response!"
-            )
-        )
+        raise ModelError(err.MODEL_ERROR.format(error="Model did not produce a final response!"))
 
     @classmethod
     async def _run_shields(
@@ -810,9 +800,7 @@ class Runner:
                         if not t.done():
                             t.cancel()
                     error_class = InputShieldError if is_input else OutputShieldError
-                    raise RunnerError(
-                        ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(error_class(result)))
-                    )
+                    raise ShieldError(err.SHIELD_ERROR.format(error=str(error_class(result))))
                 if queue is not None:
                     queue.put_nowait(result)
                 shield_results.append(result)
@@ -821,6 +809,6 @@ class Runner:
             for t in shield_tasks:
                 if not t.done():
                     t.cancel()
-            raise RunnerError(ERROR_MESSAGES.RUNNER_ERROR.message.format(error=str(e))) from e
+            raise RunnerError(err.RUNNER_ERROR.format(error=str(e))) from e
 
         return shield_results

@@ -23,8 +23,8 @@ from ..runners.items import (
     ModelResponse,
     TResponseOutputItem,
 )
-from ..util.constants import FAKE_RESPONSES_ID, HEADERS, UNSET, logger
-from ..util.exceptions import AgentError, UsageError
+from ..util.constants import FAKE_RESPONSES_ID, HEADERS, UNSET, err, logger
+from ..util.exceptions import AgentError, ModelError, UsageError
 from ..util.types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -253,7 +253,9 @@ class ModelChatCompletionsModel(Model):
                 parallel_sword_calls=parallel_sword_calls or False,
             )
             if not isinstance(ret, AsyncStream):
-                raise TypeError(f"Expected AsyncStream, got {type(ret)}")
+                raise ModelError(
+                    err.MODEL_ERROR.format(error=f"Expected AsyncStream, got {type(ret)}")
+                )
             return response, ret
 
         return ret
@@ -380,7 +382,11 @@ class _Converter:
                 out.append({"type": "text", "text": c["text"]})
             elif c.get("type") == "input_image":
                 if "image_url" not in c or not c["image_url"]:
-                    raise AgentError(f"Only image URLs are supported for input_image {c}")
+                    raise AgentError(
+                        err.AGENT_EXEC_ERROR.format(
+                            error=f"Only image URLs are supported for input_image {c}"
+                        )
+                    )
                 out.append(
                     {
                         "type": "image_url",
@@ -391,9 +397,13 @@ class _Converter:
                     }
                 )
             elif c.get("type") == "input_file":
-                raise UsageError(f"File uploads are not supported for chat completions {c}")
+                raise UsageError(
+                    err.USAGE_ERROR.format(
+                        error=f"File uploads are not supported for chat completions {c}"
+                    )
+                )
             else:
-                raise UsageError(f"Unknown content: {c}")
+                raise UsageError(err.USAGE_ERROR.format(error=f"Unknown content: {c}"))
         return out
 
     @classmethod
@@ -456,7 +466,9 @@ class _Converter:
                         }
                     )
                 else:
-                    raise UsageError(f"Unexpected role in message: {role}")
+                    raise UsageError(
+                        err.USAGE_ERROR.format(error=f"Unexpected role in message: {role}")
+                    )
 
             elif resp_msg := cls.maybe_response_output_message(item):
                 flush_assistant_message()
@@ -471,10 +483,19 @@ class _Converter:
                         new_asst["refusal"] = c["refusal"]
                     elif c["type"] == "output_audio":
                         raise AgentError(
-                            f"Only audio IDs are supported for chat completions, but got: {c}"
+                            err.AGENT_EXEC_ERROR.format(
+                                error=(
+                                    "Only audio IDs are supported for chat completions, "
+                                    f"but got: {c}"
+                                )
+                            )
                         )
                     else:
-                        raise UsageError(f"Unknown content type in ResponseOutputMessage: {c}")
+                        raise UsageError(
+                            err.USAGE_ERROR.format(
+                                error=f"Unknown content type in ResponseOutputMessage: {c}"
+                            )
+                        )
 
                 if text_segments:
                     new_asst["content"] = "\n".join(text_segments)
@@ -528,10 +549,16 @@ class _Converter:
                 )
 
             elif cls.maybe_item_reference(item):
-                raise UsageError("Encountered an item_reference, which is not supported")
+                raise UsageError(
+                    err.USAGE_ERROR.format(
+                        error="Encountered an item_reference, which is not supported"
+                    )
+                )
 
             else:
-                raise UsageError(f"Unhandled item type or structure: {item}")
+                raise UsageError(
+                    err.USAGE_ERROR.format(error=f"Unhandled item type or structure: {item}")
+                )
 
         flush_assistant_message()
         return result

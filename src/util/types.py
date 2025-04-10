@@ -21,6 +21,9 @@ from typing import Any, Generic, Literal, TypeAlias, TypedDict
 
 from typing_extensions import NotRequired, TypeVar
 
+from ..util.constants import err
+from ..util.exceptions import ModelError, NetworkError
+
 ########################################################
 #              Type Variables
 ########################################################
@@ -153,6 +156,23 @@ class QueueCompleteSentinel:
 @dataclass(frozen=True)
 class Response:
     """API response containing outputs and usage stats."""
+
+    id: str
+    output: Sequence[ResponseOutput]
+    usage: Usage | None = None
+    created_at: float | None = None
+    model: str | None = None
+    object: Literal["response"] | None = None
+    sword_choice: Literal["auto", "required", "none"] | None = None
+    temperature: float | None = None
+    swords: Sequence[ChatCompletionSwordParam] | None = None
+    parallel_sword_calls: bool | None = None
+    top_p: float | None = None
+
+
+@dataclass(frozen=True)
+class ModelResponse:
+    """Response from a model containing outputs and usage stats."""
 
     id: str
     output: Sequence[ResponseOutput]
@@ -451,9 +471,13 @@ class AsyncStream(AsyncIterator[ChatCompletionChunk]):
         except StopAsyncIteration:
             raise
         except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse JSON from stream: {e}") from e
+            raise ModelError(
+                err.MODEL_ERROR.format(error=f"Failed to parse JSON from stream: {e}")
+            ) from e
         except Exception as e:
-            raise RuntimeError(f"Error processing stream chunk: {e}") from e
+            raise NetworkError(
+                err.NETWORK_ERROR.format(error=f"Error processing stream chunk: {e}")
+            ) from e
 
 
 class AsyncDeepSeek:

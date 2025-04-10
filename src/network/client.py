@@ -14,16 +14,8 @@ from typing import Any
 import httpx
 
 from ..models.shared import set_default_model_client
-from ..util.constants import (
-    BASE_URL,
-    CHAT_COMPLETIONS_ENDPOINT,
-    HEADERS,
-    HTTP_MAX_CONNECTIONS,
-    HTTP_MAX_KEEPALIVE_CONNECTIONS,
-    HTTP_TIMEOUT_CONNECT,
-    HTTP_TIMEOUT_READ,
-    HTTP_TIMEOUT_TOTAL,
-)
+from ..util.constants import HEADERS, config, err
+from ..util.exceptions import NetworkError
 from ..util.types import (
     AsyncDeepSeek,
     AsyncStream,
@@ -52,7 +44,7 @@ class DeepSeekClient(AsyncDeepSeek):
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self.api_key = api_key or "API_KEY"
-        self.base_url = base_url or BASE_URL
+        self.base_url = base_url or config.BASE_URL
         self.organization = organization
         self.project = project
         self.http_client = http_client or self._create_http_client()
@@ -62,11 +54,13 @@ class DeepSeekClient(AsyncDeepSeek):
         """Create and configure an HTTP client with optimal settings."""
         return httpx.AsyncClient(
             timeout=httpx.Timeout(
-                HTTP_TIMEOUT_TOTAL, connect=HTTP_TIMEOUT_CONNECT, read=HTTP_TIMEOUT_READ
+                config.HTTP_TIMEOUT_TOTAL,
+                connect=config.HTTP_TIMEOUT_CONNECT,
+                read=config.HTTP_TIMEOUT_READ,
             ),
             limits=httpx.Limits(
-                max_keepalive_connections=HTTP_MAX_KEEPALIVE_CONNECTIONS,
-                max_connections=HTTP_MAX_CONNECTIONS,
+                max_keepalive_connections=config.HTTP_MAX_KEEPALIVE_CONNECTIONS,
+                max_connections=config.HTTP_MAX_CONNECTIONS,
             ),
         )
 
@@ -122,7 +116,7 @@ class DeepSeekClient(AsyncDeepSeek):
                 }
                 data.update({k: v for k, v in optional_params.items() if v is not None})
 
-                endpoint = os.getenv("CHAT_COMPLETIONS_ENDPOINT", CHAT_COMPLETIONS_ENDPOINT)
+                endpoint = os.getenv("CHAT_COMPLETIONS_ENDPOINT", config.CHAT_COMPLETIONS_ENDPOINT)
                 url = f"{client.base_url}{endpoint}"
                 response = await client.http_client.post(
                     url,
@@ -130,7 +124,14 @@ class DeepSeekClient(AsyncDeepSeek):
                     json=data,
                 )
 
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    raise NetworkError(
+                        err.NETWORK_ERROR.format(
+                            error=f"HTTP {e.response.status_code}: {e.response.text}"
+                        )
+                    ) from e
 
                 if stream:
                     return AsyncStream(response.aiter_lines())

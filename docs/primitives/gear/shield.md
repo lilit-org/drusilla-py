@@ -88,9 +88,7 @@ class BaseShield(Generic[T, TContext]):
         data: T,
     ) -> ShieldResult:
         if not callable(self.shield_function):
-            error_msg = ERROR_MESSAGES.SHIELD_ERROR.message.format(
-                error=self.shield_function
-            )
+            error_msg = err.SHIELD_ERROR.format(error=self.shield_function)
             raise UsageError(error_msg)
 
         output = self.shield_function(context, agent, data)
@@ -225,7 +223,7 @@ class InputMathResult(BaseModel):
     reasoning: str
 
 
-shield_agent = Agent(
+shield_agent = AgentV1(
     name="Shield for integers",
     instructions="Check if the input is an even number.",
     output_type=InputMathResult,
@@ -234,20 +232,21 @@ shield_agent = Agent(
 
 @input_shield
 async def shield_math(
-    ctx: RunContextWrapper[None], agent: Agent, input: str | list[InputItem]
-) -> InputShieldResult:
+    ctx: RunContextWrapper[None], agent: AgentV1, input: str | list[InputItem]
+) -> ShieldResult:
     result = await Runner.run(shield_agent, input, context=ctx.context)
 
-    return InputShieldResult(
-        output_info=result.final_output,
-        tripwire_triggered=result.final_output.is_even,
+    return ShieldResult(
+        success=not result.final_output.is_even,
+        data=result.final_output,
+        tripwire_triggered=result.final_output.is_even
     )
 
 
-agent = Agent(
+agent = AgentV1(
     name="Agent Math Teacher",
     instructions="You are a math teacher, helping students with questions",
-    input_guardrails=[shield_math],
+    input_shields=[shield_math],
 )
 
 async def run(number):

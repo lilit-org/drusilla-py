@@ -13,7 +13,6 @@ from src.gear.shield import (
     input_shield,
     output_shield,
 )
-from src.util.constants import ERROR_MESSAGES
 from src.util.exceptions import UsageError
 from src.util.types import InputItem, RunContextWrapper
 
@@ -133,12 +132,10 @@ async def test_shield_tripwire(mock_context: RunContextWrapper[Any], mock_agent:
 @pytest.mark.asyncio
 async def test_shield_error_handling(mock_context: RunContextWrapper[Any], mock_agent: MockAgent):
     """Test shield error handling."""
-    with pytest.raises(
-        UsageError,
-        match=ERROR_MESSAGES.SHIELD_ERROR.message.format(error="not a function"),
-    ):
+    with pytest.raises(UsageError) as exc_info:
         shield = InputShield(shield_function="not a function")
         await shield.run(mock_context, mock_agent, "test input")
+    assert str(exc_info.value) == "Shield error: not a function"
 
 
 @pytest.mark.asyncio

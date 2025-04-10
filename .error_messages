@@ -1,0 +1,14 @@
+##### Error Messages
+# These are customizable error messages used throughout the application
+# The {error} placeholder will be replaced with the actual error message
+# You can customize these messages to match your application's tone and style
+
+SWORD_ERROR="Sword error: {error}"
+SHIELD_ERROR="Shield error: {error}"
+RUNCONTEXT_ERROR="RunContextWrapper error: {error}"
+RUNNER_ERROR="Runner error: {error}"
+ORBS_ERROR="Orbs error: {error}"
+AGENT_EXEC_ERROR="Agent execution error: {error}"
+MODEL_ERROR="Model error: {error}"
+TYPES_ERROR="Type error: {error}"
+OBJECT_ADDITIONAL_PROPERTIES_ERROR="Object types cannot allow additional properties. This may be due to using an older Pydantic version or explicit configuration. If needed, update the function or output sword to use a non-strict schema." 

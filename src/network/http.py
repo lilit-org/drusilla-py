@@ -16,14 +16,7 @@ from typing import Any
 import httpx
 from httpx import Limits, Timeout
 
-from ..util.constants import (
-    ERROR_MESSAGES,
-    HTTP_MAX_CONNECTIONS,
-    HTTP_MAX_KEEPALIVE_CONNECTIONS,
-    HTTP_TIMEOUT_CONNECT,
-    HTTP_TIMEOUT_READ,
-    HTTP_TIMEOUT_TOTAL,
-)
+from ..util.constants import config, err
 from ..util.exceptions import ConnectionError
 
 ########################################################
@@ -36,11 +29,11 @@ class DefaultAsyncHttpxClient(httpx.AsyncClient):
     def __init__(
         self,
         *,
-        timeout: float | Timeout | None = HTTP_TIMEOUT_TOTAL,
-        connect_timeout: float = HTTP_TIMEOUT_CONNECT,
-        read_timeout: float = HTTP_TIMEOUT_READ,
-        max_keepalive_connections: int = HTTP_MAX_KEEPALIVE_CONNECTIONS,
-        max_connections: int = HTTP_MAX_CONNECTIONS,
+        timeout: float | Timeout | None = config.HTTP_TIMEOUT_TOTAL,
+        connect_timeout: float = config.HTTP_TIMEOUT_CONNECT,
+        read_timeout: float = config.HTTP_TIMEOUT_READ,
+        max_keepalive_connections: int = config.HTTP_MAX_KEEPALIVE_CONNECTIONS,
+        max_connections: int = config.HTTP_MAX_CONNECTIONS,
         max_retries: int = 3,
         verify: bool | str = True,
         http2: bool = False,
@@ -77,7 +70,7 @@ class DefaultAsyncHttpxClient(httpx.AsyncClient):
             except (httpx.ConnectError, httpx.ReadError) as e:
                 if attempt == self.max_retries - 1:
                     raise ConnectionError(
-                        ERROR_MESSAGES.AGENT_EXEC_ERROR.message.format(
+                        err.AGENT_EXEC_ERROR.format(
                             error=f"Connection failed after {self.max_retries} attempts: {str(e)}"
                         )
                     ) from e

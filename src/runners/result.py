@@ -28,22 +28,18 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..util.types import QueueCompleteSentinel
+from ..util.constants import config, err, logger
+from ..util.exceptions import RunnerError
+from ..util.types import ModelResponse, QueueCompleteSentinel
 
 if TYPE_CHECKING:
     from ..agents.agent_v1 import Agent
     from ..gear.shield import InputShieldResult, OutputShieldResult
     from ..util.types import (
         InputItem,
-        RunResult,
-        RunResultBase,
-        RunResultStreaming,
-        SwordsToFinalOutputResult,
     )
     from .items import ModelResponse, RunItem
     from .stream_events import StreamEvent
-
-from ..util.constants import MAX_SHIELD_QUEUE_SIZE, logger
 
 ########################################################
 #               Data Classes for Results
@@ -119,10 +115,10 @@ class RunResultStreaming:
 
     # Internal state
     _event_queue: asyncio.Queue[StreamEvent | QueueCompleteSentinel] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=MAX_SHIELD_QUEUE_SIZE), repr=False
+        default_factory=lambda: asyncio.Queue(maxsize=config.MAX_SHIELD_QUEUE_SIZE), repr=False
     )
     _input_shield_queue: asyncio.Queue[InputShieldResult] = field(
-        default_factory=lambda: asyncio.Queue(maxsize=MAX_SHIELD_QUEUE_SIZE),
+        default_factory=lambda: asyncio.Queue(maxsize=config.MAX_SHIELD_QUEUE_SIZE),
         repr=False,
     )
     _run_impl_task: asyncio.Task[None] | None = field(default=None, repr=False)
@@ -166,7 +162,7 @@ class RunResultStreaming:
         finally:
             self._cleanup_tasks()
             if self._stored_exception:
-                raise self._stored_exception
+                raise RunnerError(err.RUNNER_ERROR.format(error=str(self._stored_exception)))
 
     def _cleanup_tasks(self) -> None:
         """Cancel any pending tasks that haven't completed."""

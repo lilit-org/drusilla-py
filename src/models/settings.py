@@ -19,6 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from ..util.constants import err
 from ..util.exceptions import UsageError
 
 ########################################################
@@ -56,8 +57,8 @@ class ModelSettings:
     def validate(self) -> None:
         """Validate model settings."""
         if self.temperature is not None and not 0 <= self.temperature <= 2:
-            raise UsageError("temperature must be between 0 and 2")
+            raise UsageError(err.USAGE_ERROR.format(error="temperature must be between 0 and 2"))
         if self.top_p is not None and not 0 <= self.top_p <= 1:
-            raise UsageError("top_p must be between 0 and 1")
+            raise UsageError(err.USAGE_ERROR.format(error="top_p must be between 0 and 1"))
         if self.max_tokens is not None and self.max_tokens < 1:
-            raise UsageError("max_tokens must be at least 1")
+            raise UsageError(err.USAGE_ERROR.format(error="max_tokens must be at least 1"))
