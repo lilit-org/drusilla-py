@@ -328,8 +328,10 @@ Secret love in code.
 
 <br>
 
+
 * [agent dissociative identity](examples/agent_dissociative_identity.md): another simple reasoning agent
 * [agent summer chaser](examples/agent_summer_chaser.md): an example of an agent with swords
 * [agent world traveler](examples/agent_world_traveler.md): an example of an agent as swords
-* [agent cyphepunk jokes](examples/agent_cypherpunk_jokes.md): an example of an agent with streaming
 * [agent friend with benefits](examples/agent_friend_with_benefits.md): an example of an agent with orbs
+* [agent cyphepunk jokes](examples/agent_cypherpunk_jokes.md): an example of an agent with streaming
+* [agent cypherpunk story](examples/agent_cypherpunk_storyteller.md): an example of an agent with orbs
