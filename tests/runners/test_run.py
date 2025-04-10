@@ -120,7 +120,10 @@ def mock_charms():
 
 @pytest.fixture
 def message_output():
-    return {"type": "message", "content": [{"type": "output_text", "text": "test output"}]}
+    return {
+        "type": "message",
+        "content": [{"type": "output_text", "text": "test output"}],
+    }
 
 
 @pytest.fixture

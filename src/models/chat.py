@@ -325,7 +325,11 @@ class _Converter:
                 return cast(dict[str, Any], item)
 
         # Check for input message format
-        if item.get("type") == "message" and item.get("role") in ("user", "system", "developer"):
+        if item.get("type") == "message" and item.get("role") in (
+            "user",
+            "system",
+            "developer",
+        ):
             return cast(dict[str, Any], item)
 
     @classmethod

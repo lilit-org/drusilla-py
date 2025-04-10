@@ -41,9 +41,9 @@ class ModelSettings:
         if other is None:
             return self
         return ModelSettings(
-            temperature=other.temperature if other.temperature is not None else self.temperature,
+            temperature=(other.temperature if other.temperature is not None else self.temperature),
             top_p=other.top_p if other.top_p is not None else self.top_p,
-            max_tokens=other.max_tokens if other.max_tokens is not None else self.max_tokens,
+            max_tokens=(other.max_tokens if other.max_tokens is not None else self.max_tokens),
             sword_choice=(
                 other.sword_choice if other.sword_choice is not None else self.sword_choice
             ),

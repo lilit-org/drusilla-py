@@ -424,10 +424,10 @@ class AsyncStream(AsyncIterator[ChatCompletionChunk]):
     def _create_fallback_chunk(self, data: Any, content: str = "") -> ChatCompletionChunk:
         """Create a fallback chat completion chunk with default values."""
         return {
-            "id": "fallback-id" if not isinstance(data, dict) else data.get("id", "fallback-id"),
+            "id": ("fallback-id" if not isinstance(data, dict) else data.get("id", "fallback-id")),
             "object": "chat.completion.chunk",
             "created": int(time.time()),
-            "model": "unknown" if not isinstance(data, dict) else data.get("model", "unknown"),
+            "model": ("unknown" if not isinstance(data, dict) else data.get("model", "unknown")),
             "choices": [{"index": 0, "delta": {"content": content or str(data)}}],
         }
 

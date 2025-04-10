@@ -11,7 +11,14 @@ from src.util.constants import BaseConfig, Config, config, HEADERS, logger
 def setup_env(monkeypatch):
     """Setup environment variables for tests."""
     # Clear any existing environment variables
-    for key in ["THINK_TAGS", "SUPPORTED_LANGUAGES", "API_KEY", "LOG_LEVEL", "BASE_URL", "MODEL"]:
+    for key in [
+        "THINK_TAGS",
+        "SUPPORTED_LANGUAGES",
+        "API_KEY",
+        "LOG_LEVEL",
+        "BASE_URL",
+        "MODEL",
+    ]:
         monkeypatch.delenv(key, raising=False)
 
     # Set up clean environment with properly escaped values

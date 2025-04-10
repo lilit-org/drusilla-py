@@ -6,7 +6,11 @@ from src.util.exceptions import UsageError
 
 def test_model_settings_initialization():
     settings = ModelSettings(
-        temperature=0.7, top_p=0.9, max_tokens=100, sword_choice="auto", parallel_sword_calls=True
+        temperature=0.7,
+        top_p=0.9,
+        max_tokens=100,
+        sword_choice="auto",
+        parallel_sword_calls=True,
     )
 
     assert settings.temperature == 0.7

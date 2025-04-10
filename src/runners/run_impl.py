@@ -313,7 +313,8 @@ class RunImpl:
                 ]
                 if agent.charms:
                     charms_tasks.insert(
-                        1, agent.charms.on_sword_start(context_wrapper, agent, func_sword)
+                        1,
+                        agent.charms.on_sword_start(context_wrapper, agent, func_sword),
                     )
 
                 results = await asyncio.gather(*[t for t in charms_tasks if t is not None])
