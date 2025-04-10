@@ -1,7 +1,8 @@
 # ⽊ drusilla
 
-[![lint](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/lint.yml/badge.svg)](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/lint.yml)
-[![tests](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/tests.yml/badge.svg)](https://github.com/lilit-org/deepseek-agentic-framework-py/actions/workflows/tests.yml)
+[![lint](https://github.com/lilit-org/drusilla-py/actions/workflows/lint.yml/badge.svg)](https://github.com/lilit-org/drusilla-py/actions/workflows/lint.yml)
+[![tests](https://github.com/lilit-org/drusilla-py/actions/workflows/tests.yml/badge.svg)](https://github.com/lilit-org/drusilla-py/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/lilit-org/drusilla-py/branch/main/graph/badge.svg)](https://codecov.io/gh/lilit-org/drusilla-py)
 
 
 drusilla is a multifaceted agentic framework for [deepseek-r1](https://ollama.com/library/deepseek-r1), inspired by many open-source frameworks and focused on blockchain and decentralized deployments.
