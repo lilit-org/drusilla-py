@@ -37,6 +37,14 @@ lint:
 cypherpunk-love:
 	poetry run python examples/agents/cypherpunk_love.py
 
+.PHONY: cypherpunk-jokes
+cypherpunk-jokes:
+	poetry run python examples/agents/cypherpunk_jokes.py
+
+.PHONY: cypherpunk-story
+cypherpunk-story:
+	poetry run python examples/agents/cypherpunk_storyteller.py
+
 .PHONY: world-traveler
 world-traveler:
 	poetry run python examples/agents/world_traveler.py
@@ -48,10 +56,6 @@ summer-chaser:
 .PHONY: dissociative-identity
 dissociative-identity:
 	poetry run python examples/agents/dissociative_identity.py
-
-.PHONY: cypherpunk-jokes
-cypherpunk-jokes:
-	poetry run python examples/agents/cypherpunk_jokes.py
 
 .PHONY: friend-with-benefits
 friend-with-benefits:
