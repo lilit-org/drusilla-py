@@ -7,6 +7,7 @@ from src.gear.shield import InputShieldResult, OutputShieldResult, ShieldResult
 from src.runners.items import MessageOutputItem, ModelResponse
 from src.runners.result import RunResult, RunResultStreaming
 from src.util.types import QueueCompleteSentinel, Usage
+from src.util.exceptions import RunnerError
 
 
 @pytest.fixture
@@ -229,11 +230,11 @@ async def test_run_result_streaming_exception_handling(mock_streaming_result):
     result._stored_exception = test_exception
 
     # Test that the exception is raised during streaming
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(RunnerError) as exc_info:
         async for _ in result.stream_events():
             pass
 
-    assert exc_info.value == test_exception
+    assert str(exc_info.value) == f"Runner error: {str(test_exception)}"
     assert result.is_complete
 
 

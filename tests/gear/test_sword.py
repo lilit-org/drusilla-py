@@ -17,7 +17,7 @@ from src.gear.sword import (
     generate_func_documentation,
 )
 from src.runners.items import SwordCallOutputItem
-from src.util.constants import ERROR_MESSAGES
+from src.util.constants import err
 from src.util.exceptions import ModelError, create_error_handler
 from src.util.types import RunContextWrapper
 
@@ -41,9 +41,9 @@ class TestSwordErrorHandling:
     def test_error_handler(self, mock_context: RunContextWrapper[Any]):
         """Test the sword error handler function."""
         error = Exception("Test error")
-        error_handler = create_error_handler(ERROR_MESSAGES.SWORD_ERROR.message)
+        error_handler = create_error_handler(err.SWORD_ERROR)
         result = error_handler(mock_context, error)
-        assert result == ERROR_MESSAGES.SWORD_ERROR.message.format(error="Test error")
+        assert result == err.SWORD_ERROR.format(error="Test error")
 
     @pytest.mark.asyncio
     async def test_function_sword_error_handling(self, mock_context: RunContextWrapper[Any]):

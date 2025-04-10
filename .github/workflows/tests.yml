@@ -15,63 +15,37 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Set environment variables from .env.example
         run: |
           while IFS='=' read -r key value; do
-            # Skip comments and empty lines
             if [[ $key != \#* && -n $key ]]; then
-              # Remove quotes and trim whitespace
               value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
               echo "$key=$value" >> $GITHUB_ENV
             fi
           done < .env.example
 
-      - name: Clean cache
+      - name: Set error message variables from .error_messages
         run: |
-          find . -iname '*.py[co]' -delete
-          find . -iname '__pycache__' -delete
-          rm -rf .pytest_cache
-          rm -rf dist/
-          rm -rf build/
-          rm -rf *.egg-info
-          rm -rf .tox
-          rm -rf venv/lib/python*/site-packages/*.egg
-          rm -rf .ruff_cache/
+          while IFS='=' read -r key value; do
+            if [[ $key != \#* && -n $key ]]; then
+              value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+              echo "$key=$value" >> $GITHUB_ENV
+            fi
+          done < .error_messages
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install hatchling --upgrade
           pip install pytest pytest-cov pytest-asyncio
-
-      - name: Validate environment variables
-        run: |
-          python3 << 'EOF'
-          import os
-          required_vars = {
-              'SWORD_ERROR_MESSAGE',
-              'RUNCONTEXT_ERROR_MESSAGE',
-              'SHIELD_ERROR_MESSAGE',
-              'RUNNER_ERROR_MESSAGE',
-              'ORBS_ERROR_MESSAGE',
-              'AGENT_EXEC_ERROR_MESSAGE',
-              'MODEL_ERROR_MESSAGE',
-              'TYPES_ERROR_MESSAGE',
-              'OBJECT_ADDITIONAL_PROPERTIES_ERROR',
-          }
-          missing_vars = [var for var in required_vars if not os.getenv(var)]
-          if missing_vars:
-              print(f'Error: Missing required environment variables: {", ".join(missing_vars)}')
-              exit(1)
-          EOF
 
       - name: Test with pytest
         env:

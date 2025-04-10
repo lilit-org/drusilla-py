@@ -30,7 +30,7 @@ from ..gear.shield import (
 )
 from ..gear.sword import Sword, SwordResult
 from ..runners.result import SwordsToFinalOutputResult
-from ..util.constants import MAX_TURNS, logger
+from ..util.constants import config, err, logger
 from ..util.exceptions import AgentError, GenericError, ModelError, UsageError
 from ..util.types import (
     InputItem,
@@ -273,7 +273,11 @@ class RunImpl:
                     run_orbs.append(orbs)
                 else:
                     if output["name"] not in function_map:
-                        raise ModelError(f"Sword {output['name']} not found in agent {agent.name}")
+                        raise ModelError(
+                            err.MODEL_ERROR.format(
+                                error=f"Sword {output['name']} not found in agent {agent.name}"
+                            )
+                        )
                     items.append(SwordCallItem(raw_item=output, agent=agent))
                     functions.append(
                         SwordRunFunction(
@@ -325,7 +329,7 @@ class RunImpl:
                 await asyncio.gather(*[t for t in end_charms_tasks if t is not None])
                 return result
             except Exception as e:
-                raise AgentError(e) from e
+                raise AgentError(err.AGENT_EXEC_ERROR.format(error=str(e))) from e
 
         # Run all swords in parallel
         results = await asyncio.gather(
@@ -411,7 +415,9 @@ class RunImpl:
         input_filter = orbs.input_filter or (run_config.orbs_input_filter if run_config else None)
         if input_filter:
             if not callable(input_filter):
-                raise UsageError(f"Invalid input filter: {input_filter}")
+                raise UsageError(
+                    err.USAGE_ERROR.format(error=f"Invalid input filter: {input_filter}")
+                )
 
             orbs_input_data = OrbsInputData(
                 input_history=(
@@ -423,7 +429,9 @@ class RunImpl:
 
             filtered = input_filter(orbs_input_data)
             if not isinstance(filtered, OrbsInputData):
-                raise UsageError(f"Invalid input filter result: {filtered}")
+                raise UsageError(
+                    err.USAGE_ERROR.format(error=f"Invalid input filter result: {filtered}")
+                )
 
             original_input = (
                 filtered.input_history
@@ -563,7 +571,9 @@ class RunImpl:
                     return result
 
         logger.error(f"Invalid sword_use_behavior: {agent.sword_use_behavior}")
-        raise UsageError(f"Invalid sword_use_behavior: {agent.sword_use_behavior}")
+        raise UsageError(
+            err.USAGE_ERROR.format(error=f"Invalid sword_use_behavior: {agent.sword_use_behavior}")
+        )
 
     @classmethod
     async def run(
@@ -572,7 +582,7 @@ class RunImpl:
         input: str | list[InputItem],
         *,
         context: TContext | None = None,
-        max_turns: int = MAX_TURNS,
+        max_turns: int = config.MAX_TURNS,
         charms: RunCharms[TContext] | None = None,
         run_config: RunConfig | None = None,
     ) -> Any:
@@ -608,7 +618,9 @@ class RunImpl:
                     context=context_wrapper,
                 )
             except Exception as e:
-                raise ModelError(f"Failed to get model response: {e}") from e
+                raise ModelError(
+                    err.MODEL_ERROR.format(error=f"Failed to get model response: {e}")
+                ) from e
 
             # Process response and execute swords/side effects
             processed_response = cls.process_model_response(
@@ -651,7 +663,11 @@ class RunImpl:
             elif isinstance(step_result.next_step, NextStepRunAgain):
                 current_input = step_result.original_input
             else:
-                raise GenericError(f"Unexpected next step type: {type(step_result.next_step)}")
+                raise GenericError(
+                    err.RUNNER_ERROR.format(
+                        error=f"Unexpected next step type: {type(step_result.next_step)}"
+                    )
+                )
 
             # If we've reached max_turns, return the last output
             if turn_count >= max_turns:
@@ -665,4 +681,4 @@ class RunImpl:
                     return ItemHelpers.extract_last_text(message_items[-1].raw_item)
                 return ""
 
-        raise GenericError(f"Maximum turns ({max_turns}) exceeded")
+        raise GenericError(err.RUNNER_ERROR.format(error=f"Maximum turns ({max_turns}) exceeded"))

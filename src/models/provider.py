@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from src.network.client import DeepSeekClient
 from src.network.http import DefaultAsyncHttpxClient
-from src.util.constants import BASE_URL, MODEL
+from src.util.constants import config
 from src.util.types import AsyncDeepSeek
 
 from .chat import ModelChatCompletionsModel
@@ -41,7 +41,7 @@ class ModelProvider(BaseModelProvider):
         use_responses: bool = False,
     ) -> None:
         self._stored_api_key = api_key
-        self._stored_base_url = base_url or BASE_URL
+        self._stored_base_url = base_url or config.BASE_URL
         self._stored_organization = organization
         self._stored_project = project
         self._use_responses = use_responses
@@ -69,7 +69,7 @@ class ModelProvider(BaseModelProvider):
 
     def get_model(self, model_name: str | None = None) -> Model:
         """Get a model instance based on name and response type."""
-        model_name = model_name or MODEL
+        model_name = model_name or config.MODEL
         client = self._get_client()
 
         if self._use_responses:

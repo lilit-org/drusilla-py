@@ -43,7 +43,7 @@ class AgentV1(Generic[TContext]):
     instructions: (
         str
         | Callable[
-            [RunContextWrapper[TContext], Agent[TContext]],
+            [RunContextWrapper[TContext], AgentV1[TContext]],
             MaybeAwaitable[str],
         ]
         | None
@@ -170,7 +170,7 @@ def _create_agent_sword(
         from ..runners.run import Runner
 
         result = await Runner.run(
-            starting_agent=agent, input=input, context=ctx, max_turns=MAX_TURNS
+            starting_agent=agent, input=input, context=ctx, max_turns=config.MAX_TURNS
         )
         if custom_output_extractor:
             return custom_output_extractor(result.final_output)

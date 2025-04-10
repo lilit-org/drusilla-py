@@ -19,6 +19,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
+from ..util.constants import err
+from ..util.exceptions import ModelError
 from ..util.types import ResponseStreamEvent
 from .items import RunItem
 
@@ -75,7 +77,9 @@ class RunItemStreamEvent:
 
     def __post_init__(self):
         if self.name not in VALID_RUN_ITEM_EVENT_NAMES:
-            raise TypeError(f"Invalid RunItemStreamEventName: {self.name}")
+            raise ModelError(
+                err.MODEL_ERROR.format(error=f"Invalid RunItemStreamEventName: {self.name}")
+            )
 
 
 ########################################################

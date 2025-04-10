@@ -12,10 +12,11 @@ from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 
 from pydantic import TypeAdapter
 
-from src.util.constants import ERROR_MESSAGES, MAX_TURNS
 from src.util.exceptions import AgentExecutionError, UsageError
 from src.util.schema import ensure_strict_json_schema, get_type_adapter, type_to_str
 from src.util.types import MaybeAwaitable, RunContextWrapper, TContext
+
+from ..util.constants import config, err
 
 if TYPE_CHECKING:
     from src.gear.charms import AgentCharms
@@ -46,7 +47,7 @@ def _create_agent_sword(
         from ..runners.run import Runner
 
         result = await Runner.run(
-            starting_agent=agent, input=input, context=ctx, max_turns=MAX_TURNS
+            starting_agent=agent, input=input, context=ctx, max_turns=config.MAX_TURNS
         )
         if custom_output_extractor:
             return custom_output_extractor(result.final_output)
@@ -110,7 +111,7 @@ class AgentV1(Generic[TContext]):
             return self.instructions
 
         if not callable(self.instructions):
-            error_msg = ERROR_MESSAGES.AGENT_EXEC_ERROR.message.format(
+            error_msg = err.AGENT_EXEC_ERROR.format(
                 error=f"Invalid instructions type: {type(self.instructions)}"
             )
             raise AgentExecutionError(error_msg)
@@ -151,7 +152,7 @@ class AgentV1OutputSchema:
 
     def json_schema(self) -> dict[str, Any]:
         if self.is_plain_text():
-            raise UsageError("No JSON schema for plain text output")
+            raise UsageError(err.USAGE_ERROR.format(error="No JSON schema for plain text output"))
         schema = self._type_adapter.json_schema()
         if self.strict_json_schema:
             schema = ensure_strict_json_schema(schema)

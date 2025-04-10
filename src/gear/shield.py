@@ -17,7 +17,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic
 
-from ..util.constants import ERROR_MESSAGES
+from ..util.constants import err
 from ..util.exceptions import UsageError
 from ..util.types import (
     InputItem,
@@ -31,7 +31,7 @@ from ..util.types import (
 )
 
 if TYPE_CHECKING:
-    from ..agent.agent import Agent
+    from ..agents.agent_v1 import AgentV1 as Agent
 
 
 ########################################################
@@ -81,7 +81,7 @@ class BaseShield(Generic[T, TContext]):
         data: T,
     ) -> ShieldResult:
         if not callable(self.shield_function):
-            error_msg = ERROR_MESSAGES.SHIELD_ERROR.message.format(error=self.shield_function)
+            error_msg = err.SHIELD_ERROR.format(error=self.shield_function)
             raise UsageError(error_msg)
 
         output = self.shield_function(context, agent, data)

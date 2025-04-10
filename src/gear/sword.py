@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, create_model
 from typing_extensions import ParamSpec
 
 from ..runners.items import RunItem
-from ..util.constants import ERROR_MESSAGES
+from ..util.constants import err
 from ..util.exceptions import ModelError, UsageError, create_error_handler
 from ..util.schema import ensure_strict_json_schema
 from ..util.types import (
@@ -39,7 +39,7 @@ SwordFunctionWithoutContext = Callable[SwordParams, Any]
 SwordFunctionWithContext = Callable[Concatenate[RunContextWrapper[Any], SwordParams], Any]
 SwordFunction = SwordFunctionWithoutContext[SwordParams] | SwordFunctionWithContext[SwordParams]
 SwordErrorFunction = Callable[[RunContextWrapper[Any], Exception], MaybeAwaitable[str]]
-SWORD_ERROR_HANDLER = create_error_handler(ERROR_MESSAGES.SWORD_ERROR.message)
+SWORD_ERROR_HANDLER = create_error_handler(err.SWORD_ERROR)
 
 
 ########################################################
@@ -102,8 +102,8 @@ def create_sword_decorator(
                         error_msg = failure_error_function(ctx, e)
                         if inspect.iscoroutinefunction(failure_error_function):
                             error_msg = await error_msg
-                        raise ModelError(error_msg) from e
-                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
+                        raise ModelError(err.MODEL_ERROR.format(error=error_msg)) from e
+                    raise ModelError(err.MODEL_ERROR.format(error=str(e))) from e
 
             return sword_class(
                 name=schema.name,
@@ -309,7 +309,7 @@ def _create_invocation_handler(
                 return await func(*args, **kwargs)
             return func(*args, **kwargs)
         except Exception as e:
-            raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
+            raise ModelError(err.MODEL_ERROR.format(error=str(e))) from e
 
     return on_invoke_sword
 
@@ -343,7 +343,7 @@ def _process_parameters(
         if ann != inspect._empty:
             origin = get_origin(ann) or ann
             if origin is RunContextWrapper:
-                raise UsageError(ERROR_MESSAGES.RUN_CONTEXT_ERROR.message.format(error=(sig.name)))
+                raise UsageError(err.USAGE_ERROR.format(error=sig.name))
         filtered_params.append((name, param))
 
     return takes_context, filtered_params

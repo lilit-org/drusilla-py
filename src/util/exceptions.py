@@ -34,6 +34,10 @@ class ConnectionError(AgentError):
     """Raised for exceptions related to network connections."""
 
 
+class NetworkError(AgentError):
+    """Raised for general network-related errors."""
+
+
 class RunnerError(AgentError):
     """Raised when an error occurs during runner execution."""
 

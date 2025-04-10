@@ -13,16 +13,17 @@ It includes:
    - Converts strings into valid Python function names
 """
 
+from __future__ import annotations
+
 import re
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
 
-from src.util.constants import ERROR_MESSAGES, THINK_TAGS
-
 from ..runners.items import ModelResponse, Usage
 from ..runners.result import RunResult, RunResultStreaming
-from .exceptions import ModelError
+from ..util.constants import config, err
+from ..util.exceptions import ModelError, RunnerError
 from .types import T
 
 ########################################################
@@ -48,9 +49,7 @@ def _format_final_output(raw_response: ModelResponse) -> tuple[str, str]:
 
     try:
         if not isinstance(raw_response.output, list):
-            raise ModelError(
-                ERROR_MESSAGES.MODEL_ERROR.message.format(error="Output is not a list")
-            )
+            raise RunnerError(err.RUNNER_ERROR.format(error="Output is not a list"))
 
         if not raw_response.output:
             return "", ""
@@ -58,19 +57,17 @@ def _format_final_output(raw_response: ModelResponse) -> tuple[str, str]:
         output_text = str(raw_response.output[0].get("text", raw_response.output[0]))
         output_text = output_text.strip("'").strip().encode().decode("unicode-escape")
 
-        if THINK_TAGS[0] not in output_text or THINK_TAGS[1] not in output_text:
+        if config.THINK_TAGS[0] not in output_text or config.THINK_TAGS[1] not in output_text:
             return "", f"\n\n✅ RESULT:\n\n{output_text}\n"
 
-        start = output_text.find(THINK_TAGS[0]) + len(THINK_TAGS[0])
-        end = output_text.find(THINK_TAGS[1])
+        start = output_text.find(config.THINK_TAGS[0]) + len(config.THINK_TAGS[0])
+        end = output_text.find(config.THINK_TAGS[1])
         reasoning = output_text[start:end].strip()
-        result = output_text[end + len(THINK_TAGS[1]) :].strip()
+        result = output_text[end + len(config.THINK_TAGS[1]) :].strip()
         return (f"\n\n✅ REASONING:\n\n{reasoning}", f"\n\n✅ RESULT:\n\n{result}\n")
     except (IndexError, AttributeError, UnicodeDecodeError) as e:
-        raise ModelError(
-            ERROR_MESSAGES.MODEL_ERROR.message.format(
-                error=f"Failed to format model output: {str(e)}"
-            )
+        raise RunnerError(
+            err.RUNNER_ERROR.format(error=f"Failed to format model output: {str(e)}")
         ) from e
 
 
@@ -154,15 +151,11 @@ def pretty_print_result_stats(result: RunResult) -> str:
 def pretty_print_result(result: RunResult, show_reasoning: bool = True) -> str:
     """Format and print the result of a run with optional reasoning display."""
     if not result.raw_responses:
-        raise ModelError(
-            ERROR_MESSAGES.MODEL_ERROR.message.format(error="No raw responses found in result")
-        )
+        raise ModelError(err.RUNNER_ERROR.format(error="No raw responses found in result"))
     try:
         return _format_result(result.raw_responses[0], show_reasoning)
     except (IndexError, AttributeError) as e:
-        raise ModelError(
-            ERROR_MESSAGES.MODEL_ERROR.message.format(error=f"Invalid result format: {str(e)}")
-        ) from e
+        raise ModelError(err.RUNNER_ERROR.format(error=f"Invalid result format: {str(e)}")) from e
 
 
 def pretty_print_result_stream(result: RunResultStreaming, show_reasoning: bool = True) -> str:
@@ -177,7 +170,7 @@ def validate_json(json_str: str, type_adapter: TypeAdapter[T], partial: bool = F
     try:
         return type_adapter.validate_json(json_str, experimental_allow_partial=partial)
     except ValidationError as e:
-        raise ModelError(ERROR_MESSAGES.MODEL_ERROR.message.format(error=str(e))) from e
+        raise ModelError(err.RUNNER_ERROR.format(error=str(e))) from e
 
 
 def transform_string_function_style(name: str) -> str:

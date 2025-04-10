@@ -11,7 +11,7 @@ from src.agents.agent_v1 import AgentV1 as Agent
 from src.gear.sword import function_sword
 from src.network.client import setup_client
 from src.runners.run import Runner
-from src.util.constants import LRU_CACHE_SIZE
+from src.util.constants import config
 from src.util.exceptions import AgentExecutionError, UsageError
 from src.util.print import pretty_print_result, pretty_print_result_stats
 
@@ -21,7 +21,7 @@ from src.util.print import pretty_print_result, pretty_print_result_stats
 
 
 @function_sword
-@lru_cache(maxsize=LRU_CACHE_SIZE)
+@lru_cache(maxsize=config.LRU_CACHE_SIZE)
 def get_weather(city: str) -> dict:
     print(f"Getting weather for {city}")
     return {
@@ -33,7 +33,7 @@ def get_weather(city: str) -> dict:
 
 
 @function_sword
-@lru_cache(maxsize=LRU_CACHE_SIZE)
+@lru_cache(maxsize=config.LRU_CACHE_SIZE)
 def is_summer(city: str) -> bool:
     weather = get_weather(city)
     try:
@@ -48,7 +48,7 @@ def is_summer(city: str) -> bool:
 ########################################################
 
 
-@lru_cache(maxsize=LRU_CACHE_SIZE)
+@lru_cache(maxsize=config.LRU_CACHE_SIZE)
 def create_agent() -> Agent:
     return Agent(
         name="Agent Summer Chaser",

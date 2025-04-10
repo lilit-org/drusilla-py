@@ -133,7 +133,12 @@ def create_sword_decorator(
                 try:
                     return await schema.on_invoke_sword(ctx, input)
                 except Exception as e:
-                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
+                    if failure_error_function:
+                        error_msg = failure_error_function(ctx, e)
+                        if inspect.iscoroutinefunction(failure_error_function):
+                            error_msg = await error_msg
+                        raise ModelError(error_msg) from e
+                    raise ModelError(ERROR_MESSAGES.SWORD_ERROR.format(error=str(e))) from e
 
             return sword_class(
                 name=schema.name,
@@ -356,7 +361,7 @@ def _create_invocation_handler(
                 return await func(*args, **kwargs)
             return func(*args, **kwargs)
         except Exception as e:
-            raise ModelError(ERROR_MESSAGES.SWORD_ERROR.message.format(error=str(e))) from e
+            raise ModelError(ERROR_MESSAGES.SWORD_ERROR.format(error=str(e))) from e
 
     return on_invoke_sword
 
@@ -390,7 +395,7 @@ def _process_parameters(
         if ann != inspect._empty:
             origin = get_origin(ann) or ann
             if origin is RunContextWrapper:
-                raise UsageError(ERROR_MESSAGES.RUN_CONTEXT_ERROR.message.format(error=(sig.name)))
+                raise UsageError(ERROR_MESSAGES.RUN_CONTEXT_ERROR.format(error=(sig.name)))
         filtered_params.append((name, param))
 
     return takes_context, filtered_params

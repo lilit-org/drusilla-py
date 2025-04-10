@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from src.agents.agent_v1 import AgentV1 as Agent
 from src.network.client import setup_client
 from src.runners.run import Runner
-from src.util.constants import SUPPORTED_LANGUAGES
+from src.util.constants import config
 from src.util.exceptions import AgentExecutionError
 from src.util.print import pretty_print_result, pretty_print_result_stats
 
@@ -33,7 +33,7 @@ def create_agents() -> Agent:
                 sword_name=f"translate_to_{lang_code.lower()}",
                 sword_description=f"Translate text to {lang_code.upper()}",
             )
-            for lang_code in SUPPORTED_LANGUAGES
+            for lang_code in config.SUPPORTED_LANGUAGES
         ],
     )
 

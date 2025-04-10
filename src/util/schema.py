@@ -1,13 +1,6 @@
 """
 This module provides utilities for enforcing strict JSON schema validation
 rules and managing schema references.
-
-Key features:
-- Enforces strict object property validation by default
-- Recursively processes and validates nested schema definitions
-- Handles schema references ($ref) resolution with caching
-- Supports logical operators (anyOf, allOf)
-- Ensures consistent schema structure and validation rules
 """
 
 from __future__ import annotations
@@ -17,8 +10,8 @@ from typing import Any, Final, TypeAlias, cast, get_args, get_origin
 
 from pydantic import BaseModel, TypeAdapter
 
-from .constants import LRU_CACHE_SIZE, UNSET
-from .exceptions import ModelError, UsageError, format_error_message
+from .constants import UNSET, config, err
+from .exceptions import ModelError, UsageError
 
 ########################################################
 #             Type Aliases and Constants                #
@@ -33,7 +26,7 @@ EMPTY_JSON_SCHEMA: Final[JSONSchema] = {
     "required": [],
 }
 
-CACHE_SIZE: Final[int] = LRU_CACHE_SIZE
+CACHE_SIZE: Final[int] = config.LRU_CACHE_SIZE
 LOGICAL_OPERATORS: Final[tuple[str, ...]] = ("anyOf", "allOf")
 SCHEMA_DEFINITION_KEYS: Final[tuple[str, ...]] = ("definitions", "$defs")
 
@@ -60,9 +53,7 @@ def _resolve_schema_ref_cached(*, root_hash: tuple[tuple[str, Any], ...], ref: s
     """Resolve a JSON schema reference to its target schema with caching."""
     if not ref.startswith("#/"):
         raise ModelError(
-            format_error_message(
-                ValueError(f"Invalid $ref format {ref!r}; must start with #/"), TYPES_ERROR_MESSAGE
-            )
+            err.TYPES_ERROR.format(error=f"Invalid $ref format {ref!r}; must start with #/")
         )
 
     try:
@@ -71,17 +62,14 @@ def _resolve_schema_ref_cached(*, root_hash: tuple[tuple[str, Any], ...], ref: s
             resolved = resolved[key]
             if not isinstance(resolved, dict):
                 raise ModelError(
-                    format_error_message(
-                        ValueError(
-                            f"Invalid resolution path for {ref} - "
-                            f"encountered non-dictionary at {resolved}"
-                        ),
-                        TYPES_ERROR_MESSAGE,
+                    err.TYPES_ERROR.format(
+                        error=f"Invalid resolution path for {ref} - "
+                        f"encountered non-dictionary at {resolved}"
                     )
                 )
         return cast(JSONSchema, resolved)
     except KeyError as e:
-        raise ModelError(format_error_message(e, TYPES_ERROR_MESSAGE, {"ref": ref})) from e
+        raise ModelError(err.TYPES_ERROR.format(error=str(e))) from e
 
 
 def _make_dict(t: tuple[tuple[str, Any], ...]) -> dict[str, Any]:
@@ -111,7 +99,7 @@ def _enforce_strict_schema_rules(
         if "additionalProperties" not in schema:
             schema["additionalProperties"] = False
         elif schema["additionalProperties"] is True:
-            raise UsageError(OBJECT_ADDITIONAL_PROPERTIES_ERROR)
+            raise UsageError(err.OBJECT_ADDITIONAL_PROPERTIES_ERROR)
 
     # Process object properties
     if "properties" in schema and isinstance(schema["properties"], dict):
@@ -152,11 +140,7 @@ def _enforce_strict_schema_rules(
     # Handle schema references
     if ref := schema.get("$ref"):
         if not isinstance(ref, str):
-            raise ModelError(
-                format_error_message(
-                    TypeError(f"$ref must be a string, got {ref}"), TYPES_ERROR_MESSAGE
-                )
-            )
+            raise ModelError(err.TYPES_ERROR.format(error=f"$ref must be a string, got {ref}"))
 
         if len(schema) > 1:
             root_hash = _make_hashable(root)
