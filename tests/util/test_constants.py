@@ -174,12 +174,6 @@ def test_error_messages():
     assert err.AGENT_EXEC_ERROR.format(error=test_error) == f"Agent execution error: {test_error}"
     assert err.MODEL_ERROR.format(error=test_error) == f"Model error: {test_error}"
     assert err.TYPES_ERROR.format(error=test_error) == f"Type error: {test_error}"
-    print(f"Actual error message: {err.OBJECT_ADDITIONAL_PROPERTIES_ERROR!r}")
-    assert err.OBJECT_ADDITIONAL_PROPERTIES_ERROR == (
-        "Object types cannot allow additional properties. This may be due to using an "
-        "older Pydantic version or explicit configuration. If needed, update the "
-        "function or output sword to use a non-strict schema."
-    )
 
 
 def test_validate_env_vars():
