@@ -22,6 +22,7 @@ please ensure your contribution:
 - addresses a specific problem or add a well-defined feature, and/or
 - includes tests for new functionality, and/or
 - is linted and follows the existing code style
+- see [the development docs for more information](../development)
 
 <br>
 
